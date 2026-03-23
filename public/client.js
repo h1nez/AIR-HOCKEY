@@ -53,21 +53,22 @@ function handleAuthResponse(res) {
     } else { authScreen.style.display = 'flex'; authError.innerText = res.msg; }
 }
 
-// 🔥 НОВОЕ: Загружаем все данные профиля
 function updateProfile() {
     socket.emit('getProfile', (data) => {
         if (data.success) {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
             
-            // Статистика
             document.getElementById('prof-played').innerText = data.matchesPlayed;
             document.getElementById('prof-won').innerText = data.matchesWon;
-            document.getElementById('prof-max-mmr').innerText = data.maxRating;
+            
+            // 🔥 НОВОЕ: Отображаем текущий рейтинг из базы!
+            document.getElementById('prof-mmr').innerText = Math.round(data.rating);
+            document.getElementById('prof-max-mmr').innerText = Math.round(data.maxRating);
+            
             const d = new Date(data.regDate);
             document.getElementById('prof-date').innerText = d.toLocaleDateString('ru-RU');
 
-            // Аватарки
             document.getElementById('menu-avatar').src = `/${data.avatar}.png`;
             ['avatar1', 'avatar2', 'avatar3', 'avatar4'].forEach(av => {
                 const el = document.getElementById('av-' + av);
@@ -78,7 +79,6 @@ function updateProfile() {
                 }
             });
 
-            // Скины
             ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'].forEach(skin => {
                 const el = document.getElementById('skin-' + skin);
                 const priceEl = document.getElementById('price-' + skin);
@@ -90,7 +90,6 @@ function updateProfile() {
     });
 }
 
-// 🔥 НОВОЕ: Обработчики кнопок профиля
 document.getElementById('btn-profile').onclick = () => { 
     updateProfile(); document.getElementById('profile-modal').style.display = 'flex'; 
 };
@@ -174,7 +173,6 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// --- ИГРОВАЯ ЛОГИКА ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;

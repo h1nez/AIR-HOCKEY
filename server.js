@@ -32,7 +32,6 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
-// 🔥 НОВОЕ: Добавили поля статистики и аватарку
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -98,7 +97,6 @@ function resolveCollision(puck, player) {
     }
 }
 
-// 🔥 НОВОЕ: Обновляем статистику в базе после матча
 async function finishMatch(room, winRole, isDisconnect = false) {
     room.paused = true; room.gameOver = true;
     const win = winRole === 'player1' ? room.player1 : room.player2;
@@ -293,18 +291,17 @@ io.on('connection', (socket) => {
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
-    // 🔥 НОВОЕ: Передаем всю статистику при загрузке профиля
+    // 🔥 НОВОЕ: Передаем текущий MMR (rating) тоже!
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
         callback({ 
             success: true, coins: u.coins, skin: u.skin, inventory: u.inventory,
             matchesPlayed: u.matchesPlayed, matchesWon: u.matchesWon, 
-            maxRating: u.maxRating, avatar: u.avatar, regDate: u.regDate
+            maxRating: u.maxRating, rating: u.rating, avatar: u.avatar, regDate: u.regDate
         });
     });
 
-    // 🔥 НОВОЕ: Смена аватарки
     socket.on('changeAvatar', async (avatarName, callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id);
