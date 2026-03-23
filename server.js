@@ -59,7 +59,6 @@ function createRoom(isBotMatch = false, isFriendly = false) {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
         id: roomId, puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
-        // 🔥 Добавили поле IP для каждого игрока в комнате
         player1: { id: null, ip: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
@@ -238,13 +237,15 @@ function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
     
-    // Получаем IP адрес клиента (учитываем прокси)
-    const clientIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    // 🔥 ЖЕСТКАЯ НОРМАЛИЗАЦИЯ IP (Исправляем баг с Localhost IPv4 vs IPv6)
+    let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "";
+    let clientIp = rawIp.split(',')[0].trim();
+    if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1'; // Приравниваем все локалки к одному IP
     
     for (const id in rooms) { 
         if (rooms[id].gameOver || rooms[id].isBotMatch || rooms[id].isFriendly) continue; 
         
-        // 🔥 АНТИ-СКАМ: Если в этой комнате уже сидит кто-то с таким же IP, пропускаем её!
+        // 🔥 АНТИ-СКАМ: Строго проверяем IP. Если такой IP уже есть в этой комнате — пропускаем её!
         if (rooms[id].player1.id && rooms[id].player1.ip === clientIp) continue;
         
         if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
@@ -337,8 +338,9 @@ io.on('connection', (socket) => {
             socket.to(room.id).emit('opponentLeft');
         }
         
-        if (room.player1.id === socket.id) room.player1.id = null;
-        if (room.player2.id === socket.id) room.player2.id = null;
+        // 🔥 ОЧИЩАЕМ IP ПРИ ВЫХОДЕ ИЗ МАТЧА
+        if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; }
+        if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
         
         if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot')) {
             clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; 
@@ -349,8 +351,9 @@ io.on('connection', (socket) => {
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (room.player1.id === socket.id) { room.player1.id = null; room.player1.name = "..."; }
-        if (room.player2.id === socket.id) { room.player2.id = null; room.player2.name = "..."; }
+        // 🔥 ОЧИЩАЕМ IP ПРИ ОТМЕНЕ ПОИСКА
+        if (room.player1.id === socket.id) { room.player1.id = null; room.player1.name = "..."; room.player1.ip = null; }
+        if (room.player2.id === socket.id) { room.player2.id = null; room.player2.name = "..."; room.player2.ip = null; }
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
         socket.leave(socket.roomId); socket.roomId = null; 
     });
