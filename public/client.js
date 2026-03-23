@@ -6,7 +6,6 @@ const catImages = {
     'karamelka': new Image(),
     'kompot': new Image()
 };
-// Игра будет искать файлы korzhik.png, karamelka.png и kompot.png в твоей папке public
 catImages.korzhik.src = '/korzhik.png';
 catImages.karamelka.src = '/karamelka.png';
 catImages.kompot.src = '/kompot.png';
@@ -42,7 +41,7 @@ function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
         mainMenu.style.display = 'flex'; 
-        updateProfile(); // Загружаем монеты
+        updateProfile(); 
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
         } else {
@@ -60,7 +59,6 @@ function updateProfile() {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
             
-            // Обновляем витрину
             ['default', 'korzhik', 'karamelka', 'kompot'].forEach(skin => {
                 const el = document.getElementById('skin-' + skin);
                 const priceEl = document.getElementById('price-' + skin);
@@ -91,10 +89,7 @@ window.buySkin = function(skinName) {
     });
 };
 
-document.getElementById('btn-shop').onclick = () => {
-    updateProfile();
-    document.getElementById('shop-modal').style.display = 'block';
-};
+document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'block'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
 // --- ОСТАЛЬНОЕ МЕНЮ ---
@@ -128,7 +123,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// --- ИГРОВАЯ ЛОГИКА ---
+// --- ИГРОВАЯ ЛОГИКА И УПРАВЛЕНИЕ ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -167,24 +162,25 @@ function sendInput(clientX, clientY) {
     const y = (clientY - rect.top) * (canvas.height / rect.height);
     socket.emit('input', { x, y });
 }
-canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
-canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
-// ФУНКЦИЯ ОТРИСОВКИ ИГРОКА СО СКИНОМ
+// Мышка
+canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
+
+// Мобильное управление (перемещение пальца и быстрый тап)
+canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+
 function drawPlayer(x, y, r, color, skinName) {
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
-        // Если картинка успешно загрузилась - рисуем её
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.clip(); // Обрезаем картинку в кружок
+        ctx.clip(); 
         ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2);
         ctx.restore();
-        // Рисуем цветную рамку вокруг кота
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); 
         ctx.lineWidth = 4; ctx.strokeStyle = color; ctx.stroke();
     } else {
-        // Если это дефолт или картинка еще не скачана - рисуем кружок с текстом
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
         ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.stroke();
         
@@ -213,11 +209,9 @@ function render(s) {
         if (dist < 57) { px = myPlayer.x + (dx/dist)*57; py = myPlayer.y + (dy/dist)*57; }
     }
 
-    // Шайба
     ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#eee'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
 
-    // Игроки (передаем их скины)
     drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', s.player1.skin);
     drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', s.player2.skin);
 }

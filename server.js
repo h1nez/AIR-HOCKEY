@@ -9,8 +9,6 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-
-// Разрешаем любые подключения (чтобы не было ошибки 400 polling)
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
@@ -33,7 +31,10 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    rating: { type: Number, default: 1000 }
+    rating: { type: Number, default: 1000 },
+    coins: { type: Number, default: 0 },
+    skin: { type: String, default: 'default' },
+    inventory: { type: [String], default: ['default'] }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -49,8 +50,8 @@ function createRoom() {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
         id: roomId, puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
-        player1: { id: null, name: "...", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
-        player2: { id: null, name: "...", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
+        player1: { id: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
+        player2: { id: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true
     };
     return roomId;
@@ -59,7 +60,6 @@ function createRoom() {
 function resolveCollision(puck, player) {
     const dx = puck.x - player.x; const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy); const minDist = PUCK_R + PLAYER_R;
-
     if (dist < minDist) {
         let nx = dx / dist; let ny = dy / dist; 
         if (dist < 35) { 
@@ -90,8 +90,8 @@ async function handleGoal(room, winRole) {
         const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
         try {
-            await User.findOneAndUpdate({ name: win.name }, { rating: win.rating });
-            await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating });
+            await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
+            await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
         } catch (err) {}
         io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
         setTimeout(() => { room.player1.score = 0; room.player2.score = 0; reset(room); }, 5000);
@@ -146,10 +146,10 @@ function joinPlayerToRoom(socket, user) {
 
     if (!room.player1.id) {
         room.player1.id = socket.id; room.player1.name = user.name; 
-        room.player1.rating = user.rating; socket.emit('role', 'p1');
+        room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
     } else if (!room.player2.id) {
         room.player2.id = socket.id; room.player2.name = user.name; 
-        room.player2.rating = user.rating; socket.emit('role', 'p2');
+        room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
         room.paused = false; 
     }
 }
@@ -163,7 +163,7 @@ io.on('connection', (socket) => {
             if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
 
             const hashedPassword = await bcrypt.hash(data.password, 10);
-            const newUser = new User({ name: data.name, password: hashedPassword, rating: 1000 });
+            const newUser = new User({ name: data.name, password: hashedPassword });
             await newUser.save();
 
             socket.user = newUser; 
@@ -185,20 +185,45 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
-    socket.on('play', () => {
-        if (socket.user) joinPlayerToRoom(socket, socket.user);
-    });
+    socket.on('play', () => { if (socket.user) joinPlayerToRoom(socket, socket.user); });
 
-    // НОВОЕ: ОТМЕНА ПОИСКА
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
+        if (!room.player2.id) { 
+            room.player1.id = null; delete rooms[socket.roomId]; 
+            socket.leave(socket.roomId); socket.roomId = null; 
+        }
+    });
+
+    socket.on('getProfile', async (callback) => {
+        if (!socket.user) return;
+        const u = await User.findById(socket.user._id);
+        socket.user = u; 
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
+    });
+
+    socket.on('buySkin', async (skinName, callback) => {
+        if (!socket.user) return;
+        const prices = { korzhik: 50, karamelka: 50, kompot: 50, default: 0 };
+        const u = await User.findById(socket.user._id);
         
-        if (!room.player2.id) { // Отменяем только если 2-й игрок еще не зашел
-            room.player1.id = null;
-            delete rooms[socket.roomId]; 
-            socket.leave(socket.roomId); 
-            socket.roomId = null; 
+        if (u.inventory.includes(skinName)) {
+            u.skin = skinName;
+            await u.save();
+            socket.user = u;
+            return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
+        }
+
+        if (u.coins >= prices[skinName]) {
+            u.coins -= prices[skinName];
+            u.inventory.push(skinName);
+            u.skin = skinName;
+            await u.save();
+            socket.user = u;
+            return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
+        } else {
+            return callback({ success: false, msg: "Не хватает монет!" });
         }
     });
 
