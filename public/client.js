@@ -1,6 +1,5 @@
 const socket = io();
 
-// Картинки
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
@@ -16,29 +15,18 @@ const authError = document.getElementById('auth-error');
 const savedName = localStorage.getItem('ah_name');
 const savedPass = localStorage.getItem('ah_pass');
 
-// 🔥 БЕЗОПАСНЫЙ АВТОВХОД
 if (savedName && savedPass) {
-    nameInput.value = savedName; 
-    passInput.value = savedPass;
-    authError.innerText = "Автоматический вход..."; 
-    authError.style.color = "#4da6ff";
+    nameInput.value = savedName; passInput.value = savedPass;
+    authError.innerText = "Автоматический вход..."; authError.style.color = "#4da6ff";
     
-    const doAutoLogin = () => {
-        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
-    };
-
-    if (socket.connected) {
-        doAutoLogin();
-    } else {
-        socket.on('connect', doAutoLogin);
-    }
+    const doAutoLogin = () => { socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse); };
+    if (socket.connected) { doAutoLogin(); } else { socket.on('connect', doAutoLogin); }
 }
 
 document.getElementById('btn-login').onclick = () => {
     authError.innerText = "Подключение..."; authError.style.color = "#e63946";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
-
 document.getElementById('btn-register').onclick = () => {
     authError.innerText = "Создание..."; authError.style.color = "#e63946";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
@@ -82,13 +70,11 @@ function updateProfile() {
     });
 }
 
-// ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
-            
             document.getElementById('profile-name').innerText = p.name;
             
             let av = p.avatar || 'avatar1';
@@ -99,7 +85,6 @@ window.showProfile = function(username) {
             document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
             document.getElementById('profile-min-mmr').innerText = p.minRating || 1000;
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
-            
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
             
@@ -109,25 +94,15 @@ window.showProfile = function(username) {
             const date = new Date(p.regDate);
             document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
 
-            if (username === nameInput.value) {
-                document.getElementById('avatar-selector').style.display = 'block';
-            } else {
-                document.getElementById('avatar-selector').style.display = 'none';
-            }
+            if (username === nameInput.value) document.getElementById('avatar-selector').style.display = 'block';
+            else document.getElementById('avatar-selector').style.display = 'none';
 
             document.getElementById('profile-modal').style.display = 'flex';
-        } else {
-            alert("Не удалось загрузить профиль");
-        }
+        } else alert("Не удалось загрузить профиль");
     });
 };
 
-window.setAvatar = function(av) {
-    socket.emit('setAvatar', av, (res) => {
-        if(res.success) { document.getElementById('profile-avatar').src = '/' + av + '.png'; }
-    });
-}
-
+window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
 // ДРУЗЬЯ
@@ -140,17 +115,12 @@ window.switchTab = function(tabId) {
     if(tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
     if(tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
 };
-
-document.getElementById('btn-friends').onclick = () => {
-    document.getElementById('friends-modal').style.display = 'flex';
-    loadFriendsData();
-};
+document.getElementById('btn-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'flex'; loadFriendsData(); };
 document.getElementById('btn-close-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'none'; updateProfile(); };
 
 function loadFriendsData() {
     socket.emit('getFriendsData', (res) => {
         if (!res.success) return;
-        
         const list = document.getElementById('friends-list');
         if (res.friends.length === 0) list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>";
         else {
@@ -164,110 +134,98 @@ function loadFriendsData() {
                 </div>
             `).join('');
         }
-
         const reqList = document.getElementById('requests-list');
         document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
         if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
         else {
             reqList.innerHTML = res.requests.map(r => `
-                <div class="friend-item">
-                    <div class="friend-info">${r}</div>
-                    <div>
-                        <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
-                        <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
-                    </div>
-                </div>
+                <div class="friend-item"><div class="friend-info">${r}</div><div>
+                <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
+                <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
+                </div></div>
             `).join('');
         }
     });
 }
-
 window.searchFriends = function() {
     const q = document.getElementById('search-input').value;
     socket.emit('searchUser', q, (res) => {
         const resBox = document.getElementById('search-results');
         if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
-        
         resBox.innerHTML = res.users.map(u => `
-            <div class="friend-item">
-                <div class="friend-info">${u.name} <span class="friend-mmr">(MMR: ${u.rating})</span></div>
-                <div style="display:flex; gap:5px;">
-                    <button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
-                    <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button>
-                </div>
-            </div>
+            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(MMR: ${u.rating})</span></div>
+            <div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
+            <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>
         `).join('');
     });
 };
-
 window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); };
 window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
 window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
 window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
 
 // МАГАЗИН
-window.buySkin = function(skinName) {
-    socket.emit('buySkin', skinName, (res) => {
-        if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } 
-        else { document.getElementById('shop-error').innerText = res.msg; }
-    });
-};
-
+window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => { if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } else { document.getElementById('shop-error').innerText = res.msg; } }); };
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
 // КНОПКИ ИГРЫ
 document.getElementById('btn-play').onclick = () => {
-    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
-    socket.emit('play'); 
-    document.getElementById('goal-msg').textContent = "Ищем друга...";
-    document.getElementById('goal-msg').style.color = "#fb8500";
-    document.getElementById('btn-cancel-search').style.display = 'block';
+    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); 
+    document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
+    document.getElementById('btn-cancel-search').style.display = 'block'; document.getElementById('btn-in-game-quit').style.display = 'none';
 };
 
 document.getElementById('btn-play-bot').onclick = () => {
-    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
-    socket.emit('playBot'); 
+    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('playBot'); 
     document.getElementById('goal-msg').textContent = ""; 
-    document.getElementById('btn-cancel-search').style.display = 'none';
+    document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block';
 };
 
 document.getElementById('btn-cancel-search').onclick = () => {
-    socket.emit('cancelPlay'); 
-    gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; updateProfile();
-    document.getElementById('btn-cancel-search').style.display = 'none';
-    document.getElementById('goal-msg').textContent = ""; 
+    socket.emit('cancelPlay'); gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; updateProfile();
+    document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('goal-msg').textContent = ""; 
+};
+
+// 🔥 НОВАЯ КНОПКА: ВЫЙТИ ИЗ МАТЧА
+document.getElementById('btn-in-game-quit').onclick = () => {
+    if (!serverState) return;
+    const isBot = serverState.player2.id === 'bot';
+    const msg = isBot ? "Вы уверены, что хотите прервать тренировку?" : "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снят MMR!";
+    
+    if (confirm(msg)) {
+        socket.emit('leaveMatch'); 
+        clientState = null; serverState = null; myRole = null; 
+        document.getElementById('game-wrapper').style.display = 'none';
+        document.getElementById('end-screen').style.display = 'none';
+        document.getElementById('btn-in-game-quit').style.display = 'none';
+        document.getElementById('main-menu').style.display = 'flex';
+        updateProfile();
+    }
 };
 
 // ЭНД СКРИН
-socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; });
+socket.on('showEndScreen', () => { 
+    document.getElementById('end-screen').style.display = 'flex'; 
+    document.getElementById('btn-in-game-quit').style.display = 'none'; 
+});
 socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; });
 
 socket.on('opponentLeft', () => {
-    socket.emit('leaveMatch'); 
-    clientState = null; serverState = null; myRole = null; 
-    document.getElementById('game-wrapper').style.display = 'none';
-    document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('main-menu').style.display = 'flex';
-    updateProfile();
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
+    document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
 });
 
 document.getElementById('btn-new-game').onclick = () => {
-    socket.emit('leaveMatch'); 
-    clientState = null; serverState = null; myRole = null; 
-    document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('goal-msg').textContent = "Ищем друга...";
-    document.getElementById('btn-cancel-search').style.display = 'block';
-    socket.emit('play'); 
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
+    document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none';
+    document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('btn-cancel-search').style.display = 'block'; socket.emit('play'); 
 };
-
 document.getElementById('btn-leave-match').onclick = () => {
-    socket.emit('leaveMatch');
-    clientState = null; serverState = null; myRole = null; 
-    document.getElementById('game-wrapper').style.display = 'none';
-    document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('main-menu').style.display = 'flex';
-    updateProfile();
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
+    document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
 };
 
 socket.on('forceReload', () => { window.location.reload(); });
@@ -292,21 +250,15 @@ const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
 
 socket.on('role', role => myRole = role);
-socket.on('goalNotify', data => {
-    const msgEl = document.getElementById('goal-msg');
-    msgEl.textContent = data.msg; msgEl.style.color = data.color;
-});
+socket.on('goalNotify', data => { document.getElementById('goal-msg').textContent = data.msg; document.getElementById('goal-msg').style.color = data.color; });
 
 socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    document.getElementById('s1').textContent = s.player1.score;
-    document.getElementById('s2').textContent = s.player2.score;
-    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
-    document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
-    document.getElementById('n1').textContent = s.player1.name;
-    document.getElementById('n2').textContent = s.player2.name;
+    document.getElementById('s1').textContent = s.player1.score; document.getElementById('s2').textContent = s.player2.score;
+    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`; document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
+    document.getElementById('n1').textContent = s.player1.name; document.getElementById('n2').textContent = s.player2.name;
 
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
@@ -314,6 +266,7 @@ socket.on('gameStateUpdate', s => {
     } 
     else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
+        document.getElementById('btn-in-game-quit').style.display = 'block'; // 🔥 Показываем кнопку выхода во время игры!
         if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
             document.getElementById('goal-msg').textContent = ""; 
         }
@@ -366,8 +319,7 @@ function drawPlayer(x, y, skinName, color) {
 function render(s) {
     ctx.fillStyle = '#f4faff'; ctx.fillRect(0, 0, 800, 400);
 
-    ctx.font = '30px Arial'; ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '30px Arial'; ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     [{t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200}, {t:'⭐', x:350, y:80}, {t:'🐾', x:400, y:320}, {t:'⭐', x:520, y:200}, {t:'🐾', x:680, y:80}, {t:'⭐', x:650, y:320}].forEach(d => ctx.fillText(d.t, d.x, d.y));
 
     ctx.lineWidth = 6;

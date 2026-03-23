@@ -61,7 +61,7 @@ function createRoom(isBotMatch = false) {
         player2: { id: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
         disconnectTimeout: null, reconnectDeadline: null, timeLeft: null,
-        isBotMatch: isBotMatch // 🔥 Флаг тренировки с ботом
+        isBotMatch: isBotMatch
     };
     return roomId;
 }
@@ -103,10 +103,9 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     if (lose.name === "...") return; 
     if (isDisconnect) win.score = 11; 
 
-    // 🔥 Если это игра с ботом — НИКАКИХ ИЗМЕНЕНИЙ В БАЗЕ ДАННЫХ
     if (room.isBotMatch) {
         room.rematch = { player1: false, player2: false };
-        let msg = winRole === 'player1' ? "ПОБЕДА НАД БОТОМ! 🎉" : "БОТ ПОБЕДИЛ 🤖";
+        let msg = isDisconnect ? "ВЫХОД ИЗ ТРЕНИРОВКИ" : (winRole === 'player1' ? "ПОБЕДА НАД БОТОМ! 🎉" : "БОТ ПОБЕДИЛ 🤖");
         io.to(room.id).emit('goalNotify', { msg: msg, color: "gold" });
         setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
         return;
@@ -123,6 +122,7 @@ async function finishMatch(room, winRole, isDisconnect = false) {
             if (win.rating < (winnerDoc.minRating || 1000)) winnerDoc.minRating = win.rating;
             await winnerDoc.save();
         }
+
         const loserDoc = await User.findOne({ name: lose.name });
         if (loserDoc) {
             loserDoc.rating = lose.rating; loserDoc.coins += 5; loserDoc.gamesPlayed += 1;
@@ -159,7 +159,6 @@ function reset(room) {
     }
 }
 
-// 🔥 ИГРОВОЙ ЦИКЛ + ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ БОТА
 setInterval(() => {
     for (const roomId in rooms) {
         const room = rooms[roomId];
@@ -169,33 +168,20 @@ setInterval(() => {
             
             // 🤖 ЛОГИКА БОТА
             if (room.isBotMatch && room.player2.id === 'bot') {
-                const bot = room.player2;
-                const puck = room.puck;
+                const bot = room.player2; const puck = room.puck;
                 const oldX = bot.x; const oldY = bot.y;
-                
-                let targetY = puck.y;
-                let targetX = 720; // Обычная позиция защиты
-                
-                // Если шайба на стороне бота, он бросается в атаку
-                if (puck.x > 400) {
-                    targetX = Math.max(450, puck.x + 10);
-                }
-                
-                // Скорость реакции бота (не слишком быстро, чтобы можно было обыграть)
+                let targetY = puck.y; let targetX = 720; 
+                if (puck.x > 400) targetX = Math.max(450, puck.x + 10);
                 const botSpeed = 6.5; 
                 
                 if (bot.y < targetY - botSpeed) bot.y += botSpeed;
                 else if (bot.y > targetY + botSpeed) bot.y -= botSpeed;
-                
                 if (bot.x < targetX - botSpeed) bot.x += botSpeed;
                 else if (bot.x > targetX + botSpeed) bot.x -= botSpeed;
 
-                // Ограничиваем перемещение бота его половиной
                 bot.x = Math.max(435, Math.min(765, bot.x));
                 bot.y = Math.max(35, Math.min(365, bot.y));
-                
-                bot.speedX = bot.x - oldX;
-                bot.speedY = bot.y - oldY;
+                bot.speedX = bot.x - oldX; bot.speedY = bot.y - oldY;
             }
 
             room.puck.vx *= 0.995; room.puck.vy *= 0.995;
@@ -246,7 +232,7 @@ function joinPlayerToRoom(socket, user) {
     let myRoomId = null;
     
     for (const id in rooms) { 
-        if (rooms[id].gameOver || rooms[id].isBotMatch) continue; // 🔥 В бот-комнаты не заходим
+        if (rooms[id].gameOver || rooms[id].isBotMatch) continue; 
         if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
             myRoomId = id; break; 
         } 
@@ -296,7 +282,6 @@ io.on('connection', (socket) => {
 
     socket.on('play', () => { if (socket.user) joinPlayerToRoom(socket, socket.user); else socket.emit('forceReload'); });
 
-    // 🔥 НОВОЕ: Запуск игры с ботом
     socket.on('playBot', () => {
         if (!socket.user || socket.roomId) return;
         const roomId = createRoom(true);
@@ -305,9 +290,7 @@ io.on('connection', (socket) => {
         room.player2 = { id: 'bot', name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0 };
         room.paused = false;
         
-        socket.join(roomId);
-        socket.roomId = roomId;
-        socket.emit('role', 'p1');
+        socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
     });
 
     socket.on('rematch', () => {
@@ -316,10 +299,7 @@ io.on('connection', (socket) => {
         if (socket.id === room.player1.id) room.rematch.player1 = true;
         if (socket.id === room.player2.id) room.rematch.player2 = true;
 
-        // 🔥 Если это игра с ботом, бот "соглашается" на реванш автоматически
-        if (room.isBotMatch && room.rematch.player1) {
-            room.rematch.player2 = true; 
-        }
+        if (room.isBotMatch && room.rematch.player1) room.rematch.player2 = true; 
 
         if (room.rematch.player1 && room.rematch.player2) {
             room.player1.score = 0; room.player2.score = 0;
@@ -334,7 +314,7 @@ io.on('connection', (socket) => {
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
-        if (room.player2.name !== "..." && !room.gameOver && !room.isBotMatch) {
+        if (room.player2.name !== "..." && !room.gameOver) {
             finishMatch(room, winRole, true);
         } else {
             socket.to(room.id).emit('opponentLeft');
@@ -344,7 +324,8 @@ io.on('connection', (socket) => {
         if (room.player2.id === socket.id) room.player2.id = null;
         
         if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot')) {
-            clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; 
+            clearTimeout(room.disconnectTimeout);
+            delete rooms[socket.roomId]; 
         }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
@@ -367,8 +348,11 @@ io.on('connection', (socket) => {
     socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
-            if (target) callback({ success: true, profile: target });
-            else callback({ success: false, msg: "Игрок не найден" });
+            if (target) {
+                callback({ success: true, profile: target });
+            } else {
+                callback({ success: false, msg: "Игрок не найден" });
+            }
         } catch(e) { callback({ success: false }); }
     });
 
@@ -376,7 +360,8 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
-            u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true });
+            u.avatar = avatar; await u.save(); socket.user = u;
+            callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
@@ -419,7 +404,8 @@ io.on('connection', (socket) => {
             if (!target) return callback({ success: false, msg: "Игрок не найден" });
             if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
             if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
-            target.requests.push(socket.user.name); await target.save();
+            target.requests.push(socket.user.name);
+            await target.save();
             callback({ success: true, msg: "Запрос отправлен!" });
         } catch(e) { callback({ success: false, msg: "Ошибка" }); }
     });
