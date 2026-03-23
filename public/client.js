@@ -13,7 +13,7 @@ function start() {
     if (nick) { socket.emit('join', nick); document.getElementById('auth').style.display = 'none'; }
 }
 
-socket.on('role', role => { myRole = role; });
+socket.on('role', r => myRole = r);
 socket.on('goalNotify', d => { msgBox.textContent = d.msg; msgBox.style.color = d.color; });
 
 socket.on('gameStateUpdate', s => {
@@ -21,43 +21,40 @@ socket.on('gameStateUpdate', s => {
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
     document.getElementById('s1').textContent = s.player1.score;
-    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('n1').textContent = s.player1.name;
+    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('s2').textContent = s.player2.score;
-    document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
     document.getElementById('n2').textContent = s.player2.name;
+    document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
 });
 
-// МГНОВЕННОЕ ДВИЖЕНИЕ СВОЕЙ БИТЫ
 canvas.addEventListener('mousemove', e => {
     const r = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - r.left;
-    const mouseY = e.clientY - r.top;
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
 
     if (clientState && myRole && !serverState.paused) {
         if (myRole === 'p1') {
-            clientState.player1.x = Math.min(365, Math.max(35, mouseX));
-            clientState.player1.y = Math.min(365, Math.max(35, mouseY));
+            clientState.player1.x = Math.min(365, Math.max(35, mx));
+            clientState.player1.y = Math.min(365, Math.max(35, my));
         } else {
-            clientState.player2.x = Math.min(765, Math.max(435, mouseX));
-            clientState.player2.y = Math.min(365, Math.max(35, mouseY));
+            clientState.player2.x = Math.min(765, Math.max(435, mx));
+            clientState.player2.y = Math.min(365, Math.max(35, my));
         }
     }
-    socket.emit('input', { x: mouseX, y: mouseY });
+    socket.emit('input', { x: mx, y: my });
 });
 
 function loop() {
     if (serverState && clientState) {
-        const lerp = 0.15; 
-        // Сглаживаем шайбу
+        const lerp = 0.2; 
         clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
         clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
         
-        // Сглаживаем ТОЛЬКО ЧУЖУЮ биту
         if (myRole === 'p1') {
             clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp;
             clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
-        } else if (myRole === 'p2') {
+        } else {
             clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp;
             clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
         }
@@ -67,24 +64,24 @@ function loop() {
 }
 
 setInterval(() => {
-    const startPing = Date.now();
+    const startP = Date.now();
     socket.emit('pingCheck');
     socket.once('pongCheck', () => {
-        const ping = Date.now() - startPing;
-        if(pingDisplay) pingDisplay.textContent = `Ping: ${ping}ms`;
+        if(pingDisplay) pingDisplay.textContent = `Ping: ${Date.now() - startP}ms`;
     });
 }, 2000);
 
 function render(s) {
     ctx.clearRect(0, 0, 800, 400);
-    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
+    
     ctx.lineWidth = 10;
-    ctx.strokeStyle = '#ccccff'; ctx.strokeRect(0, 125, 4, 150);
-    ctx.strokeStyle = '#ffcccc'; ctx.strokeRect(796, 125, 4, 150);
+    ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
+    ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
 
-    drawCircle(s.puck.x, s.puck.y, 22, '#222', true);
+    drawCircle(s.puck.x, s.puck.y, 22, '#333', true);
     drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
     drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
 }
