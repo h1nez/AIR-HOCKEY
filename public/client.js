@@ -1,5 +1,14 @@
-const socket = io();
+// Жестко заставляем браузер использовать быстрые вебсокеты
+const socket = io({ transports: ["websocket"] });
 
+// Добавляем отладку, чтобы видеть, подключился ли клиент вообще
+socket.on('connect', () => {
+    console.log("✅ Успешно подключено к серверу! Мой ID:", socket.id);
+});
+socket.on('connect_error', (err) => {
+    console.error("❌ Ошибка соединения:", err.message);
+    document.getElementById('auth-error').innerText = "Нет связи с сервером!";
+});
 const authScreen = document.getElementById('auth-screen');
 const nameInput = document.getElementById('username');
 const passInput = document.getElementById('password');
