@@ -22,6 +22,12 @@
         .p1-info { color: #6666ff; display: flex; flex-direction: column; align-items: flex-start; }
         .p2-info { color: #ff6666; display: flex; flex-direction: column; align-items: flex-end; }
         .mmr { font-size: 14px; color: #aaa; font-weight: normal; }
+        
+        /* Стили для карточек магазина */
+        .shop-item { background: #333; padding: 15px; border-radius: 10px; margin: 10px; width: 120px; display: inline-block; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
+        .shop-item:hover { transform: scale(1.05); }
+        .shop-item.equipped { border-color: #00eeff; box-shadow: 0 0 10px #00eeff; }
+        .shop-item h3 { margin: 5px 0; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -41,7 +47,9 @@
     </div>
 
     <div id="main-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 500; flex-direction: column; align-items: center; justify-content: center;">
-        <h1 style="color: white; font-size: 48px; margin-bottom: 40px; text-shadow: 0 0 20px #4444ff;">АЭРОХОККЕЙ ONLINE</h1>
+        <h1 style="color: white; font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #4444ff;">АЭРОХОККЕЙ ONLINE</h1>
+        <div id="menu-coins" style="font-size: 24px; color: gold; margin-bottom: 40px; font-weight: bold;">💰 Монеты: 0</div>
+        
         <div style="display: flex; gap: 20px;">
             <button id="btn-shop" style="padding: 20px 40px; font-size: 24px; background: #222; color: #ffaa00; border: 2px solid #ffaa00; border-radius: 10px; cursor: pointer; transition: 0.2s;">🛒 Магазин</button>
             <button id="btn-play" style="padding: 20px 60px; font-size: 32px; background: #4444ff; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 20px #4444ff; transition: 0.2s;">ИГРАТЬ</button>
@@ -55,9 +63,29 @@
         <button id="btn-close-lb" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
     </div>
 
-    <div id="shop-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #ffaa00; text-align: center; width: 300px;">
-        <h2 style="margin-top:0;">Магазин</h2>
-        <p style="color: #aaa; margin-bottom: 20px;">Здесь скоро появятся крутые скины!</p>
+    <div id="shop-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #ffaa00; text-align: center; width: 500px;">
+        <h2 style="margin-top:0;">Скины "Три Кота"</h2>
+        <div id="shop-coins" style="color: gold; margin-bottom: 20px;">Ваши монеты: 0</div>
+        
+        <div>
+            <div class="shop-item" onclick="buySkin('default')" id="skin-default">
+                <h3>Обычный</h3>
+                <p id="price-default" style="color: #aaa;">Бесплатно</p>
+            </div>
+            <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik">
+                <h3>Коржик</h3>
+                <p id="price-korzhik" style="color: gold;">50 монет</p>
+            </div>
+            <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka">
+                <h3>Карамелька</h3>
+                <p id="price-karamelka" style="color: gold;">50 монет</p>
+            </div>
+            <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
+                <h3>Компот</h3>
+                <p id="price-kompot" style="color: gold;">50 монет</p>
+            </div>
+        </div>
+        <div id="shop-error" style="color: #ff4444; margin: 10px 0; min-height: 20px;"></div>
         <button id="btn-close-shop" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
     </div>
 

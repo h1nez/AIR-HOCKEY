@@ -1,6 +1,17 @@
 const socket = io();
 
-// --- АВТОРИЗАЦИЯ И МЕНЮ ---
+// --- ЗАГРУЗКА КАРТИНОК КОТОВ ---
+const catImages = {
+    'korzhik': new Image(),
+    'karamelka': new Image(),
+    'kompot': new Image()
+};
+// Игра будет искать файлы korzhik.png, karamelka.png и kompot.png в твоей папке public
+catImages.korzhik.src = '/korzhik.png';
+catImages.karamelka.src = '/karamelka.png';
+catImages.kompot.src = '/kompot.png';
+// ------------------------------
+
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -14,8 +25,7 @@ const savedName = localStorage.getItem('ah_name');
 const savedPass = localStorage.getItem('ah_pass');
 
 if (savedName && savedPass) {
-    nameInput.value = savedName;
-    passInput.value = savedPass;
+    nameInput.value = savedName; passInput.value = savedPass;
     socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
 }
 
@@ -23,7 +33,6 @@ document.getElementById('btn-login').onclick = () => {
     authError.innerText = "Подключение...";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
-
 document.getElementById('btn-register').onclick = () => {
     authError.innerText = "Создание...";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
@@ -33,39 +42,73 @@ function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
         mainMenu.style.display = 'flex'; 
-        
+        updateProfile(); // Загружаем монеты
         if (rememberCb.checked) {
-            localStorage.setItem('ah_name', nameInput.value);
-            localStorage.setItem('ah_pass', passInput.value);
+            localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
         } else {
-            localStorage.removeItem('ah_name');
-            localStorage.removeItem('ah_pass');
+            localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass');
         }
     } else {
-        authScreen.style.display = 'flex'; 
-        authError.innerText = res.msg;
+        authScreen.style.display = 'flex'; authError.innerText = res.msg;
     }
 }
 
-// --- КНОПКИ ГЛАВНОГО МЕНЮ ---
+// --- ЛОГИКА МАГАЗИНА ---
+function updateProfile() {
+    socket.emit('getProfile', (data) => {
+        if (data.success) {
+            document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
+            document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
+            
+            // Обновляем витрину
+            ['default', 'korzhik', 'karamelka', 'kompot'].forEach(skin => {
+                const el = document.getElementById('skin-' + skin);
+                const priceEl = document.getElementById('price-' + skin);
+                el.classList.remove('equipped');
+                
+                if (data.inventory.includes(skin)) {
+                    priceEl.innerText = "Куплено";
+                    priceEl.style.color = "#00ff00";
+                }
+                if (data.skin === skin) {
+                    el.classList.add('equipped');
+                    priceEl.innerText = "Надето";
+                    priceEl.style.color = "#00eeff";
+                }
+            });
+        }
+    });
+}
+
+window.buySkin = function(skinName) {
+    socket.emit('buySkin', skinName, (res) => {
+        if (res.success) {
+            document.getElementById('shop-error').innerText = "";
+            updateProfile();
+        } else {
+            document.getElementById('shop-error').innerText = res.msg;
+        }
+    });
+};
+
+document.getElementById('btn-shop').onclick = () => {
+    updateProfile();
+    document.getElementById('shop-modal').style.display = 'block';
+};
+document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
+
+// --- ОСТАЛЬНОЕ МЕНЮ ---
 document.getElementById('btn-play').onclick = () => {
-    mainMenu.style.display = 'none';
-    gameWrapper.style.display = 'flex'; 
+    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
     socket.emit('play'); 
-    
-    const msgEl = document.getElementById('goal-msg');
-    msgEl.textContent = "Ожидание соперника...";
-    msgEl.style.color = "white";
-    
-    // Показываем кнопку отмены
+    document.getElementById('goal-msg').textContent = "Ожидание соперника...";
+    document.getElementById('goal-msg').style.color = "white";
     document.getElementById('btn-cancel-search').style.display = 'block';
 };
 
-// Отмена поиска
 document.getElementById('btn-cancel-search').onclick = () => {
     socket.emit('cancelPlay'); 
-    gameWrapper.style.display = 'none'; 
-    mainMenu.style.display = 'flex'; 
+    gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; updateProfile();
     document.getElementById('btn-cancel-search').style.display = 'none';
     document.getElementById('goal-msg').textContent = ""; 
 };
@@ -73,11 +116,9 @@ document.getElementById('btn-cancel-search').onclick = () => {
 document.getElementById('btn-leaderboard').onclick = () => {
     socket.emit('getLeaderboard', (res) => {
         if (res.success) {
-            const list = document.getElementById('leaderboard-list');
-            list.innerHTML = ''; 
+            const list = document.getElementById('leaderboard-list'); list.innerHTML = ''; 
             res.leaderboard.forEach(user => {
-                const li = document.createElement('li');
-                li.style.margin = "5px 0";
+                const li = document.createElement('li'); li.style.margin = "5px 0";
                 li.innerHTML = `<b>${user.name}</b> — MMR: ${user.rating}`;
                 list.appendChild(li);
             });
@@ -87,24 +128,15 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-document.getElementById('btn-shop').onclick = () => document.getElementById('shop-modal').style.display = 'block';
-document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
-
-
 // --- ИГРОВАЯ ЛОГИКА ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
-let serverState = null;
-let clientState = null;
-let myRole = null;
+let serverState = null; let clientState = null; let myRole = null;
 
 socket.on('role', role => myRole = role);
-
 socket.on('goalNotify', data => {
     const msgEl = document.getElementById('goal-msg');
-    msgEl.textContent = data.msg;
-    msgEl.style.color = data.color;
+    msgEl.textContent = data.msg; msgEl.style.color = data.color;
 });
 
 socket.on('gameStateUpdate', s => {
@@ -118,14 +150,10 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
 
-    // Прячем кнопку отмены, если игра началась (оба игрока тут)
     if (s.player1.id && s.player2.id) {
         document.getElementById('btn-cancel-search').style.display = 'none';
-        if (document.getElementById('goal-msg').textContent === "Ожидание соперника...") {
-            document.getElementById('goal-msg').textContent = ""; 
-        }
+        if (document.getElementById('goal-msg').textContent === "Ожидание соперника...") document.getElementById('goal-msg').textContent = ""; 
     }
-
     if (s.paused) {
         clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y;
         clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
@@ -135,20 +163,39 @@ socket.on('gameStateUpdate', s => {
 function sendInput(clientX, clientY) {
     if (!myRole) return;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
     socket.emit('input', { x, y });
 }
-
 canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
 canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
-function drawCircle(x, y, r, color, isPuck = false) {
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
-    ctx.lineWidth = isPuck ? 2 : 4; ctx.strokeStyle = '#000'; ctx.stroke();
-    if (!isPuck) { ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#222'; ctx.fill(); }
+// ФУНКЦИЯ ОТРИСОВКИ ИГРОКА СО СКИНОМ
+function drawPlayer(x, y, r, color, skinName) {
+    if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
+        // Если картинка успешно загрузилась - рисуем её
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip(); // Обрезаем картинку в кружок
+        ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2);
+        ctx.restore();
+        // Рисуем цветную рамку вокруг кота
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); 
+        ctx.lineWidth = 4; ctx.strokeStyle = color; ctx.stroke();
+    } else {
+        // Если это дефолт или картинка еще не скачана - рисуем кружок с текстом
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.stroke();
+        
+        ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (skinName === 'korzhik') ctx.fillText("КОРЖ", x, y);
+        else if (skinName === 'karamelka') ctx.fillText("КАРА", x, y);
+        else if (skinName === 'kompot') ctx.fillText("КОМП", x, y);
+        else {
+            ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#222'; ctx.fill();
+        }
+    }
 }
 
 function render(s) {
@@ -156,21 +203,23 @@ function render(s) {
     ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
+    ctx.lineWidth = 10; ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
     ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
 
     let px = s.puck.x; let py = s.puck.y;
     if (myRole && !serverState.paused) {
         const myPlayer = myRole === 'p1' ? s.player1 : s.player2;
-        let dx = px - myPlayer.x; let dy = py - myPlayer.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
+        let dx = px - myPlayer.x; let dy = py - myPlayer.y; let dist = Math.sqrt(dx*dx + dy*dy);
         if (dist < 57) { px = myPlayer.x + (dx/dist)*57; py = myPlayer.y + (dy/dist)*57; }
     }
 
-    drawCircle(px, py, 22, '#eee', true);
-    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
-    drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
+    // Шайба
+    ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#eee'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+
+    // Игроки (передаем их скины)
+    drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', s.player1.skin);
+    drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', s.player2.skin);
 }
 
 function loop() {
