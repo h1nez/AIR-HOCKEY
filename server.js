@@ -18,7 +18,7 @@ const io = new Server(server, {
 // 1. ПОДКЛЮЧЕНИЕ К MONGODB
 // ==========================================
 // Сюда мы позже вставим твою личную ссылку от MongoDB Atlas
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:admin@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
 
 mongoose.connect(MONGODB_URI, { 
     family: 4, // ПРИНУДИТЕЛЬНО используем IPv4 (спасает от ETIMEOUT)
