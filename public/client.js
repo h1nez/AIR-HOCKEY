@@ -1,60 +1,150 @@
-const socket = io({ transports: ["websocket"] });
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const msgBox = document.getElementById('msg');
-const pingDisplay = document.getElementById('ping');
+const socket = io();
 
-let serverState = null; 
-let clientState = null; 
-let myRole = null; 
-let currentPing = 0;
+// --- ЛОГИКА АВТОРИЗАЦИИ ---
+const authScreen = document.getElementById('auth-screen');
+const nameInput = document.getElementById('username');
+const passInput = document.getElementById('password');
+const rememberCb = document.getElementById('remember');
+const authError = document.getElementById('auth-error');
 
-function start() {
-    const nick = document.getElementById('nick').value;
-    if (nick) { socket.emit('join', nick); document.getElementById('auth').style.display = 'none'; }
+const savedName = localStorage.getItem('ah_name');
+const savedPass = localStorage.getItem('ah_pass');
+
+if (savedName && savedPass) {
+    nameInput.value = savedName;
+    passInput.value = savedPass;
+    socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
 }
 
-socket.on('role', r => myRole = r);
-socket.on('goalNotify', d => { msgBox.textContent = d.msg; msgBox.style.color = d.color; });
+document.getElementById('btn-login').onclick = () => {
+    authError.innerText = "Подключение...";
+    socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
+};
+
+document.getElementById('btn-register').onclick = () => {
+    authError.innerText = "Создание...";
+    socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
+};
+
+function handleAuthResponse(res) {
+    if (res.success) {
+        authScreen.style.display = 'none';
+        if (rememberCb.checked) {
+            localStorage.setItem('ah_name', nameInput.value);
+            localStorage.setItem('ah_pass', passInput.value);
+        } else {
+            localStorage.removeItem('ah_name');
+            localStorage.removeItem('ah_pass');
+        }
+    } else {
+        authScreen.style.display = 'flex'; 
+        authError.innerText = res.msg;
+    }
+}
+// --------------------------
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let serverState = null;
+let clientState = null;
+let myRole = null;
+
+socket.on('role', role => myRole = role);
+
+socket.on('goalNotify', data => {
+    const msgEl = document.getElementById('goal-msg');
+    msgEl.textContent = data.msg;
+    msgEl.style.color = data.color;
+});
 
 socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // Счёт
     document.getElementById('s1').textContent = s.player1.score;
     document.getElementById('s2').textContent = s.player2.score;
-    
-    // Рейтинг
     document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
-    
-    // ВЕРНУЛИ НИКИ НА МЕСТО:
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
+
+    if (s.paused) {
+        clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y;
+        clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
+    }
 });
 
-canvas.addEventListener('mousemove', e => {
-    const r = canvas.getBoundingClientRect();
-    const mx = e.clientX - r.left;
-    const my = e.clientY - r.top;
-    if (clientState && myRole && !serverState.paused) {
-        const p = (myRole === 'p1') ? clientState.player1 : clientState.player2;
-        p.x = (myRole === 'p1') ? Math.min(365, Math.max(35, mx)) : Math.min(765, Math.max(435, mx));
-        p.y = Math.min(365, Math.max(35, my));
+function sendInput(clientX, clientY) {
+    if (!myRole) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    
+    socket.emit('input', { x, y });
+}
+
+canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+
+function drawCircle(x, y, r, color, isPuck = false) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = isPuck ? 2 : 4;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    
+    if (!isPuck) {
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#222';
+        ctx.fill();
     }
-    socket.emit('input', { x: mx, y: my });
-});
+}
+
+function render(s) {
+    ctx.clearRect(0, 0, 800, 400);
+    
+    // Разметка поля
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
+    ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
+    
+    // Ворота
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
+    ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
+
+    let px = s.puck.x;
+    let py = s.puck.y;
+    
+    // Визуальная защита от проваливания шайбы в клюшку на клиенте
+    if (myRole && !serverState.paused) {
+        const myPlayer = myRole === 'p1' ? s.player1 : s.player2;
+        let dx = px - myPlayer.x; let dy = py - myPlayer.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 57) {
+            px = myPlayer.x + (dx/dist)*57;
+            py = myPlayer.y + (dy/dist)*57;
+        }
+    }
+
+    drawCircle(px, py, 22, '#eee', true);
+    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
+    drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
+}
 
 function loop() {
     if (serverState && clientState) {
-        const lerp = 0.4; // Идеальный баланс плавности и резкости
-        
-        // Шайба просто плавно догоняет сервер (никаких магнитов)
+        const lerp = 0.4;
         clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
         clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
         
-        // Враг
         const enemy = myRole === 'p1' ? 'player2' : 'player1';
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
@@ -64,51 +154,4 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-function render(s) {
-    ctx.clearRect(0, 0, 800, 400);
-    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
-    ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
-    
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
-    ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
-
-    // Легкая защита от наложения только для отрисовки
-    let px = s.puck.x;
-    let py = s.puck.y;
-    if (myRole && !serverState.paused) {
-        const myPlayer = myRole === 'p1' ? s.player1 : s.player2;
-        let dx = px - myPlayer.x;
-        let dy = py - myPlayer.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 57) {
-            px = myPlayer.x + (dx/dist)*57;
-            py = myPlayer.y + (dy/dist)*57;
-        }
-    }
-
-    // Рисуем
-    drawCircle(px, py, 22, '#333', true);
-    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
-    drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
-}
-
-setInterval(() => {
-    const startP = Date.now();
-    socket.emit('pingCheck');
-    socket.once('pongCheck', () => {
-        currentPing = Date.now() - startP;
-        if(pingDisplay) {
-            pingDisplay.textContent = `Ping: ${currentPing}ms`;
-            pingDisplay.style.color = currentPing > 200 ? '#ff4444' : '#00ff00';
-        }
-    });
-}, 1000);
-
-
-function drawCircle(x,y,r,c,p){
-    ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle=p?'#000':'#fff'; ctx.lineWidth=3; ctx.stroke();
-}
 loop();

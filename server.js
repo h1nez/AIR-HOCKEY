@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,7 +19,7 @@ const io = new Server(server, {
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
 // ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
-const MONGODB_URI = process.env.MONGODB_URI || 'ТВОЯ_ДЛИННАЯ_ССЫЛКА_ИЗ_ПРОШЛОГО_ШАГА';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -33,6 +34,7 @@ mongoose.connect(MONGODB_URI)
 
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
     rating: { type: Number, default: 1000 }
 });
 const User = mongoose.model('User', userSchema);
@@ -45,13 +47,9 @@ const HEIGHT = 400;
 const PUCK_R = 22; 
 const PLAYER_R = 35;
 
-// ==========================================
-// 2. СИСТЕМА КОМНАТ (ROOMS)
-// ==========================================
-const rooms = {}; // Хранилище всех активных комнат
+const rooms = {}; 
 let roomCounter = 1;
 
-// Функция создания новой комнаты
 function createRoom() {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
@@ -65,53 +63,31 @@ function createRoom() {
 }
 
 function resolveCollision(puck, player) {
-    const dx = puck.x - player.x;
-    const dy = puck.y - player.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = PUCK_R + PLAYER_R;
+    const dx = puck.x - player.x; const dy = puck.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy); const minDist = PUCK_R + PLAYER_R;
 
     if (dist < minDist) {
-        let nx = dx / dist; 
-        let ny = dy / dist; 
-
+        let nx = dx / dist; let ny = dy / dist; 
         if (dist < 35) { 
-            const oldX = player.x - player.speedX;
-            const oldY = player.y - player.speedY;
-            const oldDx = puck.x - oldX;
-            const oldDy = puck.y - oldY;
+            const oldX = player.x - player.speedX; const oldY = player.y - player.speedY;
+            const oldDx = puck.x - oldX; const oldDy = puck.y - oldY;
             const oldDist = Math.sqrt(oldDx * oldDx + oldDy * oldDy);
             if (oldDist > 0) { nx = oldDx / oldDist; ny = oldDy / oldDist; }
         }
-
-        puck.x = player.x + nx * (minDist + 0.1);
-        puck.y = player.y + ny * (minDist + 0.1);
-
-        const relVX = puck.vx - player.speedX;
-        const relVY = puck.vy - player.speedY;
+        puck.x = player.x + nx * (minDist + 0.1); puck.y = player.y + ny * (minDist + 0.1);
+        const relVX = puck.vx - player.speedX; const relVY = puck.vy - player.speedY;
         const velNormal = relVX * nx + relVY * ny;
-
         if (velNormal > 0) return;
-
-        const res = 1.6; 
-        const impulse = -(1 + res) * velNormal;
-
-        puck.vx += impulse * nx + (player.speedX * 0.8);
-        puck.vy += impulse * ny + (player.speedY * 0.8);
-
-        const maxSpeed = 28;
-        const speed = Math.sqrt(puck.vx**2 + puck.vy**2);
-        if (speed > maxSpeed) {
-            puck.vx = (puck.vx / speed) * maxSpeed;
-            puck.vy = (puck.vy / speed) * maxSpeed;
-        }
+        const res = 1.6; const impulse = -(1 + res) * velNormal;
+        puck.vx += impulse * nx + (player.speedX * 0.8); puck.vy += impulse * ny + (player.speedY * 0.8);
+        const maxSpeed = 28; const speed = Math.sqrt(puck.vx**2 + puck.vy**2);
+        if (speed > maxSpeed) { puck.vx = (puck.vx / speed) * maxSpeed; puck.vy = (puck.vy / speed) * maxSpeed; }
     }
 }
 
 async function handleGoal(room, winRole) {
     room.paused = true;
-    room.player1.x = 80; room.player1.y = 200;
-    room.player2.x = 720; room.player2.y = 200;
-
+    room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
     const win = winRole === 'player1' ? room.player1 : room.player2;
     const lose = winRole === 'player1' ? room.player2 : room.player1;
     win.score++;
@@ -120,12 +96,10 @@ async function handleGoal(room, winRole) {
         const K = 32;
         const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
-        
         try {
             await User.findOneAndUpdate({ name: win.name }, { rating: win.rating });
             await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating });
-        } catch (err) { console.error('Ошибка сохранения рейтинга:', err); }
-
+        } catch (err) {}
         io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
         setTimeout(() => { room.player1.score = 0; room.player2.score = 0; reset(room); }, 5000);
     } else {
@@ -136,27 +110,19 @@ async function handleGoal(room, winRole) {
 
 function reset(room) {
     room.puck = { x: WIDTH/2, y: HEIGHT/2, vx: 0, vy: 0 }; 
-    room.player1.x = 80; room.player1.y = 200;
-    room.player2.x = 720; room.player2.y = 200;
+    room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
     room.paused = false;
     io.to(room.id).emit('goalNotify', { msg: "", color: "" });
 }
 
-// ==========================================
-// 3. ГЛАВНЫЙ ЦИКЛ СЕРВЕРА (ОБРАБАТЫВАЕТ ВСЕ КОМНАТЫ)
-// ==========================================
 setInterval(() => {
     for (const roomId in rooms) {
         const room = rooms[roomId];
-        
         if (!room.paused) {
             room.puck.vx *= 0.995; room.puck.vy *= 0.995;
-            room.puck.x += room.puck.vx; 
-            room.puck.y += room.puck.vy;
-            
+            room.puck.x += room.puck.vx; room.puck.y += room.puck.vy;
             if (room.puck.y < PUCK_R) { room.puck.y = PUCK_R; room.puck.vy *= -1; }
             if (room.puck.y > HEIGHT - PUCK_R) { room.puck.y = HEIGHT - PUCK_R; room.puck.vy *= -1; }
-
             if (room.puck.x < PUCK_R) {
                 if (room.puck.y > 125 && room.puck.y < 275) handleGoal(room, 'player2');
                 else { room.puck.x = PUCK_R; room.puck.vx *= -1; }
@@ -165,58 +131,70 @@ setInterval(() => {
                 if (room.puck.y > 125 && room.puck.y < 275) handleGoal(room, 'player1');
                 else { room.puck.x = WIDTH - PUCK_R; room.puck.vx *= -1; }
             }
-
-            resolveCollision(room.puck, room.player1);
-            resolveCollision(room.puck, room.player2);
+            resolveCollision(room.puck, room.player1); resolveCollision(room.puck, room.player2);
         }
-        // Отправляем данные только игрокам в этой конкретной комнате
         io.to(roomId).emit('gameStateUpdate', room);
     }
 }, 20);
 
 // ==========================================
-// 4. ПОДКЛЮЧЕНИЕ ИГРОКОВ К КОМНАТАМ
+// 4. СИСТЕМА АВТОРИЗАЦИИ И ПОИСК КОМНАТЫ
 // ==========================================
+function joinPlayerToRoom(socket, user) {
+    let myRoomId = null;
+    for (const id in rooms) {
+        if (rooms[id].player1.id && !rooms[id].player2.id) { myRoomId = id; break; }
+    }
+    if (!myRoomId) myRoomId = createRoom();
+
+    const room = rooms[myRoomId];
+    socket.join(myRoomId);
+    socket.roomId = myRoomId;
+
+    if (!room.player1.id) {
+        room.player1.id = socket.id; room.player1.name = user.name; 
+        room.player1.rating = user.rating; socket.emit('role', 'p1');
+    } else if (!room.player2.id) {
+        room.player2.id = socket.id; room.player2.name = user.name; 
+        room.player2.rating = user.rating; socket.emit('role', 'p2');
+        room.paused = false; 
+    }
+}
+
 io.on('connection', (socket) => {
-    socket.on('join', async (name) => {
+    
+    socket.on('register', async (data, callback) => {
         try {
-            let user = await User.findOne({ name: name });
-            if (!user) {
-                user = new User({ name: name, rating: 1000 });
-                await user.save();
-            }
+            if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
+            const existing = await User.findOne({ name: data.name });
+            if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
 
-            let myRoomId = null;
-            // Ищем комнату, где сидит только 1 игрок и ждет соперника
-            for (const id in rooms) {
-                if (rooms[id].player1.id && !rooms[id].player2.id) {
-                    myRoomId = id; break;
-                }
-            }
-            // Если свободных комнат нет — создаем новую
-            if (!myRoomId) {
-                myRoomId = createRoom();
-            }
+            const hashedPassword = await bcrypt.hash(data.password, 10);
+            const newUser = new User({ name: data.name, password: hashedPassword, rating: 1000 });
+            await newUser.save();
 
-            const room = rooms[myRoomId];
-            socket.join(myRoomId);       // Подключаем сокет к каналу связи комнаты
-            socket.roomId = myRoomId;    // Запоминаем, в какой комнате игрок
+            joinPlayerToRoom(socket, newUser);
+            callback({ success: true });
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
+    });
 
-            if (!room.player1.id) {
-                room.player1.id = socket.id; room.player1.name = name; 
-                room.player1.rating = user.rating; socket.emit('role', 'p1');
-            } else if (!room.player2.id) {
-                room.player2.id = socket.id; room.player2.name = name; 
-                room.player2.rating = user.rating; socket.emit('role', 'p2');
-                room.paused = false; // Начинаем матч!
-            }
-        } catch(e) { console.error("Ошибка входа:", e); }
+    socket.on('login', async (data, callback) => {
+        try {
+            if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
+            const user = await User.findOne({ name: data.name });
+            if (!user) return callback({ success: false, msg: "Аккаунт не найден!" });
+
+            const isMatch = await bcrypt.compare(data.password, user.password);
+            if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
+
+            joinPlayerToRoom(socket, user);
+            callback({ success: true });
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
     socket.on('input', (data) => {
-        if (!socket.roomId || !rooms[socket.roomId]) return; // Игнорируем, если нет комнаты
+        if (!socket.roomId || !rooms[socket.roomId]) return; 
         const room = rooms[socket.roomId];
-
         const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
         if (p && !room.paused) {
             const oldX = p.x; const oldY = p.y;
@@ -229,13 +207,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-
         if (socket.id === room.player1.id) { room.player1.id = null; room.paused = true; }
         if (socket.id === room.player2.id) { room.player2.id = null; room.paused = true; }
-
-        // Если из комнаты вышли ОБА игрока — удаляем её, чтобы не засорять память сервера
-        if (!room.player1.id && !room.player2.id) {
-            delete rooms[socket.roomId];
-        }
+        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
     });
 });

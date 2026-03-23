@@ -1,34 +1,82 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Air Hockey Pro MMR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Аэрохоккей Онлайн</title>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #auth { position: absolute; background: #222; padding: 30px; border-radius: 15px; border: 2px solid #444; text-align: center; z-index: 100; }
-        input { padding: 10px; border-radius: 5px; border: none; margin-bottom: 15px; width: 200px; }
-        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 10px; }
-        .card { background: #222; padding: 10px 20px; border-radius: 10px; text-align: center; min-width: 120px; border-bottom: 4px solid #444; }
-        canvas { background: #fff; border: 4px solid #333; border-radius: 10px; cursor: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        #msg { position: absolute; font-size: 32px; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 50; }
+        body { margin: 0; background-color: #111; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #game-container { position: relative; width: 800px; height: 400px; }
+        canvas { background-color: #222; border: 4px solid #555; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        #ui { display: flex; justify-content: space-between; width: 800px; padding: 10px 0; font-size: 24px; font-weight: bold; }
+        .p1-info { color: #6666ff; display: flex; flex-direction: column; align-items: flex-start; }
+        .p2-info { color: #ff6666; display: flex; flex-direction: column; align-items: flex-end; }
+        .mmr { font-size: 14px; color: #aaa; font-weight: normal; }
+        .score { font-size: 36px; color: white; }
+        #goal-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-shadow: 2px 2px 10px black; pointer-events: none; }
+
+        /* ОКНО АВТОРИЗАЦИИ */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; color: white;
+        }
+        .auth-box {
+            background: #222; padding: 40px; border-radius: 10px;
+            box-shadow: 0 0 20px rgba(68, 68, 255, 0.5); width: 300px; text-align: center;
+        }
+        .auth-box h2 { margin-top: 0; color: #fff; }
+        .auth-box input[type="text"], .auth-box input[type="password"] {
+            width: 90%; padding: 10px; margin: 10px 0; border: none; border-radius: 5px; font-size: 16px;
+        }
+        .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 14px; color: #ccc;}
+        .auth-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .auth-buttons button {
+            flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+        }
+        #btn-login { background: #4444ff; color: white; }
+        #btn-register { background: #ff4444; color: white; }
+        #auth-error { color: #ff6666; margin-top: 15px; font-size: 14px; min-height: 20px; }
     </style>
 </head>
 <body>
-    <div id="auth">
-        <h2>AIR HOCKEY</h2>
-        <input type="text" id="nick" placeholder="Ваш ник" maxlength="10"><br>
-        <button onclick="start()" style="padding: 10px 25px; cursor: pointer;">ИГРАТЬ</button>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h2>АЭРОХОККЕЙ</h2>
+            <input type="text" id="username" placeholder="Ваш никнейм">
+            <input type="password" id="password" placeholder="Пароль">
+            
+            <label class="remember-label">
+                <input type="checkbox" id="remember" checked> Запомнить меня
+            </label>
+            
+            <div class="auth-buttons">
+                <button id="btn-login">Войти</button>
+                <button id="btn-register">Создать</button>
+            </div>
+            <div id="auth-error"></div>
+        </div>
     </div>
+
     <div id="ui">
-        <div class="card" style="border-color: #4444ff"><div id="n1">?</div><div id="s1" style="font-size: 32px; color: #4444ff">0</div><div id="r1" style="color: gold; font-size: 12px"></div></div>
-        <div style="align-self: center; color: #555;">BATTLE TO 11</div>
-		<div id="ping" style="color: #00ff00; font-size: 12px; font-family: monospace;">Ping: ...ms</div>
-        <div class="card" style="border-color: #ff4444"><div id="n2">?</div><div id="s2" style="font-size: 32px; color: #ff4444">0</div><div id="r2" style="color: gold; font-size: 12px"></div></div>
+        <div class="p1-info">
+            <span id="n1">Игрок 1</span>
+            <span class="mmr" id="r1">MMR: 1000</span>
+        </div>
+        <div><span id="s1" class="score">0</span> : <span id="s2" class="score">0</span></div>
+        <div class="p2-info">
+            <span id="n2">Игрок 2</span>
+            <span class="mmr" id="r2">MMR: 1000</span>
+        </div>
     </div>
-    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-        <canvas id="game" width="800" height="400"></canvas>
-        <div id="msg"></div>
+    
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="goal-msg"></div>
     </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
 </body>
