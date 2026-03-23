@@ -1,31 +1,29 @@
-const socket = io({ transports: ["websocket"] }); // Принудительно быстрый протокол
+const socket = io({ transports: ["websocket"] });
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const msgBox = document.getElementById('msg');
 
-let state = null;
+let serverState = null; // То, что прислал сервер
+let clientState = null; // То, что мы рисуем (плавное)
 
 function start() {
     const nick = document.getElementById('nick').value;
-    if (nick) {
-        socket.emit('join', nick);
-        document.getElementById('auth').style.display = 'none';
-    }
+    if (nick) { socket.emit('join', nick); document.getElementById('auth').style.display = 'none'; }
 }
 
-socket.on('goalNotify', d => {
-    msgBox.textContent = d.msg;
-    msgBox.style.color = d.color;
-});
+socket.on('goalNotify', d => { msgBox.textContent = d.msg; msgBox.style.color = d.color; });
 
 socket.on('gameStateUpdate', s => {
-    state = s;
+    serverState = s;
+    if (!clientState) clientState = JSON.parse(JSON.stringify(s));
+    
+    // Обновляем текст UI
     document.getElementById('s1').textContent = s.player1.score;
-    document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
+    document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('s2').textContent = s.player2.score;
-    document.getElementById('n2').textContent = s.player2.name;
     document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
+    document.getElementById('n2').textContent = s.player2.name;
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -34,38 +32,42 @@ canvas.addEventListener('mousemove', e => {
 });
 
 function loop() {
-    if (state) {
-        // КЛИЕНТСКОЕ ПРЕДСКАЗАНИЕ: Двигаем шайбу сами между кадрами от сервера
-        if (!state.paused) {
-            state.puck.x += state.puck.vx;
-            state.puck.y += state.puck.vy;
-            state.puck.vx *= 0.99;
-            state.puck.vy *= 0.99;
-        }
-        render();
+    if (serverState && clientState) {
+        // ПЛАВНОЕ СБЛИЖЕНИЕ (Lerp)
+        // Мы не прыгаем в координаты сервера, а идем к ним на 20% каждый кадр
+        const lerp = 0.2; 
+        
+        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
+        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
+        
+        clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp;
+        clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
+        
+        clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp;
+        clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
+
+        render(clientState);
     }
     requestAnimationFrame(loop);
 }
 
-function render() {
+function render(s) {
     ctx.clearRect(0, 0, 800, 400);
-    // Поле
     ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
-    // Ворота
     ctx.lineWidth = 10;
     ctx.strokeStyle = '#ccccff'; ctx.strokeRect(0, 125, 4, 150);
     ctx.strokeStyle = '#ffcccc'; ctx.strokeRect(796, 125, 4, 150);
-    // Объекты
-    drawCircle(state.puck.x, state.puck.y, 15, '#222', true);
-    drawCircle(state.player1.x, state.player1.y, 30, '#4444ff');
-    drawCircle(state.player2.x, state.player2.y, 30, '#ff4444');
+
+    drawCircle(s.puck.x, s.puck.y, 15, '#222', true);
+    drawCircle(s.player1.x, s.player1.y, 30, '#4444ff');
+    drawCircle(s.player2.x, s.player2.y, 30, '#ff4444');
 }
 
-function drawCircle(x, y, r, c, puck) {
+function drawCircle(x, y, r, c, p) {
     ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = puck ? '#000' : '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = p ? '#000' : '#fff'; ctx.lineWidth = 3; ctx.stroke();
 }
 
-loop(); // Запускаем цикл отрисовки
+loop();

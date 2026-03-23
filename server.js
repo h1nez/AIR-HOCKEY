@@ -23,11 +23,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const WIDTH = 800;
 const HEIGHT = 400;
-const PUCK_RADIUS = 15;
-const PLAYER_RADIUS = 30;
+const PUCK_RADIUS = 22;   // Было 15
+const PLAYER_RADIUS = 35; // Было 30
 const GOAL_TOP = 125;
 const GOAL_BOTTOM = 275;
-const WIN_SCORE = 11;
+const WIN_SCORE = 5;
 
 let gameState = {
     puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
