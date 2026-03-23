@@ -17,7 +17,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
 // 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
-const MONGODB_URI = process.env.MONGODB_URI || 'ТВОЯ_ДЛИННАЯ_ССЫЛКА_ИЗ_ПРОШЛОГО_ШАГА';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
