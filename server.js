@@ -9,16 +9,12 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-
-const io = new Server(server, { 
-    cors: { origin: "*" },
-    pingInterval: 2000,
-    pingTimeout: 4000
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
+// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -32,6 +28,7 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
+// 🔥 НОВОЕ: Добавили массивы friends и requests
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -39,11 +36,8 @@ const userSchema = new mongoose.Schema({
     coins: { type: Number, default: 0 },
     skin: { type: String, default: 'default' },
     inventory: { type: [String], default: ['default'] },
-    matchesPlayed: { type: Number, default: 0 },
-    matchesWon: { type: Number, default: 0 },
-    maxRating: { type: Number, default: 1000 },
-    avatar: { type: String, default: 'avatar1' },
-    regDate: { type: Date, default: Date.now }
+    friends: { type: [String], default: [] },
+    requests: { type: [String], default: [] }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -105,27 +99,13 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     if (isDisconnect) win.score = 11; 
     const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
     win.rating += diff; lose.rating -= diff;
-    
     try {
-        const winUser = await User.findOne({ name: win.name });
-        if (winUser) {
-            winUser.rating = win.rating; winUser.coins += 25;
-            winUser.matchesPlayed += 1; winUser.matchesWon += 1;
-            if (win.rating > winUser.maxRating) winUser.maxRating = win.rating;
-            await winUser.save();
-        }
-        const loseUser = await User.findOne({ name: lose.name });
-        if (loseUser) {
-            loseUser.rating = lose.rating; loseUser.coins += 5;
-            loseUser.matchesPlayed += 1;
-            if (lose.rating > loseUser.maxRating) loseUser.maxRating = lose.rating;
-            await loseUser.save();
-        }
+        await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
+        await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
     } catch (err) {}
-
     room.rematch = { player1: false, player2: false };
-    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "#06d6a0" }); } 
-    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "#fb8500" }); }
+    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold" }); } 
+    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" }); }
     setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
 }
 
@@ -167,13 +147,7 @@ setInterval(() => {
             }
             resolveCollision(room.puck, room.player1); resolveCollision(room.puck, room.player2);
         }
-        
-        io.to(roomId).emit('gameStateUpdate', {
-            puck: room.puck,
-            player1: { x: room.player1.x, y: room.player1.y, score: room.player1.score, rating: room.player1.rating, name: room.player1.name, skin: room.player1.skin, id: room.player1.id },
-            player2: { x: room.player2.x, y: room.player2.y, score: room.player2.score, rating: room.player2.rating, name: room.player2.name, skin: room.player2.skin, id: room.player2.id },
-            paused: room.paused, gameOver: room.gameOver, timeLeft: room.timeLeft
-        });
+        io.to(roomId).emit('gameStateUpdate', room);
     }
 }, 20);
 
@@ -183,26 +157,17 @@ setInterval(() => {
 function tryRejoin(socket, user) {
     for (const id in rooms) {
         const r = rooms[id]; if (r.gameOver) continue;
-        if (r.player1.name === user.name) {
-            if (r.player1.id && r.player1.id !== socket.id) {
-                const oldSocket = io.sockets.sockets.get(r.player1.id);
-                if (oldSocket) { oldSocket.leave(id); oldSocket.roomId = null; oldSocket.disconnect(); }
-            }
+        if (r.player1.name === user.name && !r.player1.id) {
             r.player1.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
             if (r.player2.id) r.paused = false; socket.emit('role', 'p1'); return true;
         }
-        if (r.player2.name === user.name) {
-            if (r.player2.id && r.player2.id !== socket.id) {
-                const oldSocket = io.sockets.sockets.get(r.player2.id);
-                if (oldSocket) { oldSocket.leave(id); oldSocket.roomId = null; oldSocket.disconnect(); }
-            }
+        if (r.player2.name === user.name && !r.player2.id) {
             r.player2.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
             if (r.player1.id) r.paused = false; socket.emit('role', 'p2'); return true;
         }
-    } 
-    return false;
+    } return false;
 }
 
 function joinPlayerToRoom(socket, user) {
@@ -278,7 +243,7 @@ io.on('connection', (socket) => {
         if (room.player2.name !== "..." && !room.gameOver) finishMatch(room, winRole, true);
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
-        if (!room.player1.id && !room.player2.id) { clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; }
+        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
@@ -291,22 +256,10 @@ io.on('connection', (socket) => {
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
-    // 🔥 НОВОЕ: Передаем текущий MMR (rating) тоже!
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ 
-            success: true, coins: u.coins, skin: u.skin, inventory: u.inventory,
-            matchesPlayed: u.matchesPlayed, matchesWon: u.matchesWon, 
-            maxRating: u.maxRating, rating: u.rating, avatar: u.avatar, regDate: u.regDate
-        });
-    });
-
-    socket.on('changeAvatar', async (avatarName, callback) => {
-        if (!socket.user) return;
-        const u = await User.findById(socket.user._id);
-        u.avatar = avatarName; await u.save(); socket.user = u;
-        callback({ success: true });
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
     socket.on('buySkin', async (skinName, callback) => {
@@ -322,6 +275,95 @@ io.on('connection', (socket) => {
             await u.save(); socket.user = u;
             return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
         } else { return callback({ success: false, msg: "Не хватает монет!" }); }
+    });
+
+    // ==========================================
+    // 🔥 НОВОЕ: СИСТЕМА ДРУЗЕЙ
+    // ==========================================
+    
+    // Получить данные для меню друзей
+    socket.on('getFriendsData', async (callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            // Получаем профили друзей
+            const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin');
+            callback({ success: true, friends: friendsProfiles, requests: u.requests });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // Поиск игрока
+    socket.on('searchUser', async (query, callback) => {
+        if (!socket.user || !query) return;
+        try {
+            // Ищем по нику (без учета регистра), исключая себя
+            const users = await User.find({ name: new RegExp(query, 'i'), name: { $ne: socket.user.name } }).limit(5).select('name rating');
+            callback({ success: true, users });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // Отправить запрос
+    socket.on('sendFriendRequest', async (targetName, callback) => {
+        if (!socket.user) return;
+        try {
+            const target = await User.findOne({ name: targetName });
+            if (!target) return callback({ success: false, msg: "Игрок не найден" });
+            if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
+            if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
+
+            target.requests.push(socket.user.name);
+            await target.save();
+            callback({ success: true, msg: "Запрос отправлен!" });
+        } catch(e) { callback({ success: false, msg: "Ошибка" }); }
+    });
+
+    // Принять запрос
+    socket.on('acceptFriend', async (senderName, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            const sender = await User.findOne({ name: senderName });
+
+            u.requests = u.requests.filter(n => n !== senderName); // Удаляем из запросов
+            
+            if (sender && !u.friends.includes(senderName)) {
+                u.friends.push(senderName); // Добавляем себе
+                if (!sender.friends.includes(u.name)) {
+                    sender.friends.push(u.name); // Добавляем ему
+                    await sender.save();
+                }
+            }
+            await u.save();
+            callback({ success: true });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // Отклонить запрос
+    socket.on('rejectFriend', async (senderName, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            u.requests = u.requests.filter(n => n !== senderName);
+            await u.save();
+            callback({ success: true });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // Удалить из друзей
+    socket.on('removeFriend', async (friendName, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            const friend = await User.findOne({ name: friendName });
+
+            u.friends = u.friends.filter(n => n !== friendName);
+            if (friend) {
+                friend.friends = friend.friends.filter(n => n !== u.name);
+                await friend.save();
+            }
+            await u.save();
+            callback({ success: true });
+        } catch(e) { callback({ success: false }); }
     });
 
     socket.on('getLeaderboard', async (callback) => {

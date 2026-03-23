@@ -1,5 +1,6 @@
 const socket = io();
 
+// Загрузка картинок
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
@@ -7,43 +8,48 @@ catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
-
 const nameInput = document.getElementById('username');
 const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
 const authError = document.getElementById('auth-error');
 
-socket.on('connect', () => {
-    const savedName = localStorage.getItem('ah_name');
-    const savedPass = localStorage.getItem('ah_pass');
-    if (savedName && savedPass) {
-        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
-    }
-});
+const savedName = localStorage.getItem('ah_name');
+const savedPass = localStorage.getItem('ah_pass');
 
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { socket.disconnect(); } 
-    else { socket.connect(); }
-});
+// 🔥 ИСПРАВЛЕННЫЙ АВТОВХОД
+if (savedName && savedPass) {
+    nameInput.value = savedName; 
+    passInput.value = savedPass;
+    authError.innerText = "Автоматический вход...";
+    authError.style.color = "#4da6ff"; // Синенький цвет для загрузки
+    
+    // Ждем, пока установится связь с сервером, и только потом отправляем!
+    socket.on('connect', () => {
+        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
+    });
+}
 
 document.getElementById('btn-login').onclick = () => {
     authError.innerText = "Подключение...";
+    authError.style.color = "#e63946";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
+
 document.getElementById('btn-register').onclick = () => {
     authError.innerText = "Создание...";
+    authError.style.color = "#e63946";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
 function handleAuthResponse(res) {
+// ... дальше идет старый код функции, его не трогай
     if (res.success) {
         authScreen.style.display = 'none';
         if (res.rejoining) {
             mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
             document.getElementById('btn-cancel-search').style.display = 'none';
-        } else { 
-            gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; 
-        }
+        } else { mainMenu.style.display = 'flex'; }
+        
         updateProfile(); 
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
@@ -59,25 +65,10 @@ function updateProfile() {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
             
-            document.getElementById('prof-played').innerText = data.matchesPlayed;
-            document.getElementById('prof-won').innerText = data.matchesWon;
-            
-            // 🔥 НОВОЕ: Отображаем текущий рейтинг из базы!
-            document.getElementById('prof-mmr').innerText = Math.round(data.rating);
-            document.getElementById('prof-max-mmr').innerText = Math.round(data.maxRating);
-            
-            const d = new Date(data.regDate);
-            document.getElementById('prof-date').innerText = d.toLocaleDateString('ru-RU');
-
-            document.getElementById('menu-avatar').src = `/${data.avatar}.png`;
-            ['avatar1', 'avatar2', 'avatar3', 'avatar4'].forEach(av => {
-                const el = document.getElementById('av-' + av);
-                if (data.avatar === av) {
-                    el.style.borderColor = '#06d6a0'; el.style.boxShadow = '0 0 10px #06d6a0';
-                } else {
-                    el.style.borderColor = '#eee'; el.style.boxShadow = 'none';
-                }
-            });
+            // Бейджик запросов в друзья
+            const reqBadge = document.getElementById('req-badge');
+            if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; }
+            else { reqBadge.style.display = 'none'; }
 
             ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'].forEach(skin => {
                 const el = document.getElementById('skin-' + skin);
@@ -90,17 +81,81 @@ function updateProfile() {
     });
 }
 
-document.getElementById('btn-profile').onclick = () => { 
-    updateProfile(); document.getElementById('profile-modal').style.display = 'flex'; 
+// ==========================================
+// 🔥 ЛОГИКА ДРУЗЕЙ
+// ==========================================
+window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    
+    // Находим кнопку, которая соответствует вкладке, и делаем её активной
+    if(tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    if(tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    if(tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
 };
-document.getElementById('btn-close-profile').onclick = () => { 
-    document.getElementById('profile-modal').style.display = 'none'; 
+
+document.getElementById('btn-friends').onclick = () => {
+    document.getElementById('friends-modal').style.display = 'flex';
+    loadFriendsData();
 };
-window.changeAvatar = function(av) {
-    socket.emit('changeAvatar', av, (res) => {
-        if (res.success) updateProfile();
+document.getElementById('btn-close-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'none'; updateProfile(); };
+
+function loadFriendsData() {
+    socket.emit('getFriendsData', (res) => {
+        if (!res.success) return;
+        
+        // Отрисовка списка друзей
+        const list = document.getElementById('friends-list');
+        if (res.friends.length === 0) list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>";
+        else {
+            list.innerHTML = res.friends.map(f => `
+                <div class="friend-item">
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">MMR: ${f.rating} | Скин: ${f.skin}</span></div>
+                    <button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button>
+                </div>
+            `).join('');
+        }
+
+        // Отрисовка запросов
+        const reqList = document.getElementById('requests-list');
+        document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
+        if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
+        else {
+            reqList.innerHTML = res.requests.map(r => `
+                <div class="friend-item">
+                    <div class="friend-info">${r}</div>
+                    <div>
+                        <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
+                        <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    });
+}
+
+window.searchFriends = function() {
+    const q = document.getElementById('search-input').value;
+    socket.emit('searchUser', q, (res) => {
+        const resBox = document.getElementById('search-results');
+        if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
+        
+        resBox.innerHTML = res.users.map(u => `
+            <div class="friend-item">
+                <div class="friend-info">${u.name} <span class="friend-mmr">(MMR: ${u.rating})</span></div>
+                <button class="btn btn-blue btn-small" onclick="sendReq('${u.name}')">Добавить</button>
+            </div>
+        `).join('');
     });
 };
+
+window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); };
+window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
+window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
+window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
+
+// ==========================================
 
 window.buySkin = function(skinName) {
     socket.emit('buySkin', skinName, (res) => {
@@ -173,6 +228,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
+// --- ИГРОВАЯ ЛОГИКА ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -197,13 +253,7 @@ socket.on('gameStateUpdate', s => {
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
         document.getElementById('goal-msg').style.color = "#ffb703";
-        document.getElementById('btn-cancel-search').style.display = 'none';
     } 
-    else if (!s.gameOver && ((s.player1.id && !s.player2.id) || (!s.player1.id && s.player2.id))) {
-        document.getElementById('goal-msg').textContent = "Ищем друга...";
-        document.getElementById('goal-msg').style.color = "#fb8500";
-        document.getElementById('btn-cancel-search').style.display = 'block';
-    }
     else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
         if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
@@ -261,19 +311,15 @@ function render(s) {
 
     ctx.font = '30px Arial'; ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const decor = [
-        {t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200},
-        {t:'⭐', x:350, y:80}, {t:'🐾', x:400, y:320}, {t:'⭐', x:520, y:200},
-        {t:'🐾', x:680, y:80}, {t:'⭐', x:650, y:320}
-    ];
-    decor.forEach(d => ctx.fillText(d.t, d.x, d.y));
+    [{t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200}, {t:'⭐', x:350, y:80}, {t:'🐾', x:400, y:320}, {t:'⭐', x:520, y:200}, {t:'🐾', x:680, y:80}, {t:'⭐', x:650, y:320}].forEach(d => ctx.fillText(d.t, d.x, d.y));
 
     ctx.lineWidth = 6;
     ctx.fillStyle = 'rgba(77, 166, 255, 0.2)'; ctx.beginPath(); ctx.arc(0, 200, 100, -Math.PI/2, Math.PI/2); ctx.fill();
     ctx.fillStyle = 'rgba(255, 77, 77, 0.2)'; ctx.beginPath(); ctx.arc(800, 200, 100, Math.PI/2, -Math.PI/2); ctx.fill();
 
     ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
-    ctx.strokeStyle = '#4da6ff'; ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke(); ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
+    ctx.strokeStyle = '#4da6ff'; ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
 
     ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(400,200,77,0,Math.PI*2); ctx.fill();
