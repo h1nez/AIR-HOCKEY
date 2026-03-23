@@ -3,8 +3,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const msgBox = document.getElementById('msg');
 
-let serverState = null; // То, что прислал сервер
-let clientState = null; // То, что мы рисуем (плавное)
+let serverState = null; 
+let clientState = null; 
 
 function start() {
     const nick = document.getElementById('nick').value;
@@ -17,7 +17,7 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // Обновляем текст UI
+    // Обновляем UI
     document.getElementById('s1').textContent = s.player1.score;
     document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('n1').textContent = s.player1.name;
@@ -33,18 +33,18 @@ canvas.addEventListener('mousemove', e => {
 
 function loop() {
     if (serverState && clientState) {
-        // ПЛАВНОЕ СБЛИЖЕНИЕ (Lerp)
-        // Мы не прыгаем в координаты сервера, а идем к ним на 20% каждый кадр
-        const lerp = 0.2; 
+        // КОЭФФИЦИЕНТ СГЛАЖИВАНИЯ (0.1 - очень плавно, 0.5 - резче)
+        const lerpFactor = 0.15; 
         
-        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
-        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
+        // Плавно подтягиваем шайбу к серверным координатам
+        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerpFactor;
+        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerpFactor;
         
-        clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp;
-        clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
-        
-        clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp;
-        clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
+        // Плавно подтягиваем игроков
+        clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerpFactor;
+        clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerpFactor;
+        clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerpFactor;
+        clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerpFactor;
 
         render(clientState);
     }
@@ -53,9 +53,11 @@ function loop() {
 
 function render(s) {
     ctx.clearRect(0, 0, 800, 400);
+    // Поле
     ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
+    // Ворота
     ctx.lineWidth = 10;
     ctx.strokeStyle = '#ccccff'; ctx.strokeRect(0, 125, 4, 150);
     ctx.strokeStyle = '#ffcccc'; ctx.strokeRect(796, 125, 4, 150);
