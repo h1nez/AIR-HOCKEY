@@ -29,10 +29,19 @@ document.getElementById('btn-register').onclick = () => {
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
+// 🔥 НОВОЕ: Читаем флаг `rejoining`. Если мы вернулись в матч после обрыва - кидаем сразу в игру!
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
-        mainMenu.style.display = 'flex'; 
+        
+        if (res.rejoining) {
+            mainMenu.style.display = 'none';
+            gameWrapper.style.display = 'flex';
+            document.getElementById('btn-cancel-search').style.display = 'none';
+        } else {
+            mainMenu.style.display = 'flex'; 
+        }
+        
         updateProfile(); 
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
@@ -95,33 +104,18 @@ socket.on('hideEndScreen', () => {
     document.getElementById('end-screen').style.display = 'none';
 });
 
-// ПРОТИВНИК ВЫШЕЛ - ОЧИЩАЕМ ДАННЫЕ МАТЧА
-socket.on('opponentLeft', () => {
-    alert("Соперник покинул игру!");
-    socket.emit('leaveMatch'); 
-    clientState = null; serverState = null; myRole = null; // 🔥 Жестко сбрасываем память браузера!
-    document.getElementById('game-wrapper').style.display = 'none';
-    document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('main-menu').style.display = 'flex';
-    updateProfile();
-});
-
-// КНОПКА "НАЙТИ НОВУЮ ИГРУ" - ВЫХОДИМ И СРАЗУ ИЩЕМ НОВУЮ
 document.getElementById('btn-new-game').onclick = () => {
-    socket.emit('leaveMatch'); // Покидаем старую комнату
-    clientState = null; serverState = null; myRole = null; // 🔥 Сбрасываем старые скины и данные
-    
+    socket.emit('leaveMatch'); 
+    clientState = null; serverState = null; myRole = null; 
     document.getElementById('end-screen').style.display = 'none';
     document.getElementById('goal-msg').textContent = "Ожидание соперника...";
     document.getElementById('btn-cancel-search').style.display = 'block';
-    
-    socket.emit('play'); // Заходим в новую!
+    socket.emit('play'); 
 };
 
-// КНОПКА "ВЫЙТИ В МЕНЮ"
 document.getElementById('btn-leave-match').onclick = () => {
     socket.emit('leaveMatch');
-    clientState = null; serverState = null; myRole = null; // 🔥 Сбрасываем старые данные
+    clientState = null; serverState = null; myRole = null; 
     document.getElementById('game-wrapper').style.display = 'none';
     document.getElementById('end-screen').style.display = 'none';
     document.getElementById('main-menu').style.display = 'flex';
@@ -169,10 +163,18 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
 
-    if (s.player1.id && s.player2.id) {
+    // 🔥 НОВОЕ: Вывод таймера переподключения
+    if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
+        document.getElementById('goal-msg').textContent = `Игрок отключился. Ждем: ${s.timeLeft}с`;
+        document.getElementById('goal-msg').style.color = "#ffaa00";
+    } 
+    else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
-        if (document.getElementById('goal-msg').textContent === "Ожидание соперника...") document.getElementById('goal-msg').textContent = ""; 
+        if (document.getElementById('goal-msg').textContent.includes("Ожидание") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
+            document.getElementById('goal-msg').textContent = ""; 
+        }
     }
+
     if (s.paused) {
         clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y;
         clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
@@ -228,7 +230,6 @@ function render(s) {
     ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#eee'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
 
-    // 🔥 ИСПРАВЛЕНИЕ: Берем скины строго напрямую с сервера каждый кадр
     drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', serverState.player1.skin);
     drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', serverState.player2.skin);
 }

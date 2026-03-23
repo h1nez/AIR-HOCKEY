@@ -15,7 +15,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
 // 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/'';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -53,7 +53,11 @@ function createRoom() {
         player1: { id: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         player2: { id: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true,
-        gameOver: false
+        gameOver: false,
+        rematch: { player1: false, player2: false },
+        disconnectTimeout: null, // Таймер на 60 секунд
+        reconnectDeadline: null, // Время, когда будет засчитано поражение
+        timeLeft: null // Секунды для отображения на экране
     };
     return roomId;
 }
@@ -80,24 +84,41 @@ function resolveCollision(puck, player) {
     }
 }
 
+// ФУНКЦИЯ ОКОНЧАНИЯ МАТЧА (Вызывается и при голе, и при истечении таймера/выходе)
+async function finishMatch(room, winRole, isDisconnect = false) {
+    room.paused = true; room.gameOver = true;
+    const win = winRole === 'player1' ? room.player1 : room.player2;
+    const lose = winRole === 'player1' ? room.player2 : room.player1;
+    
+    if (lose.name === "...") return; // Защита от багов с пустыми комнатами
+
+    if (isDisconnect) win.score = 11; // Натягиваем победителю счет до 11
+    
+    const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
+    win.rating += diff; lose.rating -= diff;
+    try {
+        await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
+        await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
+    } catch (err) {}
+    
+    room.rematch = { player1: false, player2: false };
+    
+    if (isDisconnect) {
+        io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold" });
+    } else {
+        io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
+    }
+    setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
+}
+
 async function handleGoal(room, winRole) {
     room.paused = true;
     room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
     const win = winRole === 'player1' ? room.player1 : room.player2;
-    const lose = winRole === 'player1' ? room.player2 : room.player1;
     win.score++;
 
     if (win.score >= 11) {
-        const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
-        win.rating += diff; lose.rating -= diff;
-        try {
-            await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
-            await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
-        } catch (err) {}
-        
-        room.gameOver = true;
-        io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
-        setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
+        await finishMatch(room, winRole, false);
     } else {
         io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4444ff' : '#ff4444' });
         setTimeout(() => reset(room), 2000);
@@ -114,6 +135,12 @@ function reset(room) {
 setInterval(() => {
     for (const roomId in rooms) {
         const room = rooms[roomId];
+        
+        // Считаем оставшееся время для переподключения
+        if (room.reconnectDeadline) {
+            room.timeLeft = Math.max(0, Math.ceil((room.reconnectDeadline - Date.now()) / 1000));
+        }
+
         if (!room.paused && !room.gameOver) {
             room.puck.vx *= 0.995; room.puck.vy *= 0.995;
             room.puck.x += room.puck.vx; room.puck.y += room.puck.vy;
@@ -136,6 +163,32 @@ setInterval(() => {
 // ==========================================
 // 3. АВТОРИЗАЦИЯ И МЕНЮ
 // ==========================================
+// Функция для возвращения в матч после вылета
+function tryRejoin(socket, user) {
+    for (const id in rooms) {
+        const r = rooms[id];
+        if (r.gameOver) continue;
+        
+        if (r.player1.name === user.name && !r.player1.id) {
+            r.player1.id = socket.id;
+            socket.join(id); socket.roomId = id;
+            clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
+            if (r.player2.id) r.paused = false;
+            socket.emit('role', 'p1');
+            return true;
+        }
+        if (r.player2.name === user.name && !r.player2.id) {
+            r.player2.id = socket.id;
+            socket.join(id); socket.roomId = id;
+            clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
+            if (r.player1.id) r.paused = false;
+            socket.emit('role', 'p2');
+            return true;
+        }
+    }
+    return false;
+}
+
 function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
@@ -167,7 +220,9 @@ io.on('connection', (socket) => {
             const hashedPassword = await bcrypt.hash(data.password, 10);
             const newUser = new User({ name: data.name, password: hashedPassword });
             await newUser.save();
-            socket.user = newUser; callback({ success: true });
+            socket.user = newUser; 
+            if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true });
+            else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
@@ -178,7 +233,11 @@ io.on('connection', (socket) => {
             if (!user) return callback({ success: false, msg: "Аккаунт не найден!" });
             const isMatch = await bcrypt.compare(data.password, user.password);
             if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
-            socket.user = user; callback({ success: true });
+            socket.user = user; 
+            
+            // Если игрок вылетел из активного матча - возвращаем его прямо в игру!
+            if (tryRejoin(socket, user)) callback({ success: true, rejoining: true });
+            else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
@@ -187,15 +246,35 @@ io.on('connection', (socket) => {
         else socket.emit('forceReload');
     });
 
+    socket.on('rematch', () => {
+        if (!socket.roomId || !rooms[socket.roomId]) return;
+        const room = rooms[socket.roomId];
+        if (socket.id === room.player1.id) room.rematch.player1 = true;
+        if (socket.id === room.player2.id) room.rematch.player2 = true;
+
+        if (room.rematch.player1 && room.rematch.player2) {
+            room.player1.score = 0; room.player2.score = 0;
+            room.gameOver = false; reset(room);
+            io.to(room.id).emit('hideEndScreen');
+        }
+    });
+
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        socket.to(room.id).emit('opponentLeft');
+        const role = room.player1.id === socket.id ? 'player1' : 'player2';
+        const winRole = role === 'player1' ? 'player2' : 'player1';
+        
+        // Если вышел во время активной игры — выдаем Тех. Победу противнику
+        if (room.player2.name !== "..." && !room.gameOver) {
+            finishMatch(room, winRole, true);
+        }
+        
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
-        socket.leave(socket.roomId); 
-        socket.roomId = null; 
+        
+        socket.leave(socket.roomId); socket.roomId = null; 
     });
 
     socket.on('cancelPlay', () => {
@@ -250,9 +329,31 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        socket.to(room.id).emit('opponentLeft'); 
-        if (socket.id === room.player1.id) { room.player1.id = null; room.paused = true; }
-        if (socket.id === room.player2.id) { room.player2.id = null; room.paused = true; }
-        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
+        const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
+        
+        if (role) {
+            room[role].id = null; // Отмечаем, что игрок временно пропал
+            
+            // Если игра еще не началась или уже закончена
+            if (room.player2.name === "..." || room.gameOver) {
+                if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
+                return;
+            }
+
+            // Если вылетели оба - удаляем комнату
+            if (!room.player1.id && !room.player2.id) {
+                clearTimeout(room.disconnectTimeout);
+                delete rooms[socket.roomId];
+                return;
+            }
+
+            // ⏱️ ЗАПУСКАЕМ ТАЙМЕР НА 60 СЕКУНД
+            room.paused = true;
+            room.reconnectDeadline = Date.now() + 60000;
+            room.disconnectTimeout = setTimeout(() => {
+                const winRole = role === 'player1' ? 'player2' : 'player1';
+                finishMatch(room, winRole, true); // Выдаем поражение
+            }, 60000);
+        }
     });
 });
