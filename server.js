@@ -150,7 +150,16 @@ setInterval(() => {
             }
             resolveCollision(room.puck, room.player1); resolveCollision(room.puck, room.player2);
         }
-        io.to(roomId).emit('gameStateUpdate', room);
+        
+        // 🔥 ИСПРАВЛЕНИЕ: Отправляем только чистые данные без системных таймеров!
+        io.to(roomId).emit('gameStateUpdate', {
+            puck: room.puck,
+            player1: { x: room.player1.x, y: room.player1.y, score: room.player1.score, rating: room.player1.rating, name: room.player1.name, skin: room.player1.skin, id: room.player1.id },
+            player2: { x: room.player2.x, y: room.player2.y, score: room.player2.score, rating: room.player2.rating, name: room.player2.name, skin: room.player2.skin, id: room.player2.id },
+            paused: room.paused,
+            gameOver: room.gameOver,
+            timeLeft: room.timeLeft
+        });
     }
 }, 20);
 
