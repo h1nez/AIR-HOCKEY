@@ -155,22 +155,21 @@ function loadFriendsData() {
             `).join('');
         }
 
-        const reqList = document.getElementById('requests-list');
-        document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
-        if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
-        else {
-            reqList.innerHTML = res.requests.map(r => `
-                <div class="friend-item">
-                    <div class="friend-info">${r}</div>
-                    <div>
-                        <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
-                        <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-    });
-}
+		document.getElementById('btn-play').onclick = () => {
+			mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
+			socket.emit('play'); 
+			document.getElementById('goal-msg').textContent = "Ищем друга...";
+			document.getElementById('goal-msg').style.color = "#fb8500";
+			document.getElementById('btn-cancel-search').style.display = 'block';
+		};
+
+		// 🔥 НОВОЕ: Кнопка тренировки
+		document.getElementById('btn-play-bot').onclick = () => {
+			mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
+			socket.emit('playBot'); // Отправляем спец-команду серверу
+			document.getElementById('goal-msg').textContent = ""; // Бот подключается моментально!
+			document.getElementById('btn-cancel-search').style.display = 'none';
+		};
 
 window.searchFriends = function() {
     const q = document.getElementById('search-input').value;
