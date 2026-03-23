@@ -11,16 +11,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     transports: ["websocket"],
-    pingInterval: 1000, // Чаще проверяем связь
+    pingInterval: 1000,
     pingTimeout: 3000 
 });
 
-const dbPath = path.resolve(__dirname, 'db.json');
-if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, JSON.stringify({ users: [] }));
+// Настройка базы данных для Windows 10
+const dbPath = path.join(process.cwd(), 'db.json');
+if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify({ users: [] }, null, 2));
+}
 const db = await JSONFilePreset(dbPath, { users: [] });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Константы
 const WIDTH = 800;
 const HEIGHT = 400;
 const PUCK_R = 22; 
@@ -42,8 +46,11 @@ function resolveCollision(puck, player) {
     if (dist < minDist) {
         const nx = dx / dist; 
         const ny = dy / dist; 
-        puck.x = player.x + nx * (minDist + 2); // Жесткий выталкиватель
-        puck.y = player.y + ny * (minDist + 2);
+        const overlap = minDist - dist;
+
+        // Жесткое выталкивание
+        puck.x += nx * (overlap + 2);
+        puck.y += ny * (overlap + 2);
 
         const relVX = puck.vx - player.speedX;
         const relVY = puck.vy - player.speedY;
@@ -53,8 +60,8 @@ function resolveCollision(puck, player) {
 
         const res = 1.3;
         let j = -(1 + res) * velNormal;
-        puck.vx += j * nx + player.speedX * 0.5;
-        puck.vy += j * ny + player.speedY * 0.5;
+        puck.vx += j * nx + player.speedX * 0.4;
+        puck.vy += j * ny + player.speedY * 0.4;
 
         const maxS = 18;
         const curS = Math.sqrt(puck.vx**2 + puck.vy**2);
@@ -72,11 +79,14 @@ async function handleGoal(winRole) {
         const K = 32;
         const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
+        
         await db.read();
-        const u1 = db.data.users.find(u => u.name === win.name);
-        const u2 = db.data.users.find(u => u.name === lose.name);
-        if(u1) u1.rating = win.rating; if(u2) u2.rating = lose.rating;
-        await db.write();
+        let u1 = db.data.users.find(u => u.name === win.name);
+        let u2 = db.data.users.find(u => u.name === lose.name);
+        if(u1) u1.rating = win.rating; 
+        if(u2) u2.rating = lose.rating;
+        await db.write(); // КРИТИЧНО ДЛЯ СОХРАНЕНИЯ
+
         io.emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
         setTimeout(() => { gameState.player1.score = 0; gameState.player2.score = 0; reset(winRole); }, 5000);
     } else {
@@ -97,6 +107,7 @@ setInterval(() => {
     if (!gameState.paused) {
         gameState.puck.vx *= 0.985; gameState.puck.vy *= 0.985;
         gameState.puck.x += gameState.puck.vx; gameState.puck.y += gameState.puck.vy;
+        
         if (gameState.puck.y < PUCK_R || gameState.puck.y > HEIGHT - PUCK_R) {
             gameState.puck.vy *= -1;
             gameState.puck.y = gameState.puck.y < HEIGHT/2 ? PUCK_R : HEIGHT - PUCK_R;
@@ -113,21 +124,28 @@ setInterval(() => {
         resolveCollision(gameState.puck, gameState.player2);
     }
     io.emit('gameStateUpdate', gameState);
-}, 22); // ~45 FPS
+}, 22);
 
 io.on('connection', (socket) => {
     socket.on('join', async (name) => {
-        await db.read();
-        let user = db.data.users.find(u => u.name === name);
-        if (!user) { user = { name, rating: 1000 }; db.data.users.push(user); await db.write(); }
-        if (!gameState.player1.id) {
-            gameState.player1.id = socket.id; gameState.player1.name = name; 
-            gameState.player1.rating = user.rating; socket.emit('role', 'p1');
-        } else if (!gameState.player2.id) {
-            gameState.player2.id = socket.id; gameState.player2.name = name; 
-            gameState.player2.rating = user.rating; socket.emit('role', 'p2');
-            gameState.paused = false;
-        }
+        try {
+            await db.read();
+            let user = db.data.users.find(u => u.name === name);
+            if (!user) {
+                user = { name, rating: 1000 };
+                db.data.users.push(user);
+                await db.write();
+                console.log(`✅ Пользователь ${name} сохранен!`);
+            }
+            if (!gameState.player1.id) {
+                gameState.player1.id = socket.id; gameState.player1.name = name; 
+                gameState.player1.rating = user.rating; socket.emit('role', 'p1');
+            } else if (!gameState.player2.id) {
+                gameState.player2.id = socket.id; gameState.player2.name = name; 
+                gameState.player2.rating = user.rating; socket.emit('role', 'p2');
+                gameState.paused = false;
+            }
+        } catch(e) { console.error("Ошибка БД:", e); }
     });
     socket.on('input', (data) => {
         const p = socket.id === gameState.player1.id ? gameState.player1 : (socket.id === gameState.player2.id ? gameState.player2 : null);
@@ -144,4 +162,6 @@ io.on('connection', (socket) => {
         if (socket.id === gameState.player2.id) { gameState.player2.id = null; gameState.paused = true; }
     });
 });
-server.listen(process.env.PORT || 3000);
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🚀 Сервер: http://localhost:${PORT}`));

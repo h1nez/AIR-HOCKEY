@@ -41,17 +41,16 @@ canvas.addEventListener('mousemove', e => {
 
 function loop() {
     if (serverState && clientState) {
-        // ЭКСТРАПОЛЯЦИЯ (Предсказание при высоком пинге)
-        // Чем выше пинг, тем дальше вперед мы рисуем шайбу
-        const prediction = currentPing / 50; 
+        const lerp = 0.15; 
+        
+        // ЭКСТРАПОЛЯЦИЯ: компенсируем пинг
+        const prediction = currentPing / 45; // Магическое число для предсказания
         const targetX = serverState.puck.x + (serverState.puck.vx * prediction);
         const targetY = serverState.puck.y + (serverState.puck.vy * prediction);
 
-        const lerp = 0.15; 
         clientState.puck.x += (targetX - clientState.puck.x) * lerp;
         clientState.puck.y += (targetY - clientState.puck.y) * lerp;
         
-        // Сглаживание врага
         const enemy = myRole === 'p1' ? 'player2' : 'player1';
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
@@ -68,7 +67,7 @@ setInterval(() => {
         currentPing = Date.now() - startP;
         if(pingDisplay) {
             pingDisplay.textContent = `Ping: ${currentPing}ms`;
-            pingDisplay.style.color = currentPing > 200 ? 'red' : 'green';
+            pingDisplay.style.color = currentPing > 200 ? '#ff4444' : '#00ff00';
         }
     });
 }, 1000);
