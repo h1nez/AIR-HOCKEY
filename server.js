@@ -3,7 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import mongoose from 'mongoose'; // Подключаем настоящую БД
+import mongoose from 'mongoose';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -15,26 +15,22 @@ const io = new Server(server, {
 });
 
 // ==========================================
-// 1. ПОДКЛЮЧЕНИЕ К MONGODB
+// 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// Сюда мы позже вставим твою личную ссылку от MongoDB Atlas
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
+// ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
+const MONGODB_URI = process.env.MONGODB_URI || 'ТВОЯ_ДЛИННАЯ_ССЫЛКА_ИЗ_ПРОШЛОГО_ШАГА';
 
-mongoose.connect(MONGODB_URI, { 
-    family: 4, // ПРИНУДИТЕЛЬНО используем IPv4 (спасает от ETIMEOUT)
-    serverSelectionTimeoutMS: 5000 // Ждем максимум 5 секунд
-})
-.then(() => {
-    console.log('✅ Успешное подключение к MongoDB!');
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
-})
-.catch(err => {
-    console.error('❌ Критическая ошибка БД:', err.message);
-    process.exit(1);
-});
+mongoose.connect(MONGODB_URI)
+    .then(() => {
+        console.log('✅ Успешное подключение к MongoDB!');
+        const PORT = process.env.PORT || 10000;
+        server.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
+    })
+    .catch(err => {
+        console.error('❌ Критическая ошибка БД:', err.message);
+        process.exit(1);
+    });
 
-// Создаем "Схему" игрока (как таблица в БД)
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     rating: { type: Number, default: 1000 }
@@ -49,39 +45,44 @@ const HEIGHT = 400;
 const PUCK_R = 22; 
 const PLAYER_R = 35;
 
-let gameState = {
-    puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
-    player1: { id: null, name: "...", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
-    player2: { id: null, name: "...", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
-    paused: true
-};
+// ==========================================
+// 2. СИСТЕМА КОМНАТ (ROOMS)
+// ==========================================
+const rooms = {}; // Хранилище всех активных комнат
+let roomCounter = 1;
+
+// Функция создания новой комнаты
+function createRoom() {
+    const roomId = 'room_' + roomCounter++;
+    rooms[roomId] = {
+        id: roomId,
+        puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
+        player1: { id: null, name: "...", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
+        player2: { id: null, name: "...", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
+        paused: true
+    };
+    return roomId;
+}
 
 function resolveCollision(puck, player) {
     const dx = puck.x - player.x;
     const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = PUCK_R + PLAYER_R; // 57
+    const minDist = PUCK_R + PLAYER_R;
 
     if (dist < minDist) {
         let nx = dx / dist; 
         let ny = dy / dist; 
 
-        // 🛑 АНТИ-ПРОКРУТКА: Если клюшка оказалась "внутри" шайбы из-за резкого рывка
         if (dist < 35) { 
-            // Берем старую позицию клюшки (до удара) и считаем вектор от неё
             const oldX = player.x - player.speedX;
             const oldY = player.y - player.speedY;
             const oldDx = puck.x - oldX;
             const oldDy = puck.y - oldY;
             const oldDist = Math.sqrt(oldDx * oldDx + oldDy * oldDy);
-            
-            if (oldDist > 0) {
-                nx = oldDx / oldDist; // Теперь вектор удара всегда правильный!
-                ny = oldDy / oldDist;
-            }
+            if (oldDist > 0) { nx = oldDx / oldDist; ny = oldDy / oldDist; }
         }
 
-        // Выталкиваем шайбу (без магнитов, ровно на край)
         puck.x = player.x + nx * (minDist + 0.1);
         puck.y = player.y + ny * (minDist + 0.1);
 
@@ -106,15 +107,13 @@ function resolveCollision(puck, player) {
     }
 }
 
-async function handleGoal(winRole) {
-    gameState.paused = true;
-    
-    // ДОБАВИТЬ ЭТИ ДВЕ СТРОКИ: Сразу возвращаем клюшки на старт
-    gameState.player1.x = 80; gameState.player1.y = 200;
-    gameState.player2.x = 720; gameState.player2.y = 200;
+async function handleGoal(room, winRole) {
+    room.paused = true;
+    room.player1.x = 80; room.player1.y = 200;
+    room.player2.x = 720; room.player2.y = 200;
 
-    const win = winRole === 'player1' ? gameState.player1 : gameState.player2;
-    const lose = winRole === 'player1' ? gameState.player2 : gameState.player1;
+    const win = winRole === 'player1' ? room.player1 : room.player2;
+    const lose = winRole === 'player1' ? room.player2 : room.player1;
     win.score++;
 
     if (win.score >= 11) {
@@ -122,94 +121,121 @@ async function handleGoal(winRole) {
         const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
         
-        // --- СОХРАНЕНИЕ В MONGODB ---
         try {
             await User.findOneAndUpdate({ name: win.name }, { rating: win.rating });
             await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating });
-            console.log(`💾 Рейтинг обновлен: ${win.name} (${win.rating}), ${lose.name} (${lose.rating})`);
-        } catch (err) {
-            console.error('Ошибка сохранения рейтинга:', err);
-        }
-        // ----------------------------
+        } catch (err) { console.error('Ошибка сохранения рейтинга:', err); }
 
-        io.emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
-        setTimeout(() => { gameState.player1.score = 0; gameState.player2.score = 0; reset(winRole); }, 5000);
+        io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
+        setTimeout(() => { room.player1.score = 0; room.player2.score = 0; reset(room); }, 5000);
     } else {
-        io.emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4444ff' : '#ff4444' });
-        setTimeout(() => reset(winRole), 2000);
+        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4444ff' : '#ff4444' });
+        setTimeout(() => reset(room), 2000);
     }
 }
 
-function reset(lastWin) {
-    gameState.puck = { x: WIDTH/2, y: HEIGHT/2, vx: lastWin === 'player1' ? 0 : 0, vy: 0 };
-    gameState.player1.x = 80; gameState.player1.y = 200;
-    gameState.player2.x = 720; gameState.player2.y = 200;
-    gameState.paused = false;
-    io.emit('goalNotify', { msg: "", color: "" });
+function reset(room) {
+    room.puck = { x: WIDTH/2, y: HEIGHT/2, vx: 0, vy: 0 }; 
+    room.player1.x = 80; room.player1.y = 200;
+    room.player2.x = 720; room.player2.y = 200;
+    room.paused = false;
+    io.to(room.id).emit('goalNotify', { msg: "", color: "" });
 }
 
+// ==========================================
+// 3. ГЛАВНЫЙ ЦИКЛ СЕРВЕРА (ОБРАБАТЫВАЕТ ВСЕ КОМНАТЫ)
+// ==========================================
 setInterval(() => {
-    if (!gameState.paused) {
-        gameState.puck.vx *= 0.995; gameState.puck.vy *= 0.995;
-        gameState.puck.x += gameState.puck.vx; 
-        gameState.puck.y += gameState.puck.vy;
+    for (const roomId in rooms) {
+        const room = rooms[roomId];
         
-        if (gameState.puck.y < PUCK_R) { gameState.puck.y = PUCK_R; gameState.puck.vy *= -1; }
-        if (gameState.puck.y > HEIGHT - PUCK_R) { gameState.puck.y = HEIGHT - PUCK_R; gameState.puck.vy *= -1; }
+        if (!room.paused) {
+            room.puck.vx *= 0.995; room.puck.vy *= 0.995;
+            room.puck.x += room.puck.vx; 
+            room.puck.y += room.puck.vy;
+            
+            if (room.puck.y < PUCK_R) { room.puck.y = PUCK_R; room.puck.vy *= -1; }
+            if (room.puck.y > HEIGHT - PUCK_R) { room.puck.y = HEIGHT - PUCK_R; room.puck.vy *= -1; }
 
-        if (gameState.puck.x < PUCK_R) {
-            if (gameState.puck.y > 125 && gameState.puck.y < 275) handleGoal('player2');
-            else { gameState.puck.x = PUCK_R; gameState.puck.vx *= -1; }
-        }
-        if (gameState.puck.x > WIDTH - PUCK_R) {
-            if (gameState.puck.y > 125 && gameState.puck.y < 275) handleGoal('player1');
-            else { gameState.puck.x = WIDTH - PUCK_R; gameState.puck.vx *= -1; }
-        }
+            if (room.puck.x < PUCK_R) {
+                if (room.puck.y > 125 && room.puck.y < 275) handleGoal(room, 'player2');
+                else { room.puck.x = PUCK_R; room.puck.vx *= -1; }
+            }
+            if (room.puck.x > WIDTH - PUCK_R) {
+                if (room.puck.y > 125 && room.puck.y < 275) handleGoal(room, 'player1');
+                else { room.puck.x = WIDTH - PUCK_R; room.puck.vx *= -1; }
+            }
 
-        resolveCollision(gameState.puck, gameState.player1);
-        resolveCollision(gameState.puck, gameState.player2);
+            resolveCollision(room.puck, room.player1);
+            resolveCollision(room.puck, room.player2);
+        }
+        // Отправляем данные только игрокам в этой конкретной комнате
+        io.to(roomId).emit('gameStateUpdate', room);
     }
-    io.emit('gameStateUpdate', gameState);
 }, 20);
 
+// ==========================================
+// 4. ПОДКЛЮЧЕНИЕ ИГРОКОВ К КОМНАТАМ
+// ==========================================
 io.on('connection', (socket) => {
     socket.on('join', async (name) => {
         try {
-            // --- ПОИСК ИЛИ СОЗДАНИЕ В MONGODB ---
             let user = await User.findOne({ name: name });
             if (!user) {
                 user = new User({ name: name, rating: 1000 });
                 await user.save();
-                console.log(`✅ Новый игрок зарегистрирован: ${name}`);
-            } else {
-                console.log(`🔙 Игрок вернулся: ${name} (Рейтинг: ${user.rating})`);
             }
-            // ------------------------------------
 
-            if (!gameState.player1.id) {
-                gameState.player1.id = socket.id; gameState.player1.name = name; 
-                gameState.player1.rating = user.rating; socket.emit('role', 'p1');
-            } else if (!gameState.player2.id) {
-                gameState.player2.id = socket.id; gameState.player2.name = name; 
-                gameState.player2.rating = user.rating; socket.emit('role', 'p2');
-                gameState.paused = false;
+            let myRoomId = null;
+            // Ищем комнату, где сидит только 1 игрок и ждет соперника
+            for (const id in rooms) {
+                if (rooms[id].player1.id && !rooms[id].player2.id) {
+                    myRoomId = id; break;
+                }
+            }
+            // Если свободных комнат нет — создаем новую
+            if (!myRoomId) {
+                myRoomId = createRoom();
+            }
+
+            const room = rooms[myRoomId];
+            socket.join(myRoomId);       // Подключаем сокет к каналу связи комнаты
+            socket.roomId = myRoomId;    // Запоминаем, в какой комнате игрок
+
+            if (!room.player1.id) {
+                room.player1.id = socket.id; room.player1.name = name; 
+                room.player1.rating = user.rating; socket.emit('role', 'p1');
+            } else if (!room.player2.id) {
+                room.player2.id = socket.id; room.player2.name = name; 
+                room.player2.rating = user.rating; socket.emit('role', 'p2');
+                room.paused = false; // Начинаем матч!
             }
         } catch(e) { console.error("Ошибка входа:", e); }
     });
 
     socket.on('input', (data) => {
-        const p = socket.id === gameState.player1.id ? gameState.player1 : (socket.id === gameState.player2.id ? gameState.player2 : null);
-        if (p && !gameState.paused) {
+        if (!socket.roomId || !rooms[socket.roomId]) return; // Игнорируем, если нет комнаты
+        const room = rooms[socket.roomId];
+
+        const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
+        if (p && !room.paused) {
             const oldX = p.x; const oldY = p.y;
-            p.x = (p === gameState.player1) ? Math.min(365, Math.max(35, data.x)) : Math.min(765, Math.max(435, data.x));
+            p.x = (p === room.player1) ? Math.min(365, Math.max(35, data.x)) : Math.min(765, Math.max(435, data.x));
             p.y = Math.min(365, Math.max(35, data.y));
             p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
 
-    socket.on('pingCheck', () => socket.emit('pongCheck'));
     socket.on('disconnect', () => {
-        if (socket.id === gameState.player1.id) { gameState.player1.id = null; gameState.paused = true; }
-        if (socket.id === gameState.player2.id) { gameState.player2.id = null; gameState.paused = true; }
+        if (!socket.roomId || !rooms[socket.roomId]) return;
+        const room = rooms[socket.roomId];
+
+        if (socket.id === room.player1.id) { room.player1.id = null; room.paused = true; }
+        if (socket.id === room.player2.id) { room.player2.id = null; room.paused = true; }
+
+        // Если из комнаты вышли ОБА игрока — удаляем её, чтобы не засорять память сервера
+        if (!room.player1.id && !room.player2.id) {
+            delete rooms[socket.roomId];
+        }
     });
 });
