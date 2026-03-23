@@ -6,25 +6,24 @@
     <title>Аэрохоккей Онлайн</title>
     <style>
         body { margin: 0; background-color: #111; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #game-container { position: relative; width: 800px; height: 400px; }
-        canvas { background-color: #222; border: 4px solid #555; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
-        #ui { display: flex; justify-content: space-between; width: 800px; padding: 10px 0; font-size: 24px; font-weight: bold; }
-        .p1-info { color: #6666ff; display: flex; flex-direction: column; align-items: flex-start; }
-        .p2-info { color: #ff6666; display: flex; flex-direction: column; align-items: flex-end; }
-        .mmr { font-size: 14px; color: #aaa; font-weight: normal; }
-        .score { font-size: 36px; color: white; }
-        #goal-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-shadow: 2px 2px 10px black; pointer-events: none; }
-
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
+        
+        /* Авторизация */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
         .auth-box { background: #222; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(68, 68, 255, 0.5); width: 300px; text-align: center; }
         .auth-box h2 { margin-top: 0; color: #fff; }
         .auth-box input { width: 90%; padding: 10px; margin: 10px 0; border: none; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
         .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 14px; color: #ccc;}
         .auth-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .auth-buttons button { flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .auth-buttons button { flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .auth-buttons button:hover { opacity: 0.8; }
         #btn-login { background: #4444ff; color: white; }
         #btn-register { background: #ff4444; color: white; }
         #auth-error { color: #ff6666; margin-top: 15px; font-size: 14px; min-height: 20px; }
+
+        /* Игровой интерфейс */
+        .p1-info { color: #6666ff; display: flex; flex-direction: column; align-items: flex-start; }
+        .p2-info { color: #ff6666; display: flex; flex-direction: column; align-items: flex-end; }
+        .mmr { font-size: 14px; color: #aaa; font-weight: normal; }
     </style>
 </head>
 <body>
@@ -34,11 +33,7 @@
             <h2>АЭРОХОККЕЙ</h2>
             <input type="text" id="username" placeholder="Ваш никнейм">
             <input type="password" id="password" placeholder="Пароль">
-            
-            <label class="remember-label">
-                <input type="checkbox" id="remember" checked> Запомнить меня
-            </label>
-            
+            <label class="remember-label"><input type="checkbox" id="remember" checked> Запомнить меня</label>
             <div class="auth-buttons">
                 <button id="btn-login">Войти</button>
                 <button id="btn-register">Создать</button>
@@ -47,15 +42,38 @@
         </div>
     </div>
 
-    <div id="ui">
-        <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
-        <div><span id="s1" class="score">0</span> : <span id="s2" class="score">0</span></div>
-        <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
+    <div id="main-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 500; flex-direction: column; align-items: center; justify-content: center;">
+        <h1 style="color: white; font-size: 48px; margin-bottom: 40px; text-shadow: 0 0 20px #4444ff;">АЭРОХОККЕЙ ONLINE</h1>
+        <div style="display: flex; gap: 20px;">
+            <button id="btn-shop" style="padding: 20px 40px; font-size: 24px; background: #222; color: #ffaa00; border: 2px solid #ffaa00; border-radius: 10px; cursor: pointer; transition: 0.2s;">🛒 Магазин</button>
+            <button id="btn-play" style="padding: 20px 60px; font-size: 32px; background: #4444ff; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 20px #4444ff; transition: 0.2s;">ИГРАТЬ</button>
+            <button id="btn-leaderboard" style="padding: 20px 40px; font-size: 24px; background: #222; color: #00eeff; border: 2px solid #00eeff; border-radius: 10px; cursor: pointer; transition: 0.2s;">🏆 Топ-10</button>
+        </div>
     </div>
-    
-    <div id="game-container">
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
-        <div id="goal-msg"></div>
+
+    <div id="leaderboard-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #00eeff; width: 300px; text-align: center;">
+        <h2 style="margin-top:0;">Лучшие игроки</h2>
+        <ol id="leaderboard-list" style="text-align: left; margin-bottom: 20px; font-size: 18px; line-height: 1.5;"></ol>
+        <button id="btn-close-lb" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
+    </div>
+
+    <div id="shop-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #ffaa00; text-align: center; width: 300px;">
+        <h2 style="margin-top:0;">Магазин</h2>
+        <p style="color: #aaa; margin-bottom: 20px;">Здесь скоро появятся крутые скины!</p>
+        <button id="btn-close-shop" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
+    </div>
+
+    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center;">
+        <div id="ui" style="display: flex; justify-content: space-between; width: 800px; padding: 10px 0; font-size: 24px; font-weight: bold;">
+            <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
+            <div><span id="s1" style="font-size: 36px; color: white;">0</span> : <span id="s2" style="font-size: 36px; color: white;">0</span></div>
+            <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
+        </div>
+        
+        <div id="game-container" style="position: relative; width: 800px; height: 400px;">
+            <canvas id="gameCanvas" width="800" height="400" style="background-color: #222; border: 4px solid #555; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.8);"></canvas>
+            <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-shadow: 2px 2px 10px black; pointer-events: none;"></div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

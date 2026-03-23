@@ -9,14 +9,15 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" } // Разрешаем любые подключения
-});
+
+// Разрешаем любые подключения, чтобы не было ошибки 400 (polling)
+const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
+// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
+const MONGODB_URI = process.env.MONGODB_URI || 'ТВОЯ_ДЛИННАЯ_ССЫЛКА_ИЗ_ПРОШЛОГО_ШАГА';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -35,8 +36,10 @@ const userSchema = new mongoose.Schema({
     rating: { type: Number, default: 1000 }
 });
 const User = mongoose.model('User', userSchema);
-// ==========================================
 
+// ==========================================
+// 2. ИГРОВАЯ ЛОГИКА И КОМНАТЫ
+// ==========================================
 app.use(express.static(path.join(__dirname, 'public')));
 
 const WIDTH = 800; const HEIGHT = 400; const PUCK_R = 22; const PLAYER_R = 35;
@@ -128,7 +131,7 @@ setInterval(() => {
 }, 20);
 
 // ==========================================
-// 4. СИСТЕМА АВТОРИЗАЦИИ И ПОИСК КОМНАТЫ
+// 3. АВТОРИЗАЦИЯ И МЕНЮ
 // ==========================================
 function joinPlayerToRoom(socket, user) {
     let myRoomId = null;
@@ -153,40 +156,22 @@ function joinPlayerToRoom(socket, user) {
 
 io.on('connection', (socket) => {
     
-    // ДОБАВЛЕНЫ ЛОГИ В РЕГИСТРАЦИЮ
     socket.on('register', async (data, callback) => {
-        console.log(`[РЕГИСТРАЦИЯ] Попытка регистрации пользователя: ${data.name}`);
         try {
-            if (!data.name || !data.password) {
-                console.log(`[РЕГИСТРАЦИЯ] Ошибка: пустые поля`);
-                return callback({ success: false, msg: "Заполните все поля!" });
-            }
-            
-            console.log(`[РЕГИСТРАЦИЯ] Ищу пользователя в базе...`);
+            if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const existing = await User.findOne({ name: data.name });
-            if (existing) {
-                console.log(`[РЕГИСТРАЦИЯ] Ошибка: Имя уже занято`);
-                return callback({ success: false, msg: "Это имя уже занято!" });
-            }
+            if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
 
-            console.log(`[РЕГИСТРАЦИЯ] Шифрую пароль...`);
             const hashedPassword = await bcrypt.hash(data.password, 10);
-            
-            console.log(`[РЕГИСТРАЦИЯ] Сохраняю в БД...`);
             const newUser = new User({ name: data.name, password: hashedPassword, rating: 1000 });
             await newUser.save();
 
-            console.log(`[РЕГИСТРАЦИЯ] Успешно! Сажаю в комнату...`);
-            joinPlayerToRoom(socket, newUser);
+            socket.user = newUser; // Запоминаем юзера, но не кидаем в игру
             callback({ success: true });
-        } catch(e) { 
-            console.error("[РЕГИСТРАЦИЯ] КРИТИЧЕСКАЯ ОШИБКА:", e);
-            callback({ success: false, msg: "Ошибка сервера: " + e.message }); 
-        }
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
     socket.on('login', async (data, callback) => {
-        console.log(`[ВХОД] Попытка входа пользователя: ${data.name}`);
         try {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const user = await User.findOne({ name: data.name });
@@ -195,12 +180,22 @@ io.on('connection', (socket) => {
             const isMatch = await bcrypt.compare(data.password, user.password);
             if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
 
-            joinPlayerToRoom(socket, user);
+            socket.user = user; // Запоминаем юзера, но не кидаем в игру
             callback({ success: true });
-        } catch(e) { 
-            console.error("[ВХОД] КРИТИЧЕСКАЯ ОШИБКА:", e);
-            callback({ success: false, msg: "Ошибка сервера" }); 
-        }
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
+    });
+
+    // Игрок нажал кнопку "ИГРАТЬ"
+    socket.on('play', () => {
+        if (socket.user) joinPlayerToRoom(socket, socket.user);
+    });
+
+    // Игрок запросил таблицу лидеров
+    socket.on('getLeaderboard', async (callback) => {
+        try {
+            const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id');
+            callback({ success: true, leaderboard: topUsers });
+        } catch(e) { callback({ success: false }); }
     });
 
     socket.on('input', (data) => {

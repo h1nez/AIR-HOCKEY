@@ -1,5 +1,10 @@
 const socket = io();
+
+// --- АВТОРИЗАЦИЯ И МЕНЮ ---
 const authScreen = document.getElementById('auth-screen');
+const mainMenu = document.getElementById('main-menu');
+const gameWrapper = document.getElementById('game-wrapper');
+
 const nameInput = document.getElementById('username');
 const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
@@ -27,6 +32,8 @@ document.getElementById('btn-register').onclick = () => {
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
+        mainMenu.style.display = 'flex'; // Открываем Главное Меню
+        
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value);
             localStorage.setItem('ah_pass', passInput.value);
@@ -40,6 +47,39 @@ function handleAuthResponse(res) {
     }
 }
 
+// --- КНОПКИ ГЛАВНОГО МЕНЮ ---
+document.getElementById('btn-play').onclick = () => {
+    mainMenu.style.display = 'none';
+    gameWrapper.style.display = 'flex'; // Показываем игру
+    socket.emit('play'); // Запрашиваем матч у сервера
+    
+    const msgEl = document.getElementById('goal-msg');
+    msgEl.textContent = "Ожидание соперника...";
+    msgEl.style.color = "white";
+};
+
+document.getElementById('btn-leaderboard').onclick = () => {
+    socket.emit('getLeaderboard', (res) => {
+        if (res.success) {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = ''; 
+            res.leaderboard.forEach(user => {
+                const li = document.createElement('li');
+                li.style.margin = "5px 0";
+                li.innerHTML = `<b>${user.name}</b> — MMR: ${user.rating}`;
+                list.appendChild(li);
+            });
+            document.getElementById('leaderboard-modal').style.display = 'block';
+        }
+    });
+};
+document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
+
+document.getElementById('btn-shop').onclick = () => document.getElementById('shop-modal').style.display = 'block';
+document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
+
+
+// --- ИГРОВАЯ ЛОГИКА ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -48,6 +88,7 @@ let clientState = null;
 let myRole = null;
 
 socket.on('role', role => myRole = role);
+
 socket.on('goalNotify', data => {
     const msgEl = document.getElementById('goal-msg');
     msgEl.textContent = data.msg;
