@@ -3,104 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Аэрохоккей Онлайн</title>
+    <title>Аэрохоккей Три Кота</title>
     <style>
-        body { margin: 0; background-color: #111; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* Мультяшный светлый фон для всей игры */
+        body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
         
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
-        .auth-box { background: #222; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(68, 68, 255, 0.5); width: 300px; text-align: center; }
-        .auth-box h2 { margin-top: 0; color: #fff; }
-        .auth-box input { width: 90%; padding: 10px; margin: 10px 0; border: none; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
-        .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 14px; color: #ccc;}
-        .auth-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .auth-buttons button { flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .auth-buttons button:hover { opacity: 0.8; }
-        #btn-login { background: #4444ff; color: white; }
-        #btn-register { background: #ff4444; color: white; }
-        #auth-error { color: #ff6666; margin-top: 15px; font-size: 14px; min-height: 20px; }
+        /* Менюшки теперь светлые и с толстыми мультяшными рамками */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-box { background: #fff; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 6px solid #ffb703; text-align: center; width: 90%; max-width: 500px; }
+        
+        h1 { color: #ff7000; font-size: 56px; margin-bottom: 20px; text-shadow: 3px 3px 0px #ffe5b4, -2px -2px 0px #fff; text-align: center; line-height: 1.1; }
+        h2 { margin-top: 0; color: #fb8500; font-size: 32px; }
+        
+        input { width: 90%; padding: 15px; margin: 10px 0; border: 3px solid #8ecae6; border-radius: 15px; font-size: 18px; box-sizing: border-box; outline: none; font-family: inherit; }
+        input:focus { border-color: #219ebc; }
+        
+        .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 16px; color: #555; font-weight: bold;}
+        
+        .btn { padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-family: inherit; font-size: 20px; transition: 0.2s; box-shadow: 0 6px 0 rgba(0,0,0,0.2); text-transform: uppercase; }
+        .btn:active { transform: translateY(6px); box-shadow: none; }
+        .btn-blue { background: #4da6ff; color: white; }
+        .btn-red { background: #ff4d4d; color: white; }
+        .btn-green { background: #06d6a0; color: white; }
+        .btn-orange { background: #ffb703; color: white; }
+        
+        #auth-error { color: #e63946; margin-top: 15px; font-size: 16px; min-height: 20px; font-weight: bold; }
 
-        .p1-info { color: #6666ff; display: flex; flex-direction: column; align-items: flex-start; }
-        .p2-info { color: #ff6666; display: flex; flex-direction: column; align-items: flex-end; }
-        .mmr { font-size: 14px; color: #aaa; font-weight: normal; }
+        .p1-info { color: #1d3557; display: flex; flex-direction: column; align-items: flex-start; }
+        .p2-info { color: #9d0208; display: flex; flex-direction: column; align-items: flex-end; }
+        .mmr { font-size: 16px; color: #555; font-weight: normal; }
         
-        .shop-item { background: #333; padding: 15px; border-radius: 10px; margin: 10px; width: 120px; display: inline-block; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
-        .shop-item:hover { transform: scale(1.05); }
-        .shop-item.equipped { border-color: #00eeff; box-shadow: 0 0 10px #00eeff; }
-        .shop-item h3 { margin: 5px 0; font-size: 18px; }
+        .shop-item { background: #fdfdfd; padding: 10px; border-radius: 20px; margin: 5px; width: 140px; display: inline-block; cursor: pointer; transition: 0.2s; border: 4px solid #eee; vertical-align: top; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .shop-item:hover { transform: scale(1.05); border-color: #ffd166; }
+        .shop-item.equipped { border-color: #06d6a0; background: #eafff5; }
+        .shop-item h3 { margin: 5px 0; font-size: 20px; color: #333; }
+        .shop-item .boost { font-size: 13px; color: #023047; min-height: 35px; display: block; margin-bottom: 5px; font-style: italic; }
 
         #game-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 20px; font-weight: bold; }
+        #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 24px; font-weight: bold; }
         #game-container { position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1; }
-        canvas { width: 100%; height: 100%; background-color: #222; border: 4px solid #555; border-radius: 10px; box-sizing: border-box; box-shadow: 0 0 20px rgba(0,0,0,0.8); touch-action: none; }
+        
+        /* Само поле теперь со светлой рамкой и скругленными краями */
+        canvas { width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none; }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <div class="auth-box">
+    <div id="auth-screen" class="overlay">
+        <div class="modal-box">
             <h2>АЭРОХОККЕЙ</h2>
             <input type="text" id="username" placeholder="Ваш никнейм">
             <input type="password" id="password" placeholder="Пароль">
             <label class="remember-label"><input type="checkbox" id="remember" checked> Запомнить меня</label>
-            <div class="auth-buttons">
-                <button id="btn-login">Войти</button>
-                <button id="btn-register">Создать</button>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button id="btn-login" class="btn btn-blue" style="flex:1;">Войти</button>
+                <button id="btn-register" class="btn btn-red" style="flex:1;">Создать</button>
             </div>
             <div id="auth-error"></div>
         </div>
     </div>
 
-    <div id="main-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 500; flex-direction: column; align-items: center; justify-content: center;">
-        <h1 style="color: white; font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #4444ff; text-align: center;">АЭРОХОККЕЙ ONLINE</h1>
-        <div id="menu-coins" style="font-size: 24px; color: gold; margin-bottom: 40px; font-weight: bold;">💰 Монеты: 0</div>
+    <div id="main-menu" class="overlay" style="display: none;">
+        <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
+        <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 40px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
-        <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
-            <button id="btn-shop" style="padding: 15px 30px; font-size: 20px; background: #222; color: #ffaa00; border: 2px solid #ffaa00; border-radius: 10px; cursor: pointer;">🛒 Магазин</button>
-            <button id="btn-play" style="padding: 15px 50px; font-size: 28px; background: #4444ff; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 20px #4444ff;">ИГРАТЬ</button>
-            <button id="btn-leaderboard" style="padding: 15px 30px; font-size: 20px; background: #222; color: #00eeff; border: 2px solid #00eeff; border-radius: 10px; cursor: pointer;">🏆 Топ-10</button>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+            <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
+            <button id="btn-play" class="btn btn-green" style="font-size: 32px; padding: 20px 50px;">ИГРАТЬ</button>
+            <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
         </div>
     </div>
 
-    <div id="leaderboard-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #00eeff; width: 90%; max-width: 300px; text-align: center;">
-        <h2 style="margin-top:0;">Лучшие игроки</h2>
-        <ol id="leaderboard-list" style="text-align: left; margin-bottom: 20px; font-size: 18px; line-height: 1.5; padding-left: 20px;"></ol>
-        <button id="btn-close-lb" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
+    <div id="leaderboard-modal" class="overlay" style="display: none;">
+        <div class="modal-box" style="border-color: #4da6ff;">
+            <h2>🏆 Лучшие игроки</h2>
+            <ol id="leaderboard-list" style="text-align: left; margin-bottom: 20px; font-size: 20px; line-height: 1.6; padding-left: 20px; color: #333; font-weight: bold;"></ol>
+            <button id="btn-close-lb" class="btn btn-blue" style="width: 100%;">Закрыть</button>
+        </div>
     </div>
 
-    <div id="shop-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #ffaa00; text-align: center; width: 90%; max-width: 500px; overflow-y: auto; max-height: 90vh;">
-        <h2 style="margin-top:0;">Скины "Три Кота"</h2>
-        <div id="shop-coins" style="color: gold; margin-bottom: 20px;">Ваши монеты: 0</div>
-        <div style="display: flex; flex-wrap: wrap; justify-content: center;">
-            <div class="shop-item" onclick="buySkin('default')" id="skin-default"><h3>Обычный</h3><p id="price-default" style="color: #aaa;">Бесплатно</p></div>
-            <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik"><h3>Коржик</h3><p id="price-korzhik" style="color: gold;">50 монет</p></div>
-            <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka"><h3>Карамелька</h3><p id="price-karamelka" style="color: gold;">50 монет</p></div>
-            <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot"><h3>Компот</h3><p id="price-kompot" style="color: gold;">50 монет</p></div>
+    <div id="shop-modal" class="overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 600px; overflow-y: auto; max-height: 90vh;">
+            <h2>🛒 Магазин Способностей</h2>
+            <div id="shop-coins" style="color: #ffb703; margin-bottom: 20px; font-size: 24px; font-weight: bold;">Ваши монеты: 0</div>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center;">
+                <div class="shop-item" onclick="buySkin('default')" id="skin-default">
+                    <h3>Обычный</h3><span class="boost">Нет бонусов</span><p id="price-default" style="color: #888; margin:0; font-weight:bold;">Бесплатно</p>
+                </div>
+                <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik">
+                    <h3>Коржик</h3><span class="boost">Сильный удар</span><p id="price-korzhik" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                </div>
+                <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka">
+                    <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                </div>
+                <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
+                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                </div>
+                <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
+                    <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
+                </div>
+            </div>
+            <div id="shop-error" style="color: #e63946; margin: 10px 0; min-height: 20px; font-weight: bold;"></div>
+            <button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button>
         </div>
-        <div id="shop-error" style="color: #ff4444; margin: 10px 0; min-height: 20px;"></div>
-        <button id="btn-close-shop" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
     </div>
 
     <div id="game-wrapper" style="display: none;">
         <div id="ui">
             <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
-            <div><span id="s1" style="font-size: 36px; color: white;">0</span> : <span id="s2" style="font-size: 36px; color: white;">0</span></div>
+            <div><span id="s1" style="font-size: 48px; color: #1d3557;">0</span> <span style="font-size: 48px; color: #555;">:</span> <span id="s2" style="font-size: 48px; color: #9d0208;">0</span></div>
             <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
         </div>
         
         <div id="game-container">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
-            <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-shadow: 2px 2px 10px black; pointer-events: none; text-align: center; width: 100%;"></div>
             
-            <div id="end-screen" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px;">
-                <h2 style="color: gold; font-size: 40px; margin-top: 0; margin-bottom: 20px; text-shadow: 0 0 15px gold;">МАТЧ ОКОНЧЕН</h2>
-                <div id="end-status" style="color: white; font-size: 20px; margin-bottom: 30px;">Выберите действие:</div>
+            <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>
+            
+            <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); border-radius: 25px;">
+                <h2 style="color: #ffb703; font-size: 50px; margin-top: 0; margin-bottom: 20px; text-shadow: 2px 2px 0 #fff;">МАТЧ ОКОНЧЕН!</h2>
+                <div id="end-status" style="color: #333; font-size: 24px; margin-bottom: 30px; font-weight: bold;">Выберите действие:</div>
                 <div style="display: flex; gap: 20px;">
-                    <button id="btn-new-game" style="padding: 15px 30px; font-size: 18px; background: #4444ff; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 15px #4444ff;">Найти новую игру</button>
-                    <button id="btn-leave-match" style="padding: 15px 30px; font-size: 18px; background: #ff4444; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 15px #ff4444;">Выйти в меню</button>
+                    <button id="btn-new-game" class="btn btn-green">Новая игра</button>
+                    <button id="btn-leave-match" class="btn btn-red">В меню</button>
                 </div>
             </div>
 
-            <button id="btn-cancel-search" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); padding: 10px 30px; font-size: 18px; background: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; box-shadow: 0 0 15px #ff4444;">Отменить поиск</button>
+            <button id="btn-cancel-search" class="btn btn-red" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);">Отменить поиск</button>
         </div>
     </div>
 

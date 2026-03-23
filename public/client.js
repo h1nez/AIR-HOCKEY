@@ -1,12 +1,12 @@
 const socket = io();
 
-const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image() };
-catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; catImages.kompot.src = '/kompot.png';
+const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
+catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
+catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
-
 const nameInput = document.getElementById('username');
 const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
@@ -29,18 +29,13 @@ document.getElementById('btn-register').onclick = () => {
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
-// 🔥 НОВОЕ: Читаем флаг `rejoining`. Если мы вернулись в матч после обрыва - кидаем сразу в игру!
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
-        
         if (res.rejoining) {
-            mainMenu.style.display = 'none';
-            gameWrapper.style.display = 'flex';
+            mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
             document.getElementById('btn-cancel-search').style.display = 'none';
-        } else {
-            mainMenu.style.display = 'flex'; 
-        }
+        } else { mainMenu.style.display = 'flex'; }
         
         updateProfile(); 
         if (rememberCb.checked) {
@@ -48,9 +43,7 @@ function handleAuthResponse(res) {
         } else {
             localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass');
         }
-    } else {
-        authScreen.style.display = 'flex'; authError.innerText = res.msg;
-    }
+    } else { authScreen.style.display = 'flex'; authError.innerText = res.msg; }
 }
 
 function updateProfile() {
@@ -58,12 +51,12 @@ function updateProfile() {
         if (data.success) {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
-            ['default', 'korzhik', 'karamelka', 'kompot'].forEach(skin => {
+            ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'].forEach(skin => {
                 const el = document.getElementById('skin-' + skin);
                 const priceEl = document.getElementById('price-' + skin);
                 el.classList.remove('equipped');
-                if (data.inventory.includes(skin)) { priceEl.innerText = "Куплено"; priceEl.style.color = "#00ff00"; }
-                if (data.skin === skin) { el.classList.add('equipped'); priceEl.innerText = "Надето"; priceEl.style.color = "#00eeff"; }
+                if (data.inventory.includes(skin)) { priceEl.innerText = "Куплено"; priceEl.style.color = "#06d6a0"; }
+                if (data.skin === skin) { el.classList.add('equipped'); priceEl.innerText = "Надето"; priceEl.style.color = "#219ebc"; }
             });
         }
     });
@@ -76,14 +69,14 @@ window.buySkin = function(skinName) {
     });
 };
 
-document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'block'; };
+document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
     socket.emit('play'); 
-    document.getElementById('goal-msg').textContent = "Ожидание соперника...";
-    document.getElementById('goal-msg').style.color = "white";
+    document.getElementById('goal-msg').textContent = "Ищем друга...";
+    document.getElementById('goal-msg').style.color = "#fb8500";
     document.getElementById('btn-cancel-search').style.display = 'block';
 };
 
@@ -94,21 +87,23 @@ document.getElementById('btn-cancel-search').onclick = () => {
     document.getElementById('goal-msg').textContent = ""; 
 };
 
-// --- ЭКРАН ОКОНЧАНИЯ МАТЧА И ОТКЛЮЧЕНИЯ ---
-socket.on('showEndScreen', () => {
-    document.getElementById('end-screen').style.display = 'flex';
-    document.getElementById('end-status').innerText = "Выберите действие:";
-});
+socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; });
+socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; });
 
-socket.on('hideEndScreen', () => {
+socket.on('opponentLeft', () => {
+    socket.emit('leaveMatch'); 
+    clientState = null; serverState = null; myRole = null; 
+    document.getElementById('game-wrapper').style.display = 'none';
     document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('main-menu').style.display = 'flex';
+    updateProfile();
 });
 
 document.getElementById('btn-new-game').onclick = () => {
     socket.emit('leaveMatch'); 
     clientState = null; serverState = null; myRole = null; 
     document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('goal-msg').textContent = "Ожидание соперника...";
+    document.getElementById('goal-msg').textContent = "Ищем друга...";
     document.getElementById('btn-cancel-search').style.display = 'block';
     socket.emit('play'); 
 };
@@ -122,20 +117,17 @@ document.getElementById('btn-leave-match').onclick = () => {
     updateProfile();
 };
 
-socket.on('forceReload', () => {
-    alert("Связь с сервером прервалась 🔌\nСтраница будет обновлена для переподключения.");
-    window.location.reload();
-});
+socket.on('forceReload', () => { window.location.reload(); });
 
 document.getElementById('btn-leaderboard').onclick = () => {
     socket.emit('getLeaderboard', (res) => {
         if (res.success) {
             const list = document.getElementById('leaderboard-list'); list.innerHTML = ''; 
             res.leaderboard.forEach(user => {
-                const li = document.createElement('li'); li.style.margin = "5px 0";
+                const li = document.createElement('li'); li.style.margin = "8px 0";
                 li.innerHTML = `<b>${user.name}</b> — MMR: ${user.rating}`; list.appendChild(li);
             });
-            document.getElementById('leaderboard-modal').style.display = 'block';
+            document.getElementById('leaderboard-modal').style.display = 'flex';
         }
     });
 };
@@ -163,14 +155,13 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
 
-    // 🔥 НОВОЕ: Вывод таймера переподключения
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
-        document.getElementById('goal-msg').textContent = `Игрок отключился. Ждем: ${s.timeLeft}с`;
-        document.getElementById('goal-msg').style.color = "#ffaa00";
+        document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
+        document.getElementById('goal-msg').style.color = "#ffb703";
     } 
     else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
-        if (document.getElementById('goal-msg').textContent.includes("Ожидание") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
+        if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
             document.getElementById('goal-msg').textContent = ""; 
         }
     }
@@ -186,9 +177,14 @@ function sendInput(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     const x = (clientX - rect.left) * (canvas.width / rect.width);
     const y = (clientY - rect.top) * (canvas.height / rect.height);
+    
     const me = myRole === 'p1' ? 'player1' : 'player2';
-    clientState[me].x = (myRole === 'p1') ? Math.min(365, Math.max(35, x)) : Math.min(765, Math.max(435, x));
-    clientState[me].y = Math.min(365, Math.max(35, y));
+    let pR = serverState[me].skin === 'karamelka' ? 43 : (serverState[me].skin === 'gonya' ? 28 : 35);
+    let minX = myRole === 'p1' ? pR : 400 + pR;
+    let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
+    
+    clientState[me].x = Math.min(maxX, Math.max(minX, x));
+    clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
     socket.emit('input', { x, y });
 }
 
@@ -196,42 +192,95 @@ canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
 canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
-function drawPlayer(x, y, r, color, skinName) {
+function drawPlayer(x, y, skinName, color) {
+    let r = skinName === 'karamelka' ? 43 : (skinName === 'gonya' ? 28 : 35);
+    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); 
         ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.lineWidth = 4; ctx.strokeStyle = color; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.lineWidth = 5; ctx.strokeStyle = color; ctx.stroke();
     } else {
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
-        ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         if (skinName === 'korzhik') ctx.fillText("КОРЖ", x, y);
         else if (skinName === 'karamelka') ctx.fillText("КАРА", x, y);
         else if (skinName === 'kompot') ctx.fillText("КОМП", x, y);
-        else { ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#222'; ctx.fill(); }
+        else if (skinName === 'gonya') ctx.fillText("ГОНЯ", x, y);
+        else { ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
     }
 }
 
+// 🔥 НОВОЕ: МУЛЬТЯШНОЕ ПОЛЕ ТРИ КОТА
 function render(s) {
-    ctx.clearRect(0, 0, 800, 400);
-    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
+    // 1. Светло-голубой лёд
+    ctx.fillStyle = '#f4faff'; 
+    ctx.fillRect(0, 0, 800, 400);
+
+    // 2. Декорации (Лапки и звездочки)
+    ctx.font = '30px Arial';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const decor = [
+        {t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200},
+        {t:'⭐', x:350, y:80}, {t:'🐾', x:400, y:320}, {t:'⭐', x:520, y:200},
+        {t:'🐾', x:680, y:80}, {t:'⭐', x:650, y:320}
+    ];
+    decor.forEach(d => ctx.fillText(d.t, d.x, d.y));
+
+    ctx.lineWidth = 6;
+    
+    // 3. Зоны ворот (Светло-синяя и светло-красная)
+    ctx.fillStyle = 'rgba(77, 166, 255, 0.2)';
+    ctx.beginPath(); ctx.arc(0, 200, 100, -Math.PI/2, Math.PI/2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 77, 77, 0.2)';
+    ctx.beginPath(); ctx.arc(800, 200, 100, Math.PI/2, -Math.PI/2); ctx.fill();
+
+    // 4. Линии поля
+    ctx.strokeStyle = '#ff4d4d'; // Красная в центре
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
-    ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
-    ctx.lineWidth = 10; ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
-    ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
+    ctx.strokeStyle = '#4da6ff'; // Синие зоны
+    ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
+
+    // 5. Центральный круг
+    ctx.strokeStyle = '#ff4d4d';
+    ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(400,200,77,0,Math.PI*2); ctx.fill();
+
+    // 6. Три кота в центре круга! (Если загружены картинки)
+    const rCat = 22;
+    if (catImages['korzhik'].complete && catImages['korzhik'].naturalWidth > 0) {
+        ctx.drawImage(catImages['korzhik'], 400 - 45 - rCat, 200 - rCat, rCat*2, rCat*2);
+    }
+    if (catImages['karamelka'].complete && catImages['karamelka'].naturalWidth > 0) {
+        ctx.drawImage(catImages['karamelka'], 400 - rCat, 200 - 35 - rCat, rCat*2, rCat*2);
+    }
+    if (catImages['kompot'].complete && catImages['kompot'].naturalWidth > 0) {
+        ctx.drawImage(catImages['kompot'], 400 + 45 - rCat, 200 - rCat, rCat*2, rCat*2);
+    }
+
+    // 7. Сами ворота
+    ctx.lineWidth = 12; 
+    ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170);
+    ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
 
     let px = s.puck.x; let py = s.puck.y;
     if (myRole && !serverState.paused && !serverState.gameOver) {
         const myPlayer = myRole === 'p1' ? s.player1 : s.player2;
+        let pR = serverState[myRole === 'p1' ? 'player1' : 'player2'].skin === 'karamelka' ? 43 : (serverState[myRole === 'p1' ? 'player1' : 'player2'].skin === 'gonya' ? 28 : 35);
         let dx = px - myPlayer.x; let dy = py - myPlayer.y; let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 57) { px = myPlayer.x + (dx/dist)*57; py = myPlayer.y + (dy/dist)*57; }
+        if (dist < pR + 22) { px = myPlayer.x + (dx/dist)*(pR+22); py = myPlayer.y + (dy/dist)*(pR+22); }
     }
 
-    ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#eee'; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+    // Шайба (Сделали темной, чтобы контрастировала со светлым льдом)
+    ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#333'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#111'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fillStyle = '#666'; ctx.fill();
 
-    drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', serverState.player1.skin);
-    drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', serverState.player2.skin);
+    drawPlayer(s.player1.x, s.player1.y, serverState.player1.skin, '#4da6ff');
+    drawPlayer(s.player2.x, s.player2.y, serverState.player2.skin, '#ff4d4d');
 }
 
 function loop() {
