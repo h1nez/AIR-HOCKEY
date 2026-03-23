@@ -85,7 +85,7 @@ document.getElementById('btn-cancel-search').onclick = () => {
     document.getElementById('goal-msg').textContent = ""; 
 };
 
-// --- ЭКРАН ОКОНЧАНИЯ МАТЧА И ОТКЛЮЧЕНИЯ ПРОТИВНИКА ---
+// --- ЭКРАН ОКОНЧАНИЯ МАТЧА И ОТКЛЮЧЕНИЯ ---
 socket.on('showEndScreen', () => {
     document.getElementById('end-screen').style.display = 'flex';
     document.getElementById('end-status').innerText = "Выберите действие:";
@@ -95,23 +95,33 @@ socket.on('hideEndScreen', () => {
     document.getElementById('end-screen').style.display = 'none';
 });
 
-// Если противник сбежал (или нажал Выйти)
+// ПРОТИВНИК ВЫШЕЛ - ОЧИЩАЕМ ДАННЫЕ МАТЧА
 socket.on('opponentLeft', () => {
     alert("Соперник покинул игру!");
-    socket.emit('leaveMatch'); // Очищаем себя на сервере
+    socket.emit('leaveMatch'); 
+    clientState = null; serverState = null; myRole = null; // 🔥 Жестко сбрасываем память браузера!
     document.getElementById('game-wrapper').style.display = 'none';
     document.getElementById('end-screen').style.display = 'none';
     document.getElementById('main-menu').style.display = 'flex';
     updateProfile();
 });
 
-document.getElementById('btn-rematch').onclick = () => {
-    socket.emit('rematch');
-    document.getElementById('end-status').innerText = "Ожидание соперника...";
+// КНОПКА "НАЙТИ НОВУЮ ИГРУ" - ВЫХОДИМ И СРАЗУ ИЩЕМ НОВУЮ
+document.getElementById('btn-new-game').onclick = () => {
+    socket.emit('leaveMatch'); // Покидаем старую комнату
+    clientState = null; serverState = null; myRole = null; // 🔥 Сбрасываем старые скины и данные
+    
+    document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('goal-msg').textContent = "Ожидание соперника...";
+    document.getElementById('btn-cancel-search').style.display = 'block';
+    
+    socket.emit('play'); // Заходим в новую!
 };
 
+// КНОПКА "ВЫЙТИ В МЕНЮ"
 document.getElementById('btn-leave-match').onclick = () => {
     socket.emit('leaveMatch');
+    clientState = null; serverState = null; myRole = null; // 🔥 Сбрасываем старые данные
     document.getElementById('game-wrapper').style.display = 'none';
     document.getElementById('end-screen').style.display = 'none';
     document.getElementById('main-menu').style.display = 'flex';
@@ -218,8 +228,9 @@ function render(s) {
     ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#eee'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
 
-    drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', s.player1.skin);
-    drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', s.player2.skin);
+    // 🔥 ИСПРАВЛЕНИЕ: Берем скины строго напрямую с сервера каждый кадр
+    drawPlayer(s.player1.x, s.player1.y, 35, '#4444ff', serverState.player1.skin);
+    drawPlayer(s.player2.x, s.player2.y, 35, '#ff4444', serverState.player2.skin);
 }
 
 function loop() {

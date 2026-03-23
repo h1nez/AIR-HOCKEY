@@ -15,7 +15,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
 // 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -53,8 +53,7 @@ function createRoom() {
         player1: { id: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         player2: { id: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true,
-        gameOver: false, // Флаг окончания игры
-        rematch: { player1: false, player2: false } // Кто хочет играть снова
+        gameOver: false
     };
     return roomId;
 }
@@ -96,12 +95,8 @@ async function handleGoal(room, winRole) {
             await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
         } catch (err) {}
         
-        // НОВОЕ: Игра окончена, ждем выбора игроков
         room.gameOver = true;
-        room.rematch = { player1: false, player2: false };
         io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
-        
-        // Через 2 секунды показываем окно выбора
         setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
     } else {
         io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4444ff' : '#ff4444' });
@@ -192,34 +187,13 @@ io.on('connection', (socket) => {
         else socket.emit('forceReload');
     });
 
-    // НОВОЕ: Обработка кнопки "Сыграть еще раз"
-    socket.on('rematch', () => {
-        if (!socket.roomId || !rooms[socket.roomId]) return;
-        const room = rooms[socket.roomId];
-        if (socket.id === room.player1.id) room.rematch.player1 = true;
-        if (socket.id === room.player2.id) room.rematch.player2 = true;
-
-        // Если ОБА согласились - перезапускаем матч
-        if (room.rematch.player1 && room.rematch.player2) {
-            room.player1.score = 0; room.player2.score = 0;
-            room.gameOver = false;
-            reset(room);
-            io.to(room.id).emit('hideEndScreen');
-        }
-    });
-
-    // НОВОЕ: Выход из матча в меню
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        
-        // Говорим второму игроку, что противник сбежал
         socket.to(room.id).emit('opponentLeft');
-        
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
-        
         socket.leave(socket.roomId); 
         socket.roomId = null; 
     });
@@ -273,11 +247,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Обработка отключения (если игрок закрыл вкладку во время игры)
     socket.on('disconnect', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        socket.to(room.id).emit('opponentLeft'); // Оповещаем противника
+        socket.to(room.id).emit('opponentLeft'); 
         if (socket.id === room.player1.id) { room.player1.id = null; room.paused = true; }
         if (socket.id === room.player2.id) { room.player2.id = null; room.paused = true; }
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
