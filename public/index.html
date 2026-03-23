@@ -2,49 +2,32 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Air Hockey Online - MMR System</title>
+    <title>Air Hockey Pro MMR</title>
     <style>
-        body { background: #111; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #auth { position: absolute; background: #222; padding: 40px; border-radius: 20px; text-align: center; z-index: 200; border: 2px solid #444; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
-        input { padding: 12px; font-size: 18px; border-radius: 8px; border: none; margin-bottom: 20px; width: 250px; outline: none; }
-        button { padding: 12px 40px; font-size: 18px; background: #4444ff; color: white; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #6666ff; }
-        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 15px; }
-        .player-card { background: #222; padding: 10px 25px; border-radius: 12px; min-width: 180px; text-align: center; border-bottom: 4px solid transparent; }
-        #card1 { border-color: #4444ff; }
-        #card2 { border-color: #ff4444; }
-        .score { font-size: 36px; font-weight: bold; margin: 5px 0; }
-        .rating { color: #ffd700; font-size: 14px; font-weight: bold; }
-        canvas { background: #fff; border: 6px solid #333; border-radius: 15px; cursor: none; }
-        #msg { position: absolute; font-size: 42px; font-weight: bold; pointer-events: none; z-index: 10; text-align: center; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #auth { position: absolute; background: #222; padding: 30px; border-radius: 15px; border: 2px solid #444; text-align: center; z-index: 100; }
+        input { padding: 10px; border-radius: 5px; border: none; margin-bottom: 15px; width: 200px; }
+        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .card { background: #222; padding: 10px 20px; border-radius: 10px; text-align: center; min-width: 120px; border-bottom: 4px solid #444; }
+        canvas { background: #fff; border: 4px solid #333; border-radius: 10px; cursor: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #msg { position: absolute; font-size: 32px; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 50; }
     </style>
 </head>
 <body>
     <div id="auth">
-        <h1>АЭРОХОККЕЙ</h1>
-        <input type="text" id="nick" placeholder="Введите ваш ник..." maxlength="10"><br>
-        <button onclick="start()">В БОЙ</button>
+        <h2>AIR HOCKEY</h2>
+        <input type="text" id="nick" placeholder="Ваш ник" maxlength="10"><br>
+        <button onclick="start()" style="padding: 10px 25px; cursor: pointer;">ИГРАТЬ</button>
     </div>
-
     <div id="ui">
-        <div class="player-card" id="card1">
-            <div id="n1">Ожидание...</div>
-            <div id="s1" class="score" style="color:#4444ff">0</div>
-            <div id="r1" class="rating">MMR: ----</div>
-        </div>
-        <div style="align-self: center; color: #444; font-weight: bold;">МАТЧ ДО 11</div>
-        <div class="player-card" id="card2">
-            <div id="n2">Ожидание...</div>
-            <div id="s2" class="score" style="color:#ff4444">0</div>
-            <div id="r2" class="rating">MMR: ----</div>
-        </div>
+        <div class="card" style="border-color: #4444ff"><div id="n1">?</div><div id="s1" style="font-size: 32px; color: #4444ff">0</div><div id="r1" style="color: gold; font-size: 12px"></div></div>
+        <div style="align-self: center; color: #555;">BATTLE TO 11</div>
+        <div class="card" style="border-color: #ff4444"><div id="n2">?</div><div id="s2" style="font-size: 32px; color: #ff4444">0</div><div id="r2" style="color: gold; font-size: 12px"></div></div>
     </div>
-
     <div style="position: relative; display: flex; align-items: center; justify-content: center;">
         <canvas id="game" width="800" height="400"></canvas>
         <div id="msg"></div>
     </div>
-
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
 </body>
