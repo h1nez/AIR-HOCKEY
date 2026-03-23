@@ -1,0 +1,15 @@
+{
+  "name": "air-hockey-online",
+  "version": "1.0.0",
+  "description": "Online Air Hockey with Node.js and Socket.IO",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "lowdb": "^7.0.1",
+    "socket.io": "^4.7.2"
+  }
+}

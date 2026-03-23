@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Air Hockey Rating</title>
+    <style>
+        body { background: #111; display: flex; flex-direction: column; align-items: center; color: white; font-family: sans-serif; margin: 0; height: 100vh; justify-content: center; overflow: hidden; }
+        #login { position: absolute; width: 100%; height: 100%; background: #111; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 15px; font-size: 20px; border-radius: 8px; border: none; margin-bottom: 10px; width: 250px; }
+        button { padding: 15px 30px; font-size: 20px; background: #4444ff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        #ui { width: 800px; display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .stat-box { display: flex; flex-direction: column; align-items: center; min-width: 150px; }
+        .score { font-size: 40px; font-weight: bold; }
+        .name { font-size: 18px; color: #aaa; }
+        .rating { font-size: 14px; color: gold; }
+        #container { position: relative; }
+        canvas { background: #fff; border: 6px solid #333; border-radius: 12px; cursor: none; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; text-align: center; display: none; border: 3px solid gold; z-index: 100; font-size: 28px; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <div id="login">
+        <h1>АЭРОХОККЕЙ</h1>
+        <input type="text" id="nickInput" placeholder="Введите ваш ник..." maxlength="12">
+        <button onclick="join()">ИГРАТЬ</button>
+    </div>
+
+    <div id="ui">
+        <div class="stat-box">
+            <span id="n1" class="name">Ожидание...</span>
+            <span id="s1" class="score" style="color:#4444ff">0</span>
+            <span id="r1" class="rating">MMR: 1000</span>
+        </div>
+        <div style="font-size: 14px; color: #555; align-self: center;">BATTLE TO 11</div>
+        <div class="stat-box">
+            <span id="n2" class="name">Ожидание...</span>
+            <span id="s2" class="score" style="color:#ff4444">0</span>
+            <span id="r2" class="rating">MMR: 1000</span>
+        </div>
+    </div>
+
+    <div id="container">
+        <canvas id="game" width="800" height="400"></canvas>
+        <div id="msg">ОЖИДАНИЕ...</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
