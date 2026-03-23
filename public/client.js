@@ -2,22 +2,24 @@ const socket = io({ transports: ["websocket"] });
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const msgBox = document.getElementById('msg');
+const pingDisplay = document.getElementById('ping');
 
 let serverState = null; 
 let clientState = null; 
+let myRole = null; 
 
 function start() {
     const nick = document.getElementById('nick').value;
     if (nick) { socket.emit('join', nick); document.getElementById('auth').style.display = 'none'; }
 }
 
+socket.on('role', role => { myRole = role; });
 socket.on('goalNotify', d => { msgBox.textContent = d.msg; msgBox.style.color = d.color; });
 
 socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // Обновляем UI
     document.getElementById('s1').textContent = s.player1.score;
     document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('n1').textContent = s.player1.name;
@@ -26,50 +28,69 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n2').textContent = s.player2.name;
 });
 
+// МГНОВЕННОЕ ДВИЖЕНИЕ СВОЕЙ БИТЫ
 canvas.addEventListener('mousemove', e => {
     const r = canvas.getBoundingClientRect();
-    socket.emit('input', { x: e.clientX - r.left, y: e.clientY - r.top });
+    const mouseX = e.clientX - r.left;
+    const mouseY = e.clientY - r.top;
+
+    if (clientState && myRole && !serverState.paused) {
+        if (myRole === 'p1') {
+            clientState.player1.x = Math.min(365, Math.max(35, mouseX));
+            clientState.player1.y = Math.min(365, Math.max(35, mouseY));
+        } else {
+            clientState.player2.x = Math.min(765, Math.max(435, mouseX));
+            clientState.player2.y = Math.min(365, Math.max(35, mouseY));
+        }
+    }
+    socket.emit('input', { x: mouseX, y: mouseY });
 });
 
 function loop() {
     if (serverState && clientState) {
-        // КОЭФФИЦИЕНТ СГЛАЖИВАНИЯ (0.1 - очень плавно, 0.5 - резче)
-        const lerpFactor = 0.15; 
+        const lerp = 0.15; 
+        // Сглаживаем шайбу
+        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
+        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
         
-        // Плавно подтягиваем шайбу к серверным координатам
-        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerpFactor;
-        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerpFactor;
-        
-        // Плавно подтягиваем игроков
-        clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerpFactor;
-        clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerpFactor;
-        clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerpFactor;
-        clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerpFactor;
-
+        // Сглаживаем ТОЛЬКО ЧУЖУЮ биту
+        if (myRole === 'p1') {
+            clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp;
+            clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
+        } else if (myRole === 'p2') {
+            clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp;
+            clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
+        }
         render(clientState);
     }
     requestAnimationFrame(loop);
 }
 
+setInterval(() => {
+    const startPing = Date.now();
+    socket.emit('pingCheck');
+    socket.once('pongCheck', () => {
+        const ping = Date.now() - startPing;
+        if(pingDisplay) pingDisplay.textContent = `Ping: ${ping}ms`;
+    });
+}, 2000);
+
 function render(s) {
     ctx.clearRect(0, 0, 800, 400);
-    // Поле
     ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
-    // Ворота
     ctx.lineWidth = 10;
     ctx.strokeStyle = '#ccccff'; ctx.strokeRect(0, 125, 4, 150);
     ctx.strokeStyle = '#ffcccc'; ctx.strokeRect(796, 125, 4, 150);
 
-    drawCircle(s.puck.x, s.puck.y, 15, '#222', true);
-    drawCircle(s.player1.x, s.player1.y, 30, '#4444ff');
-    drawCircle(s.player2.x, s.player2.y, 30, '#ff4444');
+    drawCircle(s.puck.x, s.puck.y, 22, '#222', true);
+    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
+    drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
 }
 
 function drawCircle(x, y, r, c, p) {
     ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = p ? '#000' : '#fff'; ctx.lineWidth = 3; ctx.stroke();
 }
-
 loop();
