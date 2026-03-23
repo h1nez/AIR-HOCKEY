@@ -93,7 +93,6 @@
     <div id="profile-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
-            
             <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin-bottom: 5px; text-transform: uppercase;">Имя</h2>
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
 
@@ -176,6 +175,20 @@
             </div>
             <div id="shop-error" style="color: #e63946; margin: 10px 0; min-height: 20px; font-weight: bold;"></div>
             <button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="invite-modal" class="overlay" style="display: none; z-index: 2000;">
+        <div class="modal-box" style="border-color: #06d6a0; max-width: 400px;">
+            <h2 style="color: #06d6a0; font-size: 36px; margin-bottom: 5px;">⚔️ ВЫЗОВ!</h2>
+            <div style="font-size: 20px; margin-bottom: 25px; color: #555; font-weight: bold;">
+                Игрок <span id="invite-sender-name" style="color: #ffb703; font-size: 24px;">...</span> зовет вас в дружеский матч!
+                <div style="font-size: 14px; color: #888; font-weight: normal; margin-top: 5px;">(Матч пройдет без потери MMR)</div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button id="btn-accept-invite" class="btn btn-green" style="flex:1;">Принять</button>
+                <button id="btn-decline-invite" class="btn btn-red" style="flex:1;">Отклонить</button>
+            </div>
         </div>
     </div>
 

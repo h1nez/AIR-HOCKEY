@@ -76,41 +76,33 @@ window.showProfile = function(username) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
             document.getElementById('profile-name').innerText = p.name;
-            
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
-
             document.getElementById('profile-mmr').innerText = p.rating;
             document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
             document.getElementById('profile-min-mmr').innerText = p.minRating || 1000;
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
-            
             let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
             document.getElementById('profile-winrate').innerText = winrate + '%';
-            
             const date = new Date(p.regDate);
             document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
-
             if (username === nameInput.value) document.getElementById('avatar-selector').style.display = 'block';
             else document.getElementById('avatar-selector').style.display = 'none';
-
             document.getElementById('profile-modal').style.display = 'flex';
         } else alert("Не удалось загрузить профиль");
     });
 };
-
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
-// ДРУЗЬЯ
+// ДРУЗЬЯ И ПРИГЛАШЕНИЯ
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    
     if(tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active');
     if(tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
     if(tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
@@ -128,6 +120,7 @@ function loadFriendsData() {
                 <div class="friend-item">
                     <div class="friend-info">${f.name} <br><span class="friend-mmr">MMR: ${f.rating}</span></div>
                     <div style="display:flex; gap:5px;">
+                        <button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>
                         <button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button>
                         <button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button>
                     </div>
@@ -164,12 +157,41 @@ window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => l
 window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
 window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
 
-// МАГАЗИН
+// 🔥 ЛОГИКА ПРИГЛАШЕНИЙ В ИГРУ
+window.inviteFriendToMatch = function(name) {
+    socket.emit('inviteFriend', name, (res) => { alert(res.msg); });
+};
+
+let currentInviter = "";
+socket.on('incomingInvite', (senderName) => {
+    currentInviter = senderName;
+    document.getElementById('invite-sender-name').innerText = senderName;
+    document.getElementById('invite-modal').style.display = 'flex';
+});
+document.getElementById('btn-accept-invite').onclick = () => {
+    socket.emit('acceptInvite', currentInviter);
+    document.getElementById('invite-modal').style.display = 'none';
+};
+document.getElementById('btn-decline-invite').onclick = () => {
+    socket.emit('declineInvite', currentInviter);
+    document.getElementById('invite-modal').style.display = 'none';
+};
+socket.on('inviteDeclined', (name) => { alert(`Игрок ${name} отклонил приглашение.`); });
+
+socket.on('forceStartGame', () => {
+    document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
+    mainMenu.style.display = 'none';
+    gameWrapper.style.display = 'flex';
+    document.getElementById('goal-msg').textContent = "";
+    document.getElementById('btn-cancel-search').style.display = 'none';
+    document.getElementById('btn-in-game-quit').style.display = 'block';
+});
+
+
 window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => { if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } else { document.getElementById('shop-error').innerText = res.msg; } }); };
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
-// КНОПКИ ИГРЫ
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); 
     document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
@@ -187,11 +209,15 @@ document.getElementById('btn-cancel-search').onclick = () => {
     document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('goal-msg').textContent = ""; 
 };
 
-// 🔥 НОВАЯ КНОПКА: ВЫЙТИ ИЗ МАТЧА
 document.getElementById('btn-in-game-quit').onclick = () => {
     if (!serverState) return;
-    const isBot = serverState.player2.id === 'bot';
-    const msg = isBot ? "Вы уверены, что хотите прервать тренировку?" : "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снят MMR!";
+    const isBot = serverState.isBotMatch;
+    const isFriendly = serverState.isFriendly;
+    
+    // 🔥 РАЗНЫЕ СООБЩЕНИЯ ДЛЯ РАЗНЫХ РЕЖИМОВ
+    let msg = "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снят MMR!";
+    if (isBot) msg = "Вы уверены, что хотите прервать тренировку?";
+    if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
     
     if (confirm(msg)) {
         socket.emit('leaveMatch'); 
@@ -204,11 +230,7 @@ document.getElementById('btn-in-game-quit').onclick = () => {
     }
 };
 
-// ЭНД СКРИН
-socket.on('showEndScreen', () => { 
-    document.getElementById('end-screen').style.display = 'flex'; 
-    document.getElementById('btn-in-game-quit').style.display = 'none'; 
-});
+socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
 socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; });
 
 socket.on('opponentLeft', () => {
@@ -266,7 +288,7 @@ socket.on('gameStateUpdate', s => {
     } 
     else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
-        document.getElementById('btn-in-game-quit').style.display = 'block'; // 🔥 Показываем кнопку выхода во время игры!
+        document.getElementById('btn-in-game-quit').style.display = 'block'; 
         if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
             document.getElementById('goal-msg').textContent = ""; 
         }
