@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
 
-// Разрешаем любые подключения, чтобы не было ошибки 400 (polling)
+// Разрешаем любые подключения (чтобы не было ошибки 400 polling)
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
@@ -166,7 +166,7 @@ io.on('connection', (socket) => {
             const newUser = new User({ name: data.name, password: hashedPassword, rating: 1000 });
             await newUser.save();
 
-            socket.user = newUser; // Запоминаем юзера, но не кидаем в игру
+            socket.user = newUser; 
             callback({ success: true });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
@@ -180,17 +180,28 @@ io.on('connection', (socket) => {
             const isMatch = await bcrypt.compare(data.password, user.password);
             if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
 
-            socket.user = user; // Запоминаем юзера, но не кидаем в игру
+            socket.user = user; 
             callback({ success: true });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
-    // Игрок нажал кнопку "ИГРАТЬ"
     socket.on('play', () => {
         if (socket.user) joinPlayerToRoom(socket, socket.user);
     });
 
-    // Игрок запросил таблицу лидеров
+    // НОВОЕ: ОТМЕНА ПОИСКА
+    socket.on('cancelPlay', () => {
+        if (!socket.roomId || !rooms[socket.roomId]) return;
+        const room = rooms[socket.roomId];
+        
+        if (!room.player2.id) { // Отменяем только если 2-й игрок еще не зашел
+            room.player1.id = null;
+            delete rooms[socket.roomId]; 
+            socket.leave(socket.roomId); 
+            socket.roomId = null; 
+        }
+    });
+
     socket.on('getLeaderboard', async (callback) => {
         try {
             const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id');

@@ -32,7 +32,7 @@ document.getElementById('btn-register').onclick = () => {
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
-        mainMenu.style.display = 'flex'; // Открываем Главное Меню
+        mainMenu.style.display = 'flex'; 
         
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value);
@@ -50,12 +50,24 @@ function handleAuthResponse(res) {
 // --- КНОПКИ ГЛАВНОГО МЕНЮ ---
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none';
-    gameWrapper.style.display = 'flex'; // Показываем игру
-    socket.emit('play'); // Запрашиваем матч у сервера
+    gameWrapper.style.display = 'flex'; 
+    socket.emit('play'); 
     
     const msgEl = document.getElementById('goal-msg');
     msgEl.textContent = "Ожидание соперника...";
     msgEl.style.color = "white";
+    
+    // Показываем кнопку отмены
+    document.getElementById('btn-cancel-search').style.display = 'block';
+};
+
+// Отмена поиска
+document.getElementById('btn-cancel-search').onclick = () => {
+    socket.emit('cancelPlay'); 
+    gameWrapper.style.display = 'none'; 
+    mainMenu.style.display = 'flex'; 
+    document.getElementById('btn-cancel-search').style.display = 'none';
+    document.getElementById('goal-msg').textContent = ""; 
 };
 
 document.getElementById('btn-leaderboard').onclick = () => {
@@ -105,6 +117,14 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
+
+    // Прячем кнопку отмены, если игра началась (оба игрока тут)
+    if (s.player1.id && s.player2.id) {
+        document.getElementById('btn-cancel-search').style.display = 'none';
+        if (document.getElementById('goal-msg').textContent === "Ожидание соперника...") {
+            document.getElementById('goal-msg').textContent = ""; 
+        }
+    }
 
     if (s.paused) {
         clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y;
