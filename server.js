@@ -350,10 +350,17 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    socket.on('searchUser', async (query, callback) => {
+	socket.on('searchUser', async (query, callback) => {
         if (!socket.user || !query) return;
         try {
-            const users = await User.find({ name: new RegExp(query, 'i'), name: { $ne: socket.user.name } }).limit(5).select('name rating').lean();
+            // 🔥 ИСПРАВЛЕНИЕ: Используем $and, чтобы база учла оба условия!
+            const users = await User.find({ 
+                $and: [
+                    { name: new RegExp(query, 'i') }, // Имя должно содержать текст поиска
+                    { name: { $ne: socket.user.name } } // И это не должен быть сам игрок
+                ]
+            }).limit(5).select('name rating').lean();
+            
             callback({ success: true, users });
         } catch(e) { callback({ success: false }); }
     });
