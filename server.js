@@ -58,19 +58,13 @@ function createRoom() {
     return roomId;
 }
 
-// 🔥 НОВОЕ: Физика зависит от скина игрока
 function resolveCollision(puck, player) {
-    let pR = 35; // Дефолтный радиус
-    let res = 1.6; // Дефолтная упругость (отскок)
-    let pMaxSpeed = 28; // Дефолтная макс. скорость шайбы
-
-    if (player.skin === 'karamelka') pR = 43; // Большая клюшка
-    if (player.skin === 'gonya') pR = 28; // Маленькая клюшка
-
-    if (player.skin === 'korzhik') res = 1.9; // Сильный отскок
-    if (player.skin === 'gonya') res = 2.2; // Бешеный отскок
-
-    if (player.skin === 'kompot') pMaxSpeed = 35; // Пробивает лимит скорости
+    let pR = 35; let res = 1.6; let pMaxSpeed = 28; 
+    if (player.skin === 'karamelka') pR = 43; 
+    if (player.skin === 'gonya') pR = 28; 
+    if (player.skin === 'korzhik') res = 1.9; 
+    if (player.skin === 'gonya') res = 2.2; 
+    if (player.skin === 'kompot') pMaxSpeed = 35; 
 
     const dx = puck.x - player.x; const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy); const minDist = PUCK_R + pR;
@@ -119,7 +113,7 @@ async function handleGoal(room, winRole) {
     win.score++;
     if (win.score >= 11) { await finishMatch(room, winRole, false); } 
     else {
-        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4444ff' : '#ff4444' });
+        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d' });
         setTimeout(() => reset(room), 2000);
     }
 }
@@ -176,7 +170,11 @@ function tryRejoin(socket, user) {
 function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
-    for (const id in rooms) { if (!rooms[id].player1.id || !rooms[id].player2.id) { myRoomId = id; break; } }
+    for (const id in rooms) { 
+        // 🔥 ИСПРАВЛЕНИЕ: Игнорируем комнаты, где матч уже завершен!
+        if (rooms[id].gameOver) continue; 
+        if (!rooms[id].player1.id || !rooms[id].player2.id) { myRoomId = id; break; } 
+    }
     if (!myRoomId) myRoomId = createRoom();
 
     const room = rooms[myRoomId]; socket.join(myRoomId); socket.roomId = myRoomId;
@@ -239,7 +237,12 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId];
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
+        
+        // 🔥 Оповещаем противника, что мы ушли (чтобы он не ждал нас на экране реванша)
+        socket.to(room.id).emit('opponentLeft');
+        
         if (room.player2.name !== "..." && !room.gameOver) finishMatch(room, winRole, true);
+        
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
@@ -261,7 +264,6 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
     });
 
-    // 🔥 НОВОЕ: Цены и покупка Гони
     socket.on('buySkin', async (skinName, callback) => {
         if (!socket.user) return;
         const prices = { korzhik: 50, karamelka: 50, kompot: 50, gonya: 75, default: 0 };
@@ -290,15 +292,11 @@ io.on('connection', (socket) => {
         const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
         if (p && !room.paused && !room.gameOver) {
             const oldX = p.x; const oldY = p.y;
-            
-            // Динамические границы для клюшек (чтобы большая клюшка не вылезала за поле)
             let pR = p.skin === 'karamelka' ? 43 : (p.skin === 'gonya' ? 28 : 35);
             let minX = p === room.player1 ? pR : 400 + pR;
             let maxX = p === room.player1 ? 400 - pR : 800 - pR;
-            
             p.x = Math.min(maxX, Math.max(minX, data.x));
             p.y = Math.min(400 - pR, Math.max(pR, data.y));
-            
             p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
