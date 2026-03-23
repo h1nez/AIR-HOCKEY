@@ -9,10 +9,8 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { 
-    transports: ["websocket"],
-    pingInterval: 1000,
-    pingTimeout: 3000 
+const io = new Server(server, {
+    cors: { origin: "*" } // Разрешаем любые подключения
 });
 
 // ==========================================
