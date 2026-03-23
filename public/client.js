@@ -13,13 +13,23 @@ const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
 const authError = document.getElementById('auth-error');
 
-const savedName = localStorage.getItem('ah_name');
-const savedPass = localStorage.getItem('ah_pass');
+// 🔥 НОВОЕ: Автоматически входим при ЛЮБОМ подключении (даже если свернули и развернули игру)
+socket.on('connect', () => {
+    const savedName = localStorage.getItem('ah_name');
+    const savedPass = localStorage.getItem('ah_pass');
+    if (savedName && savedPass) {
+        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
+    }
+});
 
-if (savedName && savedPass) {
-    nameInput.value = savedName; passInput.value = savedPass;
-    socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
-}
+// 🔥 НОВОЕ: Если свернули вкладку - отключаемся мгновенно. Развернули - подключаемся!
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        socket.disconnect();
+    } else {
+        socket.connect();
+    }
+});
 
 document.getElementById('btn-login').onclick = () => {
     authError.innerText = "Подключение...";
@@ -33,10 +43,17 @@ document.getElementById('btn-register').onclick = () => {
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
+        
+        // Если мы вернулись прямо в бой
         if (res.rejoining) {
-            mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
+            mainMenu.style.display = 'none'; 
+            gameWrapper.style.display = 'flex';
             document.getElementById('btn-cancel-search').style.display = 'none';
-        } else { mainMenu.style.display = 'flex'; }
+        } else { 
+            // Иначе просто идем в меню
+            gameWrapper.style.display = 'none';
+            mainMenu.style.display = 'flex'; 
+        }
         
         updateProfile(); 
         if (rememberCb.checked) {
@@ -76,6 +93,9 @@ document.getElementById('btn-close-shop').onclick = () => document.getElementByI
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
     socket.emit('play'); 
+    document.getElementById('goal-msg').textContent = "Ищем друга...";
+    document.getElementById('goal-msg').style.color = "#fb8500";
+    document.getElementById('btn-cancel-search').style.display = 'block';
 };
 
 document.getElementById('btn-cancel-search').onclick = () => {
@@ -101,6 +121,8 @@ document.getElementById('btn-new-game').onclick = () => {
     socket.emit('leaveMatch'); 
     clientState = null; serverState = null; myRole = null; 
     document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('goal-msg').textContent = "Ищем друга...";
+    document.getElementById('btn-cancel-search').style.display = 'block';
     socket.emit('play'); 
 };
 
@@ -140,7 +162,6 @@ socket.on('goalNotify', data => {
     msgEl.textContent = data.msg; msgEl.style.color = data.color;
 });
 
-// 🔥 НОВОЕ: Умное восстановление интерфейса на основе данных сервера
 socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
@@ -152,7 +173,6 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
 
-    // Логика текста на экране
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
         document.getElementById('goal-msg').style.color = "#ffb703";

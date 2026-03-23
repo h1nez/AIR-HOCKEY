@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
 
-// 🔥 НОВОЕ: Жесткий пинг. Если игрок свернул телефон на 4 секунды - сервер считает его отключенным
+// 🔥 Жесткие таймауты: Сервер не будет ждать вечно "подвисшие" соединения
 const io = new Server(server, { 
     cors: { origin: "*" },
     pingInterval: 2000,
@@ -157,8 +157,6 @@ setInterval(() => {
 // ==========================================
 // 3. АВТОРИЗАЦИЯ И МЕНЮ
 // ==========================================
-
-// 🔥 НОВОЕ: Функция, которая принудительно выкидывает "призрака" и сажает живого игрока
 function tryRejoin(socket, user) {
     for (const id in rooms) {
         const r = rooms[id]; if (r.gameOver) continue;
@@ -260,7 +258,9 @@ io.on('connection', (socket) => {
         
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
-        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
+        if (!room.player1.id && !room.player2.id) {
+            clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId];
+        }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
@@ -322,17 +322,15 @@ io.on('connection', (socket) => {
         const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
         
         if (role) {
-            room[role].id = null; // Отмечаем, что игрок временно пропал
+            room[role].id = null;
             
-            if (room.player2.name === "..." || room.gameOver) {
-                if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
-                return;
-            }
+            // Если оба вылетели — сразу удаляем комнату
             if (!room.player1.id && !room.player2.id) {
                 clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return;
             }
-            
-            // Запускаем таймер на 60 секунд
+
+            if (room.player2.name === "..." || room.gameOver) return;
+
             room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             room.disconnectTimeout = setTimeout(() => {
                 const winRole = role === 'player1' ? 'player2' : 'player1';
