@@ -1,1 +1,20 @@
-{ "users": [] }
+{
+  "users": [
+    {
+      "name": "artem",
+      "rating": 1000
+    },
+    {
+      "name": "admin",
+      "rating": 1000
+    },
+    {
+      "name": "h1nez",
+      "rating": 1000
+    },
+    {
+      "name": "a",
+      "rating": 1000
+    }
+  ]
+}

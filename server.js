@@ -15,7 +15,6 @@ const io = new Server(server, {
     pingTimeout: 3000 
 });
 
-// Настройка базы данных для Windows 10
 const dbPath = path.join(process.cwd(), 'db.json');
 if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, JSON.stringify({ users: [] }, null, 2));
@@ -24,7 +23,6 @@ const db = await JSONFilePreset(dbPath, { users: [] });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Константы
 const WIDTH = 800;
 const HEIGHT = 400;
 const PUCK_R = 22; 
@@ -46,11 +44,10 @@ function resolveCollision(puck, player) {
     if (dist < minDist) {
         const nx = dx / dist; 
         const ny = dy / dist; 
-        const overlap = minDist - dist;
 
-        // Жесткое выталкивание
-        puck.x += nx * (overlap + 2);
-        puck.y += ny * (overlap + 2);
+        // Выталкивание ровно на границу
+        puck.x = player.x + nx * (minDist + 0.1);
+        puck.y = player.y + ny * (minDist + 0.1);
 
         const relVX = puck.vx - player.speedX;
         const relVY = puck.vy - player.speedY;
@@ -58,14 +55,22 @@ function resolveCollision(puck, player) {
 
         if (velNormal > 0) return;
 
-        const res = 1.3;
-        let j = -(1 + res) * velNormal;
-        puck.vx += j * nx + player.speedX * 0.4;
-        puck.vy += j * ny + player.speedY * 0.4;
+        // Отскок и передача силы удара от мышки
+        const res = 1.6; 
+        const impulse = -(1 + res) * velNormal;
 
-        const maxS = 18;
-        const curS = Math.sqrt(puck.vx**2 + puck.vy**2);
-        if (curS > maxS) { puck.vx = (puck.vx/curS)*maxS; puck.vy = (puck.vy/curS)*maxS; }
+        puck.vx += impulse * nx + (player.speedX * 0.8); 
+        puck.vy += impulse * ny + (player.speedY * 0.8);
+
+        // Лимит скорости
+        const maxSpeed = 28; 
+        // ВАЖНО: Вот эта переменная потерялась в прошлый раз!
+        const speed = Math.sqrt(puck.vx**2 + puck.vy**2); 
+        
+        if (speed > maxSpeed) {
+            puck.vx = (puck.vx / speed) * maxSpeed;
+            puck.vy = (puck.vy / speed) * maxSpeed;
+        }
     }
 }
 
@@ -83,9 +88,8 @@ async function handleGoal(winRole) {
         await db.read();
         let u1 = db.data.users.find(u => u.name === win.name);
         let u2 = db.data.users.find(u => u.name === lose.name);
-        if(u1) u1.rating = win.rating; 
-        if(u2) u2.rating = lose.rating;
-        await db.write(); // КРИТИЧНО ДЛЯ СОХРАНЕНИЯ
+        if(u1) u1.rating = win.rating; if(u2) u2.rating = lose.rating;
+        await db.write();
 
         io.emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
         setTimeout(() => { gameState.player1.score = 0; gameState.player2.score = 0; reset(winRole); }, 5000);
@@ -96,7 +100,7 @@ async function handleGoal(winRole) {
 }
 
 function reset(lastWin) {
-    gameState.puck = { x: WIDTH/2, y: HEIGHT/2, vx: lastWin === 'player1' ? 5 : -5, vy: 0 };
+    gameState.puck = { x: WIDTH/2, y: HEIGHT/2, vx: lastWin === 'player1' ? 10 : -10, vy: 0 };
     gameState.player1.x = 80; gameState.player1.y = 200;
     gameState.player2.x = 720; gameState.player2.y = 200;
     gameState.paused = false;
@@ -105,13 +109,14 @@ function reset(lastWin) {
 
 setInterval(() => {
     if (!gameState.paused) {
-        gameState.puck.vx *= 0.985; gameState.puck.vy *= 0.985;
-        gameState.puck.x += gameState.puck.vx; gameState.puck.y += gameState.puck.vy;
+		gameState.puck.vx *= 0.995; // Почти идеальный лед
+		gameState.puck.vy *= 0.995;
+        gameState.puck.x += gameState.puck.vx; 
+        gameState.puck.y += gameState.puck.vy;
         
-        if (gameState.puck.y < PUCK_R || gameState.puck.y > HEIGHT - PUCK_R) {
-            gameState.puck.vy *= -1;
-            gameState.puck.y = gameState.puck.y < HEIGHT/2 ? PUCK_R : HEIGHT - PUCK_R;
-        }
+        if (gameState.puck.y < PUCK_R) { gameState.puck.y = PUCK_R; gameState.puck.vy *= -1; }
+        if (gameState.puck.y > HEIGHT - PUCK_R) { gameState.puck.y = HEIGHT - PUCK_R; gameState.puck.vy *= -1; }
+
         if (gameState.puck.x < PUCK_R) {
             if (gameState.puck.y > 125 && gameState.puck.y < 275) handleGoal('player2');
             else { gameState.puck.x = PUCK_R; gameState.puck.vx *= -1; }
@@ -120,11 +125,12 @@ setInterval(() => {
             if (gameState.puck.y > 125 && gameState.puck.y < 275) handleGoal('player1');
             else { gameState.puck.x = WIDTH - PUCK_R; gameState.puck.vx *= -1; }
         }
+
         resolveCollision(gameState.puck, gameState.player1);
         resolveCollision(gameState.puck, gameState.player2);
     }
     io.emit('gameStateUpdate', gameState);
-}, 22);
+}, 20);
 
 io.on('connection', (socket) => {
     socket.on('join', async (name) => {
@@ -135,7 +141,6 @@ io.on('connection', (socket) => {
                 user = { name, rating: 1000 };
                 db.data.users.push(user);
                 await db.write();
-                console.log(`✅ Пользователь ${name} сохранен!`);
             }
             if (!gameState.player1.id) {
                 gameState.player1.id = socket.id; gameState.player1.name = name; 
@@ -145,7 +150,7 @@ io.on('connection', (socket) => {
                 gameState.player2.rating = user.rating; socket.emit('role', 'p2');
                 gameState.paused = false;
             }
-        } catch(e) { console.error("Ошибка БД:", e); }
+        } catch(e) { console.log(e); }
     });
     socket.on('input', (data) => {
         const p = socket.id === gameState.player1.id ? gameState.player1 : (socket.id === gameState.player2.id ? gameState.player2 : null);
@@ -162,6 +167,4 @@ io.on('connection', (socket) => {
         if (socket.id === gameState.player2.id) { gameState.player2.id = null; gameState.paused = true; }
     });
 });
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Сервер: http://localhost:${PORT}`));
+server.listen(process.env.PORT || 3000);
