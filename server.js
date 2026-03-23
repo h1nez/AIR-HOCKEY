@@ -18,7 +18,6 @@ const io = new Server(server, {
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
 
 mongoose.connect(MONGODB_URI)
@@ -42,19 +41,13 @@ const User = mongoose.model('User', userSchema);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const WIDTH = 800;
-const HEIGHT = 400;
-const PUCK_R = 22; 
-const PLAYER_R = 35;
-
-const rooms = {}; 
-let roomCounter = 1;
+const WIDTH = 800; const HEIGHT = 400; const PUCK_R = 22; const PLAYER_R = 35;
+const rooms = {}; let roomCounter = 1;
 
 function createRoom() {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
-        id: roomId,
-        puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
+        id: roomId, puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
         player1: { id: null, name: "...", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         player2: { id: null, name: "...", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true
@@ -93,8 +86,7 @@ async function handleGoal(room, winRole) {
     win.score++;
 
     if (win.score >= 11) {
-        const K = 32;
-        const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
+        const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
         try {
             await User.findOneAndUpdate({ name: win.name }, { rating: win.rating });
@@ -163,22 +155,40 @@ function joinPlayerToRoom(socket, user) {
 
 io.on('connection', (socket) => {
     
+    // ДОБАВЛЕНЫ ЛОГИ В РЕГИСТРАЦИЮ
     socket.on('register', async (data, callback) => {
+        console.log(`[РЕГИСТРАЦИЯ] Попытка регистрации пользователя: ${data.name}`);
         try {
-            if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
+            if (!data.name || !data.password) {
+                console.log(`[РЕГИСТРАЦИЯ] Ошибка: пустые поля`);
+                return callback({ success: false, msg: "Заполните все поля!" });
+            }
+            
+            console.log(`[РЕГИСТРАЦИЯ] Ищу пользователя в базе...`);
             const existing = await User.findOne({ name: data.name });
-            if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
+            if (existing) {
+                console.log(`[РЕГИСТРАЦИЯ] Ошибка: Имя уже занято`);
+                return callback({ success: false, msg: "Это имя уже занято!" });
+            }
 
+            console.log(`[РЕГИСТРАЦИЯ] Шифрую пароль...`);
             const hashedPassword = await bcrypt.hash(data.password, 10);
+            
+            console.log(`[РЕГИСТРАЦИЯ] Сохраняю в БД...`);
             const newUser = new User({ name: data.name, password: hashedPassword, rating: 1000 });
             await newUser.save();
 
+            console.log(`[РЕГИСТРАЦИЯ] Успешно! Сажаю в комнату...`);
             joinPlayerToRoom(socket, newUser);
             callback({ success: true });
-        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
+        } catch(e) { 
+            console.error("[РЕГИСТРАЦИЯ] КРИТИЧЕСКАЯ ОШИБКА:", e);
+            callback({ success: false, msg: "Ошибка сервера: " + e.message }); 
+        }
     });
 
     socket.on('login', async (data, callback) => {
+        console.log(`[ВХОД] Попытка входа пользователя: ${data.name}`);
         try {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const user = await User.findOne({ name: data.name });
@@ -189,7 +199,10 @@ io.on('connection', (socket) => {
 
             joinPlayerToRoom(socket, user);
             callback({ success: true });
-        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
+        } catch(e) { 
+            console.error("[ВХОД] КРИТИЧЕСКАЯ ОШИБКА:", e);
+            callback({ success: false, msg: "Ошибка сервера" }); 
+        }
     });
 
     socket.on('input', (data) => {
