@@ -2,9 +2,8 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { JSONFilePreset } from 'lowdb/node';
+import mongoose from 'mongoose'; // Подключаем настоящую БД
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -15,11 +14,33 @@ const io = new Server(server, {
     pingTimeout: 3000 
 });
 
-const dbPath = path.join(process.cwd(), 'db.json');
-if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ users: [] }, null, 2));
-}
-const db = await JSONFilePreset(dbPath, { users: [] });
+// ==========================================
+// 1. ПОДКЛЮЧЕНИЕ К MONGODB
+// ==========================================
+// Сюда мы позже вставим твою личную ссылку от MongoDB Atlas
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:admin@aerohockey.5bidt7s.mongodb.net/?appName=Aerohockey';
+
+mongoose.connect(MONGODB_URI, { 
+    family: 4, // ПРИНУДИТЕЛЬНО используем IPv4 (спасает от ETIMEOUT)
+    serverSelectionTimeoutMS: 5000 // Ждем максимум 5 секунд
+})
+.then(() => {
+    console.log('✅ Успешное подключение к MongoDB!');
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
+})
+.catch(err => {
+    console.error('❌ Критическая ошибка БД:', err.message);
+    process.exit(1);
+});
+
+// Создаем "Схему" игрока (как таблица в БД)
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    rating: { type: Number, default: 1000 }
+});
+const User = mongoose.model('User', userSchema);
+// ==========================================
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -45,7 +66,6 @@ function resolveCollision(puck, player) {
         const nx = dx / dist; 
         const ny = dy / dist; 
 
-        // Выталкивание ровно на границу
         puck.x = player.x + nx * (minDist + 0.1);
         puck.y = player.y + ny * (minDist + 0.1);
 
@@ -55,18 +75,14 @@ function resolveCollision(puck, player) {
 
         if (velNormal > 0) return;
 
-        // Отскок и передача силы удара от мышки
         const res = 1.6; 
         const impulse = -(1 + res) * velNormal;
 
-        puck.vx += impulse * nx + (player.speedX * 0.8); 
+        puck.vx += impulse * nx + (player.speedX * 0.8);
         puck.vy += impulse * ny + (player.speedY * 0.8);
 
-        // Лимит скорости
-        const maxSpeed = 28; 
-        // ВАЖНО: Вот эта переменная потерялась в прошлый раз!
-        const speed = Math.sqrt(puck.vx**2 + puck.vy**2); 
-        
+        const maxSpeed = 28;
+        const speed = Math.sqrt(puck.vx**2 + puck.vy**2);
         if (speed > maxSpeed) {
             puck.vx = (puck.vx / speed) * maxSpeed;
             puck.vy = (puck.vy / speed) * maxSpeed;
@@ -85,11 +101,15 @@ async function handleGoal(winRole) {
         const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
         win.rating += diff; lose.rating -= diff;
         
-        await db.read();
-        let u1 = db.data.users.find(u => u.name === win.name);
-        let u2 = db.data.users.find(u => u.name === lose.name);
-        if(u1) u1.rating = win.rating; if(u2) u2.rating = lose.rating;
-        await db.write();
+        // --- СОХРАНЕНИЕ В MONGODB ---
+        try {
+            await User.findOneAndUpdate({ name: win.name }, { rating: win.rating });
+            await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating });
+            console.log(`💾 Рейтинг обновлен: ${win.name} (${win.rating}), ${lose.name} (${lose.rating})`);
+        } catch (err) {
+            console.error('Ошибка сохранения рейтинга:', err);
+        }
+        // ----------------------------
 
         io.emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" });
         setTimeout(() => { gameState.player1.score = 0; gameState.player2.score = 0; reset(winRole); }, 5000);
@@ -109,8 +129,7 @@ function reset(lastWin) {
 
 setInterval(() => {
     if (!gameState.paused) {
-		gameState.puck.vx *= 0.995; // Почти идеальный лед
-		gameState.puck.vy *= 0.995;
+        gameState.puck.vx *= 0.995; gameState.puck.vy *= 0.995;
         gameState.puck.x += gameState.puck.vx; 
         gameState.puck.y += gameState.puck.vy;
         
@@ -135,13 +154,17 @@ setInterval(() => {
 io.on('connection', (socket) => {
     socket.on('join', async (name) => {
         try {
-            await db.read();
-            let user = db.data.users.find(u => u.name === name);
+            // --- ПОИСК ИЛИ СОЗДАНИЕ В MONGODB ---
+            let user = await User.findOne({ name: name });
             if (!user) {
-                user = { name, rating: 1000 };
-                db.data.users.push(user);
-                await db.write();
+                user = new User({ name: name, rating: 1000 });
+                await user.save();
+                console.log(`✅ Новый игрок зарегистрирован: ${name}`);
+            } else {
+                console.log(`🔙 Игрок вернулся: ${name} (Рейтинг: ${user.rating})`);
             }
+            // ------------------------------------
+
             if (!gameState.player1.id) {
                 gameState.player1.id = socket.id; gameState.player1.name = name; 
                 gameState.player1.rating = user.rating; socket.emit('role', 'p1');
@@ -150,8 +173,9 @@ io.on('connection', (socket) => {
                 gameState.player2.rating = user.rating; socket.emit('role', 'p2');
                 gameState.paused = false;
             }
-        } catch(e) { console.log(e); }
+        } catch(e) { console.error("Ошибка входа:", e); }
     });
+
     socket.on('input', (data) => {
         const p = socket.id === gameState.player1.id ? gameState.player1 : (socket.id === gameState.player2.id ? gameState.player2 : null);
         if (p && !gameState.paused) {
@@ -161,10 +185,10 @@ io.on('connection', (socket) => {
             p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
+
     socket.on('pingCheck', () => socket.emit('pongCheck'));
     socket.on('disconnect', () => {
         if (socket.id === gameState.player1.id) { gameState.player1.id = null; gameState.paused = true; }
         if (socket.id === gameState.player2.id) { gameState.player2.id = null; gameState.paused = true; }
     });
 });
-server.listen(process.env.PORT || 3000);
