@@ -14,6 +14,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
+// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -194,12 +195,10 @@ function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
     
-    // 🔥 ИСПРАВЛЕНИЕ ПОИСКА: Ищем ТОЛЬКО комнаты, где второй слот девственно чист (name: "...")
     for (const id in rooms) {
         if (rooms[id].gameOver) continue;
         if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
-            myRoomId = id; 
-            break; 
+            myRoomId = id; break; 
         } 
     }
     
@@ -260,7 +259,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🔥 ИСПРАВЛЕНИЕ ВЫХОДА
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
@@ -268,10 +266,8 @@ io.on('connection', (socket) => {
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
         if (room.player2.name !== "..." && !room.gameOver) {
-            // Если матч шел, присуждаем техническое поражение!
             finishMatch(room, winRole, true);
         } else {
-            // Оповещаем противника только если игра уже окончена
             socket.to(room.id).emit('opponentLeft');
         }
         
@@ -300,9 +296,10 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
+    // 🔥 ДОБАВИЛ .lean() во все запросы, чтобы сервер больше не падал от круговых ссылок!
     socket.on('getUserProfile', async (username, callback) => {
         try {
-            const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends');
+            const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
             if (target) {
                 callback({ success: true, profile: target });
             } else {
@@ -335,19 +332,21 @@ io.on('connection', (socket) => {
         } else { return callback({ success: false, msg: "Не хватает монет!" }); }
     });
 
+    // 🔥 ДОБАВИЛ .lean()
     socket.on('getFriendsData', async (callback) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
-            const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin');
+            const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin').lean();
             callback({ success: true, friends: friendsProfiles, requests: u.requests });
         } catch(e) { callback({ success: false }); }
     });
 
+    // 🔥 ДОБАВИЛ .lean()
     socket.on('searchUser', async (query, callback) => {
         if (!socket.user || !query) return;
         try {
-            const users = await User.find({ name: new RegExp(query, 'i'), name: { $ne: socket.user.name } }).limit(5).select('name rating');
+            const users = await User.find({ name: new RegExp(query, 'i'), name: { $ne: socket.user.name } }).limit(5).select('name rating').lean();
             callback({ success: true, users });
         } catch(e) { callback({ success: false }); }
     });
@@ -399,9 +398,10 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
+    // 🔥 ДОБАВИЛ .lean()
     socket.on('getLeaderboard', async (callback) => {
         try {
-            const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id');
+            const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id').lean();
             callback({ success: true, leaderboard: topUsers });
         } catch(e) { callback({ success: false }); }
     });
@@ -428,9 +428,7 @@ io.on('connection', (socket) => {
         if (role) {
             room[role].id = null;
             if (room.player2.name === "..." || room.gameOver) {
-                if (!room.player1.id && !room.player2.id) {
-                    clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId];
-                }
+                if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
                 return;
             }
             if (!room.player1.id && !room.player2.id) {
