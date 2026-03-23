@@ -1,5 +1,6 @@
 const socket = io();
 
+// Картинки
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
@@ -15,16 +16,29 @@ const authError = document.getElementById('auth-error');
 const savedName = localStorage.getItem('ah_name');
 const savedPass = localStorage.getItem('ah_pass');
 
+// 🔥 БЕЗОПАСНЫЙ АВТОВХОД
 if (savedName && savedPass) {
-    nameInput.value = savedName; passInput.value = savedPass;
-    authError.innerText = "Автоматический вход..."; authError.style.color = "#4da6ff";
-    socket.on('connect', () => { socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse); });
+    nameInput.value = savedName; 
+    passInput.value = savedPass;
+    authError.innerText = "Автоматический вход..."; 
+    authError.style.color = "#4da6ff";
+    
+    const doAutoLogin = () => {
+        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
+    };
+
+    if (socket.connected) {
+        doAutoLogin();
+    } else {
+        socket.on('connect', doAutoLogin);
+    }
 }
 
 document.getElementById('btn-login').onclick = () => {
     authError.innerText = "Подключение..."; authError.style.color = "#e63946";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
+
 document.getElementById('btn-register').onclick = () => {
     authError.innerText = "Создание..."; authError.style.color = "#e63946";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
@@ -68,6 +82,7 @@ function updateProfile() {
     });
 }
 
+// ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
@@ -76,10 +91,9 @@ window.showProfile = function(username) {
             
             document.getElementById('profile-name').innerText = p.name;
             
-            // 🔥 ЗАЩИТА: Если в базе остался старый смайлик, меняем на avatar1
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
-            document.getElementById('profile-avatar').src = '/' + av + '.png'; // Грузим картинку!
+            document.getElementById('profile-avatar').src = '/' + av + '.png'; 
 
             document.getElementById('profile-mmr').innerText = p.rating;
             document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
@@ -110,17 +124,13 @@ window.showProfile = function(username) {
 
 window.setAvatar = function(av) {
     socket.emit('setAvatar', av, (res) => {
-        if(res.success) {
-            document.getElementById('profile-avatar').src = '/' + av + '.png'; // Меняем картинку
-        }
+        if(res.success) { document.getElementById('profile-avatar').src = '/' + av + '.png'; }
     });
 }
 
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
-// ==========================================
-// ЛОГИКА ДРУЗЕЙ
-// ==========================================
+// ДРУЗЬЯ
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -155,21 +165,22 @@ function loadFriendsData() {
             `).join('');
         }
 
-		document.getElementById('btn-play').onclick = () => {
-			mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
-			socket.emit('play'); 
-			document.getElementById('goal-msg').textContent = "Ищем друга...";
-			document.getElementById('goal-msg').style.color = "#fb8500";
-			document.getElementById('btn-cancel-search').style.display = 'block';
-		};
-
-		// 🔥 НОВОЕ: Кнопка тренировки
-		document.getElementById('btn-play-bot').onclick = () => {
-			mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
-			socket.emit('playBot'); // Отправляем спец-команду серверу
-			document.getElementById('goal-msg').textContent = ""; // Бот подключается моментально!
-			document.getElementById('btn-cancel-search').style.display = 'none';
-		};
+        const reqList = document.getElementById('requests-list');
+        document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
+        if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
+        else {
+            reqList.innerHTML = res.requests.map(r => `
+                <div class="friend-item">
+                    <div class="friend-info">${r}</div>
+                    <div>
+                        <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
+                        <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    });
+}
 
 window.searchFriends = function() {
     const q = document.getElementById('search-input').value;
@@ -194,6 +205,7 @@ window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => l
 window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
 window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
 
+// МАГАЗИН
 window.buySkin = function(skinName) {
     socket.emit('buySkin', skinName, (res) => {
         if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } 
@@ -204,12 +216,20 @@ window.buySkin = function(skinName) {
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
+// КНОПКИ ИГРЫ
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
     socket.emit('play'); 
     document.getElementById('goal-msg').textContent = "Ищем друга...";
     document.getElementById('goal-msg').style.color = "#fb8500";
     document.getElementById('btn-cancel-search').style.display = 'block';
+};
+
+document.getElementById('btn-play-bot').onclick = () => {
+    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
+    socket.emit('playBot'); 
+    document.getElementById('goal-msg').textContent = ""; 
+    document.getElementById('btn-cancel-search').style.display = 'none';
 };
 
 document.getElementById('btn-cancel-search').onclick = () => {
@@ -219,6 +239,7 @@ document.getElementById('btn-cancel-search').onclick = () => {
     document.getElementById('goal-msg').textContent = ""; 
 };
 
+// ЭНД СКРИН
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; });
 socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; });
 

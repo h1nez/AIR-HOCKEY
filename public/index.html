@@ -48,7 +48,6 @@
         .friend-info { font-size: 18px; font-weight: bold; color: #333; }
         .friend-mmr { font-size: 14px; color: #888; font-weight: normal; }
 
-        /* 🔥 ОБНОВЛЕНО ДЛЯ КАРТИНОК */
         .avatar-opt { transition: 0.2s; border: 4px solid transparent; border-radius: 50%; cursor: pointer; width: 65px; height: 65px; object-fit: cover; }
         .avatar-opt:hover { transform: scale(1.1); border-color: #8ecae6; }
 
@@ -78,16 +77,18 @@
         <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
         <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 20px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
-		<div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
             <button id="btn-my-profile" class="btn btn-blue">👤 Профиль</button>
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:14px;">0</span></button>
             <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
         </div>
-        <div style="display: flex; gap: 15px;">
+        
+        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
             <button id="btn-play-bot" class="btn btn-blue" style="font-size: 20px; padding: 20px 30px;">🤖 ТРЕНИРОВКА</button>
             <button id="btn-play" class="btn btn-green" style="font-size: 36px; padding: 20px 60px;">ИГРАТЬ ONLINE</button>
         </div>
+    </div>
 
     <div id="profile-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
@@ -112,10 +113,10 @@
             <div id="avatar-selector" style="display: none; margin-bottom: 20px;">
                 <div style="font-weight:bold; margin-bottom:10px; color:#333;">Сменить аватарку:</div>
                 <div style="display: flex; justify-content: center; gap: 15px;">
-                    <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png">
-                    <img onclick="setAvatar('avatar2')" class="avatar-opt" src="/avatar2.png">
-                    <img onclick="setAvatar('avatar3')" class="avatar-opt" src="/avatar3.png">
-                    <img onclick="setAvatar('avatar4')" class="avatar-opt" src="/avatar4.png">
+                    <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png" onerror="this.src=''">
+                    <img onclick="setAvatar('avatar2')" class="avatar-opt" src="/avatar2.png" onerror="this.src=''">
+                    <img onclick="setAvatar('avatar3')" class="avatar-opt" src="/avatar3.png" onerror="this.src=''">
+                    <img onclick="setAvatar('avatar4')" class="avatar-opt" src="/avatar4.png" onerror="this.src=''">
                 </div>
             </div>
 
@@ -167,7 +168,7 @@
                     <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
                     <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
