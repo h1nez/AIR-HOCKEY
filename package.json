@@ -1,7 +1,7 @@
 {
   "name": "airhockey",
   "version": "1.0.0",
-  "description": "",
+  "description": "Multiplayer Air Hockey",
   "main": "server.js",
   "type": "module",
   "scripts": {
