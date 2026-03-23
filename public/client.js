@@ -156,10 +156,19 @@ socket.on('gameStateUpdate', s => {
 });
 
 function sendInput(clientX, clientY) {
-    if (!myRole) return;
+    // Если игра на паузе или мы еще не зашли - игнорируем касания
+    if (!myRole || !clientState || !serverState || serverState.paused) return;
+    
     const rect = canvas.getBoundingClientRect();
     const x = (clientX - rect.left) * (canvas.width / rect.width);
     const y = (clientY - rect.top) * (canvas.height / rect.height);
+    
+    // 🔥 НОВОЕ: Мгновенно двигаем свою клюшку на экране (Нулевой пинг!)
+    const me = myRole === 'p1' ? 'player1' : 'player2';
+    clientState[me].x = (myRole === 'p1') ? Math.min(365, Math.max(35, x)) : Math.min(765, Math.max(435, x));
+    clientState[me].y = Math.min(365, Math.max(35, y));
+
+    // Отправляем координаты на сервер для физики и для экрана противника
     socket.emit('input', { x, y });
 }
 
@@ -228,4 +237,11 @@ function loop() {
     }
     requestAnimationFrame(loop);
 }
+
+// Обработка потери сессии при микро-разрывах
+socket.on('forceReload', () => {
+    alert("Связь с сервером прервалась 🔌\nСтраница будет обновлена для переподключения.");
+    window.location.reload();
+});
+
 loop();
