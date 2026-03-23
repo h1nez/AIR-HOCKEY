@@ -14,7 +14,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -28,7 +27,6 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
-// 🔥 НОВОЕ: Добавили массивы friends и requests
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -262,6 +260,18 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
+    // 🔥 НОВОЕ: Команда для получения данных чужого профиля (по нику)
+    socket.on('getUserProfile', async (username, callback) => {
+        try {
+            const target = await User.findOne({ name: username }).select('name rating skin coins');
+            if (target) {
+                callback({ success: true, profile: target });
+            } else {
+                callback({ success: false, msg: "Игрок не найден" });
+            }
+        } catch(e) { callback({ success: false }); }
+    });
+
     socket.on('buySkin', async (skinName, callback) => {
         if (!socket.user) return;
         const prices = { korzhik: 50, karamelka: 50, kompot: 50, gonya: 75, default: 0 };
@@ -277,32 +287,23 @@ io.on('connection', (socket) => {
         } else { return callback({ success: false, msg: "Не хватает монет!" }); }
     });
 
-    // ==========================================
-    // 🔥 НОВОЕ: СИСТЕМА ДРУЗЕЙ
-    // ==========================================
-    
-    // Получить данные для меню друзей
     socket.on('getFriendsData', async (callback) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
-            // Получаем профили друзей
             const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin');
             callback({ success: true, friends: friendsProfiles, requests: u.requests });
         } catch(e) { callback({ success: false }); }
     });
 
-    // Поиск игрока
     socket.on('searchUser', async (query, callback) => {
         if (!socket.user || !query) return;
         try {
-            // Ищем по нику (без учета регистра), исключая себя
             const users = await User.find({ name: new RegExp(query, 'i'), name: { $ne: socket.user.name } }).limit(5).select('name rating');
             callback({ success: true, users });
         } catch(e) { callback({ success: false }); }
     });
 
-    // Отправить запрос
     socket.on('sendFriendRequest', async (targetName, callback) => {
         if (!socket.user) return;
         try {
@@ -310,59 +311,43 @@ io.on('connection', (socket) => {
             if (!target) return callback({ success: false, msg: "Игрок не найден" });
             if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
             if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
-
             target.requests.push(socket.user.name);
             await target.save();
             callback({ success: true, msg: "Запрос отправлен!" });
         } catch(e) { callback({ success: false, msg: "Ошибка" }); }
     });
 
-    // Принять запрос
     socket.on('acceptFriend', async (senderName, callback) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
             const sender = await User.findOne({ name: senderName });
-
-            u.requests = u.requests.filter(n => n !== senderName); // Удаляем из запросов
-            
+            u.requests = u.requests.filter(n => n !== senderName);
             if (sender && !u.friends.includes(senderName)) {
-                u.friends.push(senderName); // Добавляем себе
-                if (!sender.friends.includes(u.name)) {
-                    sender.friends.push(u.name); // Добавляем ему
-                    await sender.save();
-                }
+                u.friends.push(senderName);
+                if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); }
             }
-            await u.save();
-            callback({ success: true });
+            await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
-    // Отклонить запрос
     socket.on('rejectFriend', async (senderName, callback) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
             u.requests = u.requests.filter(n => n !== senderName);
-            await u.save();
-            callback({ success: true });
+            await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
-    // Удалить из друзей
     socket.on('removeFriend', async (friendName, callback) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
             const friend = await User.findOne({ name: friendName });
-
             u.friends = u.friends.filter(n => n !== friendName);
-            if (friend) {
-                friend.friends = friend.friends.filter(n => n !== u.name);
-                await friend.save();
-            }
-            await u.save();
-            callback({ success: true });
+            if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); }
+            await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
@@ -392,7 +377,6 @@ io.on('connection', (socket) => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
         const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
-        
         if (role) {
             room[role].id = null;
             if (room.player2.name === "..." || room.gameOver) {

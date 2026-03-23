@@ -38,7 +38,6 @@
         .shop-item h3 { margin: 5px 0; font-size: 20px; color: #333; }
         .shop-item .boost { font-size: 13px; color: #023047; min-height: 35px; display: block; margin-bottom: 5px; font-style: italic; }
 
-        /* 🔥 Стили для вкладок Друзей */
         .tabs { display: flex; margin-bottom: 15px; gap: 5px; }
         .tab-btn { flex: 1; padding: 10px; background: #eee; border: 3px solid #ccc; border-bottom: none; cursor: pointer; font-weight: bold; border-radius: 15px 15px 0 0; font-size: 16px; font-family: inherit; }
         .tab-btn.active { background: #ffb703; color: white; border-color: #ffb703; }
@@ -73,30 +72,35 @@
 
     <div id="main-menu" class="overlay" style="display: none;">
         <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
-        <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 40px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
+        <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 20px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
-        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
+            <button id="btn-my-profile" class="btn btn-blue">👤 Профиль</button>
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:14px;">0</span></button>
-            <button id="btn-play" class="btn btn-green" style="font-size: 32px; padding: 20px 50px;">ИГРАТЬ</button>
             <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
+        </div>
+        <button id="btn-play" class="btn btn-green" style="font-size: 36px; padding: 20px 60px;">ИГРАТЬ</button>
+    </div>
+
+    <div id="profile-modal" class="overlay" style="display: none;">
+        <div class="modal-box" style="border-color: #8ecae6; max-width: 400px;">
+            <h2 id="profile-name" style="color: #219ebc; font-size: 44px; margin-bottom: 10px; text-transform: uppercase;">Имя</h2>
+            <div style="font-size: 26px; margin-bottom: 15px; color: #555;">🏆 MMR: <span id="profile-mmr" style="color: #ffb703; font-weight: bold;">1000</span></div>
+            <div style="font-size: 26px; margin-bottom: 30px; color: #555;">👕 Скин: <span id="profile-skin" style="color: #06d6a0; font-weight: bold;">Обычный</span></div>
+            <button class="btn btn-blue" onclick="document.getElementById('profile-modal').style.display='none'" style="width: 100%;">Закрыть</button>
         </div>
     </div>
 
     <div id="friends-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #4da6ff; max-width: 600px;">
             <h2 style="color: #4da6ff;">👥 Мои Друзья</h2>
-            
             <div class="tabs">
                 <button class="tab-btn active" onclick="switchTab('tab-list')">Список</button>
                 <button class="tab-btn" onclick="switchTab('tab-search')">Поиск</button>
                 <button class="tab-btn" onclick="switchTab('tab-reqs')">Запросы <span id="req-count" style="color:red;"></span></button>
             </div>
-
-            <div id="tab-list" class="tab-content active">
-                <div id="friends-list">Загрузка...</div>
-            </div>
-
+            <div id="tab-list" class="tab-content active"><div id="friends-list">Загрузка...</div></div>
             <div id="tab-search" class="tab-content">
                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                     <input type="text" id="search-input" placeholder="Введите никнейм..." style="margin:0;">
@@ -104,11 +108,7 @@
                 </div>
                 <div id="search-results"></div>
             </div>
-
-            <div id="tab-reqs" class="tab-content">
-                <div id="requests-list">Загрузка...</div>
-            </div>
-
+            <div id="tab-reqs" class="tab-content"><div id="requests-list">Загрузка...</div></div>
             <button id="btn-close-friends" class="btn btn-orange" style="width: 100%; margin-top: 15px;">Закрыть</button>
         </div>
     </div>
@@ -136,7 +136,7 @@
                     <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
                     <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>

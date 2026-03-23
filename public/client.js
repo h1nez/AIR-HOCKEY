@@ -1,6 +1,5 @@
 const socket = io();
 
-// Загрузка картинок
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
@@ -16,33 +15,22 @@ const authError = document.getElementById('auth-error');
 const savedName = localStorage.getItem('ah_name');
 const savedPass = localStorage.getItem('ah_pass');
 
-// 🔥 ИСПРАВЛЕННЫЙ АВТОВХОД
 if (savedName && savedPass) {
-    nameInput.value = savedName; 
-    passInput.value = savedPass;
-    authError.innerText = "Автоматический вход...";
-    authError.style.color = "#4da6ff"; // Синенький цвет для загрузки
-    
-    // Ждем, пока установится связь с сервером, и только потом отправляем!
-    socket.on('connect', () => {
-        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
-    });
+    nameInput.value = savedName; passInput.value = savedPass;
+    authError.innerText = "Автоматический вход..."; authError.style.color = "#4da6ff";
+    socket.on('connect', () => { socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse); });
 }
 
 document.getElementById('btn-login').onclick = () => {
-    authError.innerText = "Подключение...";
-    authError.style.color = "#e63946";
+    authError.innerText = "Подключение..."; authError.style.color = "#e63946";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
-
 document.getElementById('btn-register').onclick = () => {
-    authError.innerText = "Создание...";
-    authError.style.color = "#e63946";
+    authError.innerText = "Создание..."; authError.style.color = "#e63946";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
 function handleAuthResponse(res) {
-// ... дальше идет старый код функции, его не трогай
     if (res.success) {
         authScreen.style.display = 'none';
         if (res.rejoining) {
@@ -65,7 +53,6 @@ function updateProfile() {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
             
-            // Бейджик запросов в друзья
             const reqBadge = document.getElementById('req-badge');
             if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; }
             else { reqBadge.style.display = 'none'; }
@@ -81,15 +68,32 @@ function updateProfile() {
     });
 }
 
+// 🔥 ЛОГИКА ПРОСМОТРА ПРОФИЛЕЙ
+window.showProfile = function(username) {
+    socket.emit('getUserProfile', username, (res) => {
+        if (res.success) {
+            const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
+            document.getElementById('profile-name').innerText = res.profile.name;
+            document.getElementById('profile-mmr').innerText = res.profile.rating;
+            document.getElementById('profile-skin').innerText = skinNames[res.profile.skin] || 'Обычный';
+            
+            document.getElementById('profile-modal').style.display = 'flex';
+        } else {
+            alert("Не удалось загрузить профиль");
+        }
+    });
+};
+
+document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
+
 // ==========================================
-// 🔥 ЛОГИКА ДРУЗЕЙ
+// ЛОГИКА ДРУЗЕЙ
 // ==========================================
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     
-    // Находим кнопку, которая соответствует вкладке, и делаем её активной
     if(tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active');
     if(tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
     if(tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
@@ -105,19 +109,20 @@ function loadFriendsData() {
     socket.emit('getFriendsData', (res) => {
         if (!res.success) return;
         
-        // Отрисовка списка друзей
         const list = document.getElementById('friends-list');
         if (res.friends.length === 0) list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>";
         else {
             list.innerHTML = res.friends.map(f => `
                 <div class="friend-item">
-                    <div class="friend-info">${f.name} <br><span class="friend-mmr">MMR: ${f.rating} | Скин: ${f.skin}</span></div>
-                    <button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button>
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">MMR: ${f.rating}</span></div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button>
+                        <button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button>
+                    </div>
                 </div>
             `).join('');
         }
 
-        // Отрисовка запросов
         const reqList = document.getElementById('requests-list');
         document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
         if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
@@ -289,7 +294,6 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.tou
 
 function drawPlayer(x, y, skinName, color) {
     let r = skinName === 'karamelka' ? 43 : (skinName === 'gonya' ? 28 : 35);
-    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); 
         ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();
