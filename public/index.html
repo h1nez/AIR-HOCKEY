@@ -28,7 +28,6 @@
         .shop-item.equipped { border-color: #00eeff; box-shadow: 0 0 10px #00eeff; }
         .shop-item h3 { margin: 5px 0; font-size: 18px; }
 
-        /* Игровое поле с поддержкой мобильных экранов */
         #game-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 20px; font-weight: bold; }
         #game-container { position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1; }
@@ -71,24 +70,11 @@
     <div id="shop-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 10px; z-index: 600; color: white; border: 2px solid #ffaa00; text-align: center; width: 90%; max-width: 500px; overflow-y: auto; max-height: 90vh;">
         <h2 style="margin-top:0;">Скины "Три Кота"</h2>
         <div id="shop-coins" style="color: gold; margin-bottom: 20px;">Ваши монеты: 0</div>
-        
         <div style="display: flex; flex-wrap: wrap; justify-content: center;">
-            <div class="shop-item" onclick="buySkin('default')" id="skin-default">
-                <h3>Обычный</h3>
-                <p id="price-default" style="color: #aaa;">Бесплатно</p>
-            </div>
-            <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik">
-                <h3>Коржик</h3>
-                <p id="price-korzhik" style="color: gold;">50 монет</p>
-            </div>
-            <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka">
-                <h3>Карамелька</h3>
-                <p id="price-karamelka" style="color: gold;">50 монет</p>
-            </div>
-            <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                <h3>Компот</h3>
-                <p id="price-kompot" style="color: gold;">50 монет</p>
-            </div>
+            <div class="shop-item" onclick="buySkin('default')" id="skin-default"><h3>Обычный</h3><p id="price-default" style="color: #aaa;">Бесплатно</p></div>
+            <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik"><h3>Коржик</h3><p id="price-korzhik" style="color: gold;">50 монет</p></div>
+            <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka"><h3>Карамелька</h3><p id="price-karamelka" style="color: gold;">50 монет</p></div>
+            <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot"><h3>Компот</h3><p id="price-kompot" style="color: gold;">50 монет</p></div>
         </div>
         <div id="shop-error" style="color: #ff4444; margin: 10px 0; min-height: 20px;"></div>
         <button id="btn-close-shop" style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">Закрыть</button>
@@ -105,6 +91,15 @@
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-shadow: 2px 2px 10px black; pointer-events: none; text-align: center; width: 100%;"></div>
             
+            <div id="end-screen" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px;">
+                <h2 style="color: gold; font-size: 40px; margin-top: 0; margin-bottom: 20px; text-shadow: 0 0 15px gold;">МАТЧ ОКОНЧЕН</h2>
+                <div id="end-status" style="color: white; font-size: 20px; margin-bottom: 30px;">Выберите действие:</div>
+                <div style="display: flex; gap: 20px;">
+                    <button id="btn-rematch" style="padding: 15px 30px; font-size: 18px; background: #4444ff; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 15px #4444ff;">Сыграть еще раз</button>
+                    <button id="btn-leave-match" style="padding: 15px 30px; font-size: 18px; background: #ff4444; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 15px #ff4444;">Выйти в меню</button>
+                </div>
+            </div>
+
             <button id="btn-cancel-search" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); padding: 10px 30px; font-size: 18px; background: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; box-shadow: 0 0 15px #ff4444;">Отменить поиск</button>
         </div>
     </div>
