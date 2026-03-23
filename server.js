@@ -14,6 +14,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
+// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -27,6 +28,7 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
+// 🔥 НОВОЕ: Добавили поля для статистики и аватарки
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -35,7 +37,13 @@ const userSchema = new mongoose.Schema({
     skin: { type: String, default: 'default' },
     inventory: { type: [String], default: ['default'] },
     friends: { type: [String], default: [] },
-    requests: { type: [String], default: [] }
+    requests: { type: [String], default: [] },
+    gamesPlayed: { type: Number, default: 0 },
+    gamesWon: { type: Number, default: 0 },
+    regDate: { type: Date, default: Date.now },
+    maxRating: { type: Number, default: 1000 },
+    minRating: { type: Number, default: 1000 },
+    avatar: { type: String, default: '🐱' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -95,12 +103,26 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     const lose = winRole === 'player1' ? room.player2 : room.player1;
     if (lose.name === "...") return; 
     if (isDisconnect) win.score = 11; 
+    
     const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
     win.rating += diff; lose.rating -= diff;
+    
+    // 🔥 НОВОЕ: Обновляем статистику в БД
     try {
-        await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
-        await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
+        await User.findOneAndUpdate({ name: win.name }, { 
+            rating: win.rating, 
+            $inc: { coins: 25, gamesPlayed: 1, gamesWon: 1 },
+            $max: { maxRating: win.rating },
+            $min: { minRating: win.rating }
+        });
+        await User.findOneAndUpdate({ name: lose.name }, { 
+            rating: lose.rating, 
+            $inc: { coins: 5, gamesPlayed: 1 },
+            $max: { maxRating: lose.rating },
+            $min: { minRating: lose.rating }
+        });
     } catch (err) {}
+    
     room.rematch = { player1: false, player2: false };
     if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold" }); } 
     else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" }); }
@@ -260,15 +282,27 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
-    // 🔥 НОВОЕ: Команда для получения данных чужого профиля (по нику)
+    // 🔥 НОВОЕ: Отправляем полную статистику для профиля
     socket.on('getUserProfile', async (username, callback) => {
         try {
-            const target = await User.findOne({ name: username }).select('name rating skin coins');
+            const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends');
             if (target) {
                 callback({ success: true, profile: target });
             } else {
                 callback({ success: false, msg: "Игрок не найден" });
             }
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // 🔥 НОВОЕ: Смена аватарки
+    socket.on('setAvatar', async (avatar, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            u.avatar = avatar;
+            await u.save();
+            socket.user = u;
+            callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 

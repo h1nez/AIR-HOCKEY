@@ -68,21 +68,51 @@ function updateProfile() {
     });
 }
 
-// 🔥 ЛОГИКА ПРОСМОТРА ПРОФИЛЕЙ
+// 🔥 ПОЛНЫЙ ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
+            const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
-            document.getElementById('profile-name').innerText = res.profile.name;
-            document.getElementById('profile-mmr').innerText = res.profile.rating;
-            document.getElementById('profile-skin').innerText = skinNames[res.profile.skin] || 'Обычный';
             
+            document.getElementById('profile-name').innerText = p.name;
+            document.getElementById('profile-avatar').innerText = p.avatar || '🐱';
+            document.getElementById('profile-mmr').innerText = p.rating;
+            document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
+            document.getElementById('profile-min-mmr').innerText = p.minRating || 1000;
+            document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
+            
+            // Новая статистика
+            document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
+            document.getElementById('profile-won').innerText = p.gamesWon || 0;
+            
+            let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
+            document.getElementById('profile-winrate').innerText = winrate + '%';
+            
+            const date = new Date(p.regDate);
+            document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
+
+            // Показываем выбор аватарки только в СВОЕМ профиле
+            if (username === nameInput.value) {
+                document.getElementById('avatar-selector').style.display = 'block';
+            } else {
+                document.getElementById('avatar-selector').style.display = 'none';
+            }
+
             document.getElementById('profile-modal').style.display = 'flex';
         } else {
             alert("Не удалось загрузить профиль");
         }
     });
 };
+
+window.setAvatar = function(av) {
+    socket.emit('setAvatar', av, (res) => {
+        if(res.success) {
+            document.getElementById('profile-avatar').innerText = av;
+        }
+    });
+}
 
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
@@ -149,7 +179,10 @@ window.searchFriends = function() {
         resBox.innerHTML = res.users.map(u => `
             <div class="friend-item">
                 <div class="friend-info">${u.name} <span class="friend-mmr">(MMR: ${u.rating})</span></div>
-                <button class="btn btn-blue btn-small" onclick="sendReq('${u.name}')">Добавить</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
+                    <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button>
+                </div>
             </div>
         `).join('');
     });
@@ -294,6 +327,7 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.tou
 
 function drawPlayer(x, y, skinName, color) {
     let r = skinName === 'karamelka' ? 43 : (skinName === 'gonya' ? 28 : 35);
+    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); 
         ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();

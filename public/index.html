@@ -48,6 +48,10 @@
         .friend-info { font-size: 18px; font-weight: bold; color: #333; }
         .friend-mmr { font-size: 14px; color: #888; font-weight: normal; }
 
+        /* Стили для выбора аватарки */
+        .avatar-opt { transition: 0.2s; border: 3px solid transparent; border-radius: 50%; padding: 5px; cursor: pointer; }
+        .avatar-opt:hover { transform: scale(1.1); background: #f4faff; border-color: #8ecae6; }
+
         #game-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 24px; font-weight: bold; }
         #game-container { position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1; }
@@ -84,10 +88,34 @@
     </div>
 
     <div id="profile-modal" class="overlay" style="display: none;">
-        <div class="modal-box" style="border-color: #8ecae6; max-width: 400px;">
-            <h2 id="profile-name" style="color: #219ebc; font-size: 44px; margin-bottom: 10px; text-transform: uppercase;">Имя</h2>
-            <div style="font-size: 26px; margin-bottom: 15px; color: #555;">🏆 MMR: <span id="profile-mmr" style="color: #ffb703; font-weight: bold;">1000</span></div>
-            <div style="font-size: 26px; margin-bottom: 30px; color: #555;">👕 Скин: <span id="profile-skin" style="color: #06d6a0; font-weight: bold;">Обычный</span></div>
+        <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
+            <div id="profile-avatar" style="font-size: 80px; margin-bottom: 10px;">🐱</div>
+            <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin-bottom: 5px; text-transform: uppercase;">Имя</h2>
+            <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
+
+            <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 15px; border-radius: 15px; margin-bottom: 15px;">
+                <div><b style="color: #4da6ff; font-size: 24px;" id="profile-played">0</b><br><span style="font-size:12px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
+                <div><b style="color: #06d6a0; font-size: 24px;" id="profile-won">0</b><br><span style="font-size:12px; color:#555; font-weight:bold;">ПОБЕД</span></div>
+                <div><b style="color: #fb8500; font-size: 24px;" id="profile-winrate">0%</b><br><span style="font-size:12px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
+            </div>
+
+            <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 20px; font-size: 18px; font-weight:bold; color: #555;">
+                <div>🏆 Текущий MMR: <b id="profile-mmr" style="color: #fb8500;">1000</b></div>
+                <div style="margin: 5px 0;">📈 Макс. MMR: <b id="profile-max-mmr" style="color: #06d6a0;">1000</b></div>
+                <div>📉 Мин. MMR: <b id="profile-min-mmr" style="color: #e63946;">1000</b></div>
+                <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
+            </div>
+
+            <div id="avatar-selector" style="display: none; margin-bottom: 20px;">
+                <div style="font-weight:bold; margin-bottom:10px; color:#333;">Сменить аватарку:</div>
+                <div style="display: flex; justify-content: center; gap: 15px; font-size: 40px;">
+                    <div onclick="setAvatar('🐱')" class="avatar-opt">🐱</div>
+                    <div onclick="setAvatar('🐶')" class="avatar-opt">🐶</div>
+                    <div onclick="setAvatar('🦊')" class="avatar-opt">🦊</div>
+                    <div onclick="setAvatar('🐻')" class="avatar-opt">🐻</div>
+                </div>
+            </div>
+
             <button class="btn btn-blue" onclick="document.getElementById('profile-modal').style.display='none'" style="width: 100%;">Закрыть</button>
         </div>
     </div>
@@ -136,7 +164,7 @@
                     <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
                     <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
