@@ -134,9 +134,16 @@ setInterval(() => {
 // 3. АВТОРИЗАЦИЯ И МЕНЮ
 // ==========================================
 function joinPlayerToRoom(socket, user) {
+    // 🛑 ЗАЩИТА 1: Если игрок УЖЕ в комнате (двойной клик), прерываем функцию
+    if (socket.roomId) return;
+
     let myRoomId = null;
+    
+    // 🛑 ЗАЩИТА 2: Ищем комнату, где свободно ЛЮБОЕ из двух мест
     for (const id in rooms) {
-        if (rooms[id].player1.id && !rooms[id].player2.id) { myRoomId = id; break; }
+        if (!rooms[id].player1.id || !rooms[id].player2.id) { 
+            myRoomId = id; break; 
+        }
     }
     if (!myRoomId) myRoomId = createRoom();
 
@@ -144,6 +151,7 @@ function joinPlayerToRoom(socket, user) {
     socket.join(myRoomId);
     socket.roomId = myRoomId;
 
+    // Сажаем на первое попавшееся свободное место
     if (!room.player1.id) {
         room.player1.id = socket.id; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
@@ -185,15 +193,30 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
-    socket.on('play', () => { if (socket.user) joinPlayerToRoom(socket, socket.user); });
+    // 🛑 ЗАЩИТА 3: Проверяем, не забыл ли сервер юзера после разрыва связи
+    socket.on('play', () => { 
+        if (socket.user) {
+            joinPlayerToRoom(socket, socket.user); 
+        } else {
+            // Если забыл — отправляем команду перезагрузить страницу
+            socket.emit('forceReload');
+        }
+    });
 
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (!room.player2.id) { 
-            room.player1.id = null; delete rooms[socket.roomId]; 
-            socket.leave(socket.roomId); socket.roomId = null; 
+        
+        // Безопасно очищаем именно того игрока, который отменил
+        if (room.player1.id === socket.id) room.player1.id = null;
+        if (room.player2.id === socket.id) room.player2.id = null;
+        
+        // Если комната опустела - удаляем
+        if (!room.player1.id && !room.player2.id) {
+            delete rooms[socket.roomId]; 
         }
+        socket.leave(socket.roomId); 
+        socket.roomId = null; 
     });
 
     socket.on('getProfile', async (callback) => {
