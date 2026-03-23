@@ -15,8 +15,8 @@ const io = new Server(server, {
     pingTimeout: 5000 
 });
 
-// --- Инициализация БД ---
-const dbPath = path.join(__dirname, 'db.json');
+// Настройка пути базы данных для Windows
+const dbPath = path.resolve(__dirname, 'db.json');
 if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, JSON.stringify({ users: [] }, null, 2));
 }
@@ -24,6 +24,7 @@ const db = await JSONFilePreset(dbPath, { users: [] });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// КОНСТАНТЫ (Должны быть идентичны на клиенте)
 const WIDTH = 800;
 const HEIGHT = 400;
 const PUCK_RADIUS = 22; 
@@ -38,6 +39,7 @@ let gameState = {
     paused: true
 };
 
+// УЛУЧШЕННАЯ ФИЗИКА СТОЛКНОВЕНИЙ
 function resolveCollision(puck, player) {
     const dx = puck.x - player.x;
     const dy = puck.y - player.y;
@@ -45,26 +47,40 @@ function resolveCollision(puck, player) {
     const minDist = PUCK_RADIUS + PLAYER_RADIUS;
 
     if (distance < minDist) {
-        // 1. ВЫТАЛКИВАНИЕ (чтобы не залезала внутрь)
+        // 1. ЖЕСТКОЕ ВЫТАЛКИВАНИЕ (Решает проблему "залезания")
+        const nx = dx / distance; // Вектор нормали X
+        const ny = dy / distance; // Вектор нормали Y
         const overlap = minDist - distance;
-        const nx = dx / distance; // Нормаль X
-        const ny = dy / distance; // Нормаль Y
-        
-        puck.x += nx * overlap;
-        puck.y += ny * overlap;
 
-        // 2. ОТСКОК
-        const dot = puck.vx * nx + puck.vy * ny;
-        // Коэффициент упругости 1.0 + добавка от скорости клюшки
-        puck.vx = (puck.vx - 2 * dot * nx) + player.speedX * 0.6;
-        puck.vy = (puck.vy - 2 * dot * ny) + player.speedY * 0.6;
-        
-        // Ограничение максимальной скорости шайбы
-        const maxSpeed = 15;
-        const speed = Math.sqrt(puck.vx**2 + puck.vy**2);
-        if (speed > maxSpeed) {
-            puck.vx = (puck.vx / speed) * maxSpeed;
-            puck.vy = (puck.vy / speed) * maxSpeed;
+        puck.x += nx * (overlap + 2); // Выталкиваем с запасом 2px
+        puck.y += ny * (overlap + 2);
+
+        // 2. РАСЧЕТ ОТСКОКА (Импульс)
+        // Вычисляем относительную скорость шайбы к игроку
+        const relVX = puck.vx - player.speedX;
+        const relVY = puck.vy - player.speedY;
+        const velAlongNormal = relVX * nx + relVY * ny;
+
+        // Если объекты уже разлетаются, не считаем отскок
+        if (velAlongNormal > 0) return;
+
+        // Сила отскока (1.3 делает игру динамичнее)
+        const restitution = 1.3;
+        let j = -(1 + restitution) * velAlongNormal;
+
+        puck.vx += j * nx;
+        puck.vy += j * ny;
+
+        // Добавляем инерцию от движения клюшки
+        puck.vx += player.speedX * 0.4;
+        puck.vy += player.speedY * 0.4;
+
+        // Лимит скорости (чтобы не пролетала сквозь стены)
+        const maxS = 18;
+        const currentS = Math.sqrt(puck.vx**2 + puck.vy**2);
+        if (currentS > maxS) {
+            puck.vx = (puck.vx / currentS) * maxS;
+            puck.vy = (puck.vy / currentS) * maxS;
         }
     }
 }
@@ -78,8 +94,8 @@ async function handleGoal(winnerRole) {
         const K = 32;
         const exp = 1 / (1 + Math.pow(10, (loser.rating - winner.rating) / 400));
         const diff = Math.round(K * (1 - exp));
-        
         winner.rating += diff; loser.rating -= diff;
+        
         await db.read();
         const u1 = db.data.users.find(u => u.name === winner.name);
         const u2 = db.data.users.find(u => u.name === loser.name);
@@ -109,12 +125,15 @@ function resetGame(lastWin) {
 setInterval(() => {
     if (!gameState.paused) {
         gameState.puck.vx *= 0.985; gameState.puck.vy *= 0.985;
-        gameState.puck.x += gameState.puck.vx; gameState.puck.y += gameState.puck.vy;
+        gameState.puck.x += gameState.puck.vx; 
+        gameState.puck.y += gameState.puck.vy;
 
+        // Стенки
         if (gameState.puck.y < PUCK_RADIUS || gameState.puck.y > HEIGHT - PUCK_RADIUS) {
             gameState.puck.vy *= -1;
             gameState.puck.y = gameState.puck.y < HEIGHT/2 ? PUCK_RADIUS : HEIGHT - PUCK_RADIUS;
         }
+        // Ворота
         if (gameState.puck.x < PUCK_RADIUS) {
             if (gameState.puck.y > GOAL_TOP && gameState.puck.y < GOAL_BOTTOM) {
                 gameState.player2.score++; handleGoal('player2');
@@ -136,7 +155,6 @@ io.on('connection', (socket) => {
         await db.read();
         let user = db.data.users.find(u => u.name === name);
         if (!user) { user = { name, rating: 1000 }; db.data.users.push(user); await db.write(); }
-        
         if (!gameState.player1.id) {
             gameState.player1.id = socket.id; gameState.player1.name = name; 
             gameState.player1.rating = user.rating; socket.emit('role', 'p1');
@@ -146,7 +164,6 @@ io.on('connection', (socket) => {
             gameState.paused = false;
         }
     });
-
     socket.on('input', (data) => {
         const p = socket.id === gameState.player1.id ? gameState.player1 : (socket.id === gameState.player2.id ? gameState.player2 : null);
         if (p && !gameState.paused) {
@@ -156,13 +173,10 @@ io.on('connection', (socket) => {
             p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
-
     socket.on('pingCheck', () => socket.emit('pongCheck'));
-    
     socket.on('disconnect', () => {
         if (socket.id === gameState.player1.id) { gameState.player1.id = null; gameState.paused = true; }
         if (socket.id === gameState.player2.id) { gameState.player2.id = null; gameState.paused = true; }
     });
 });
-
 server.listen(process.env.PORT || 3000);

@@ -21,10 +21,8 @@ socket.on('gameStateUpdate', s => {
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
     document.getElementById('s1').textContent = s.player1.score;
-    document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('s2').textContent = s.player2.score;
-    document.getElementById('n2').textContent = s.player2.name;
     document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
 });
 
@@ -73,7 +71,7 @@ setInterval(() => {
 
 function render(s) {
     ctx.clearRect(0, 0, 800, 400);
-    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2;
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
     ctx.beginPath(); ctx.arc(400,200,60,0,Math.PI*2); ctx.stroke();
     
@@ -81,8 +79,8 @@ function render(s) {
     ctx.strokeStyle = '#4444ff'; ctx.strokeRect(0, 125, 5, 150);
     ctx.strokeStyle = '#ff4444'; ctx.strokeRect(795, 125, 5, 150);
 
-    drawCircle(s.puck.x, s.puck.y, 22, '#333', true);
-    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff');
+    drawCircle(s.puck.x, s.puck.y, 22, '#333', true); // R=22 как на сервере
+    drawCircle(s.player1.x, s.player1.y, 35, '#4444ff'); // R=35 как на сервере
     drawCircle(s.player2.x, s.player2.y, 35, '#ff4444');
 }
 
