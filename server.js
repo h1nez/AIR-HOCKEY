@@ -60,12 +60,28 @@ function resolveCollision(puck, player) {
     const dx = puck.x - player.x;
     const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = PUCK_R + PLAYER_R;
+    const minDist = PUCK_R + PLAYER_R; // 57
 
     if (dist < minDist) {
-        const nx = dx / dist; 
-        const ny = dy / dist; 
+        let nx = dx / dist; 
+        let ny = dy / dist; 
 
+        // 🛑 АНТИ-ПРОКРУТКА: Если клюшка оказалась "внутри" шайбы из-за резкого рывка
+        if (dist < 35) { 
+            // Берем старую позицию клюшки (до удара) и считаем вектор от неё
+            const oldX = player.x - player.speedX;
+            const oldY = player.y - player.speedY;
+            const oldDx = puck.x - oldX;
+            const oldDy = puck.y - oldY;
+            const oldDist = Math.sqrt(oldDx * oldDx + oldDy * oldDy);
+            
+            if (oldDist > 0) {
+                nx = oldDx / oldDist; // Теперь вектор удара всегда правильный!
+                ny = oldDy / oldDist;
+            }
+        }
+
+        // Выталкиваем шайбу (без магнитов, ровно на край)
         puck.x = player.x + nx * (minDist + 0.1);
         puck.y = player.y + ny * (minDist + 0.1);
 
