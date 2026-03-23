@@ -108,6 +108,11 @@ function resolveCollision(puck, player) {
 
 async function handleGoal(winRole) {
     gameState.paused = true;
+    
+    // ДОБАВИТЬ ЭТИ ДВЕ СТРОКИ: Сразу возвращаем клюшки на старт
+    gameState.player1.x = 80; gameState.player1.y = 200;
+    gameState.player2.x = 720; gameState.player2.y = 200;
+
     const win = winRole === 'player1' ? gameState.player1 : gameState.player2;
     const lose = winRole === 'player1' ? gameState.player2 : gameState.player1;
     win.score++;
@@ -136,7 +141,7 @@ async function handleGoal(winRole) {
 }
 
 function reset(lastWin) {
-    gameState.puck = { x: WIDTH/2, y: HEIGHT/2, vx: lastWin === 'player1' ? 10 : -10, vy: 0 };
+    gameState.puck = { x: WIDTH/2, y: HEIGHT/2, vx: lastWin === 'player1' ? 0 : 0, vy: 0 };
     gameState.player1.x = 80; gameState.player1.y = 200;
     gameState.player2.x = 720; gameState.player2.y = 200;
     gameState.paused = false;
