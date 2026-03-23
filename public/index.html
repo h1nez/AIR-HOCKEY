@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Аэрохоккей Три Кота</title>
     <style>
-        /* Мультяшный светлый фон для всей игры */
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
         
-        /* Менюшки теперь светлые и с толстыми мультяшными рамками */
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
         .modal-box { background: #fff; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 6px solid #ffb703; text-align: center; width: 90%; max-width: 500px; }
         
@@ -17,7 +15,6 @@
         
         input { width: 90%; padding: 15px; margin: 10px 0; border: 3px solid #8ecae6; border-radius: 15px; font-size: 18px; box-sizing: border-box; outline: none; font-family: inherit; }
         input:focus { border-color: #219ebc; }
-        
         .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 16px; color: #555; font-weight: bold;}
         
         .btn { padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-family: inherit; font-size: 20px; transition: 0.2s; box-shadow: 0 6px 0 rgba(0,0,0,0.2); text-transform: uppercase; }
@@ -39,11 +36,15 @@
         .shop-item h3 { margin: 5px 0; font-size: 20px; color: #333; }
         .shop-item .boost { font-size: 13px; color: #023047; min-height: 35px; display: block; margin-bottom: 5px; font-style: italic; }
 
+        /* 🔥 НОВОЕ: Стили для аватарок */
+        .avatar-option { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #eee; cursor: pointer; object-fit: cover; transition: 0.2s; background: #f4faff; }
+        .avatar-option:hover { transform: scale(1.1); }
+        #btn-profile { position: absolute; top: 20px; right: 20px; cursor: pointer; transition: 0.2s; }
+        #btn-profile:hover { transform: scale(1.1); }
+
         #game-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 24px; font-weight: bold; }
         #game-container { position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1; }
-        
-        /* Само поле теперь со светлой рамкой и скругленными краями */
         canvas { width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none; }
     </style>
 </head>
@@ -64,6 +65,11 @@
     </div>
 
     <div id="main-menu" class="overlay" style="display: none;">
+        
+        <div id="btn-profile">
+            <img id="menu-avatar" src="/avatar1.png" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid #ffb703; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.2);" alt="Профиль" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><circle cx=\'50\' cy=\'50\' r=\'50\' fill=\'%23ddd\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'%23888\'>👤</text></svg>'">
+        </div>
+
         <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
         <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 40px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
@@ -71,6 +77,29 @@
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-play" class="btn btn-green" style="font-size: 32px; padding: 20px 50px;">ИГРАТЬ</button>
             <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="overlay" style="display: none;">
+        <div class="modal-box" style="border-color: #8338ec; max-width: 400px;">
+            <h2>👤 Профиль игрока</h2>
+            
+            <div style="text-align: left; font-size: 20px; line-height: 1.6; margin-bottom: 25px; color: #333; font-weight: bold; background: #f4faff; padding: 15px; border-radius: 15px; border: 2px dashed #8ecae6;">
+                <p style="margin: 5px 0;">📅 Регистрация: <span id="prof-date" style="color: #219ebc;"></span></p>
+                <p style="margin: 5px 0;">🎮 Сыграно матчей: <span id="prof-played" style="color: #fb8500;">0</span></p>
+                <p style="margin: 5px 0;">🏆 Выиграно: <span id="prof-won" style="color: #06d6a0;">0</span></p>
+                <p style="margin: 5px 0;">🔥 Макс. рейтинг (MMR): <span id="prof-max-mmr" style="color: #ff4d4d;">1000</span></p>
+            </div>
+            
+            <h3 style="margin-bottom: 10px; color: #fb8500;">Выберите аватар:</h3>
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 25px;">
+                <img src="/avatar1.png" class="avatar-option" onclick="changeAvatar('avatar1')" id="av-avatar1" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' fill=\'%23f00\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'%23fff\'>1</text></svg>'">
+                <img src="/avatar2.png" class="avatar-option" onclick="changeAvatar('avatar2')" id="av-avatar2" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' fill=\'%230f0\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'%23fff\'>2</text></svg>'">
+                <img src="/avatar3.png" class="avatar-option" onclick="changeAvatar('avatar3')" id="av-avatar3" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' fill=\'%2300f\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'%23fff\'>3</text></svg>'">
+                <img src="/avatar4.png" class="avatar-option" onclick="changeAvatar('avatar4')" id="av-avatar4" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' fill=\'%23ff0\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'%23fff\'>4</text></svg>'">
+            </div>
+            
+            <button id="btn-close-profile" class="btn btn-blue" style="width: 100%;">Закрыть</button>
         </div>
     </div>
 

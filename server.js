@@ -10,7 +10,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
 
-// 🔥 Жесткие таймауты: Сервер не будет ждать вечно "подвисшие" соединения
 const io = new Server(server, { 
     cors: { origin: "*" },
     pingInterval: 2000,
@@ -20,7 +19,6 @@ const io = new Server(server, {
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -34,13 +32,19 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
+// 🔥 НОВОЕ: Добавили поля статистики и аватарку
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     rating: { type: Number, default: 1000 },
     coins: { type: Number, default: 0 },
     skin: { type: String, default: 'default' },
-    inventory: { type: [String], default: ['default'] }
+    inventory: { type: [String], default: ['default'] },
+    matchesPlayed: { type: Number, default: 0 },
+    matchesWon: { type: Number, default: 0 },
+    maxRating: { type: Number, default: 1000 },
+    avatar: { type: String, default: 'avatar1' },
+    regDate: { type: Date, default: Date.now }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -94,6 +98,7 @@ function resolveCollision(puck, player) {
     }
 }
 
+// 🔥 НОВОЕ: Обновляем статистику в базе после матча
 async function finishMatch(room, winRole, isDisconnect = false) {
     room.paused = true; room.gameOver = true;
     const win = winRole === 'player1' ? room.player1 : room.player2;
@@ -102,10 +107,24 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     if (isDisconnect) win.score = 11; 
     const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
     win.rating += diff; lose.rating -= diff;
+    
     try {
-        await User.findOneAndUpdate({ name: win.name }, { rating: win.rating, $inc: { coins: 25 } });
-        await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
+        const winUser = await User.findOne({ name: win.name });
+        if (winUser) {
+            winUser.rating = win.rating; winUser.coins += 25;
+            winUser.matchesPlayed += 1; winUser.matchesWon += 1;
+            if (win.rating > winUser.maxRating) winUser.maxRating = win.rating;
+            await winUser.save();
+        }
+        const loseUser = await User.findOne({ name: lose.name });
+        if (loseUser) {
+            loseUser.rating = lose.rating; loseUser.coins += 5;
+            loseUser.matchesPlayed += 1;
+            if (lose.rating > loseUser.maxRating) loseUser.maxRating = lose.rating;
+            await loseUser.save();
+        }
     } catch (err) {}
+
     room.rematch = { player1: false, player2: false };
     if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "#06d6a0" }); } 
     else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "#fb8500" }); }
@@ -151,14 +170,11 @@ setInterval(() => {
             resolveCollision(room.puck, room.player1); resolveCollision(room.puck, room.player2);
         }
         
-        // 🔥 ИСПРАВЛЕНИЕ: Отправляем только чистые данные без системных таймеров!
         io.to(roomId).emit('gameStateUpdate', {
             puck: room.puck,
             player1: { x: room.player1.x, y: room.player1.y, score: room.player1.score, rating: room.player1.rating, name: room.player1.name, skin: room.player1.skin, id: room.player1.id },
             player2: { x: room.player2.x, y: room.player2.y, score: room.player2.score, rating: room.player2.rating, name: room.player2.name, skin: room.player2.skin, id: room.player2.id },
-            paused: room.paused,
-            gameOver: room.gameOver,
-            timeLeft: room.timeLeft
+            paused: room.paused, gameOver: room.gameOver, timeLeft: room.timeLeft
         });
     }
 }, 20);
@@ -169,7 +185,6 @@ setInterval(() => {
 function tryRejoin(socket, user) {
     for (const id in rooms) {
         const r = rooms[id]; if (r.gameOver) continue;
-        
         if (r.player1.name === user.name) {
             if (r.player1.id && r.player1.id !== socket.id) {
                 const oldSocket = io.sockets.sockets.get(r.player1.id);
@@ -261,15 +276,11 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId];
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
-        
         socket.to(room.id).emit('opponentLeft');
         if (room.player2.name !== "..." && !room.gameOver) finishMatch(room, winRole, true);
-        
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
-        if (!room.player1.id && !room.player2.id) {
-            clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId];
-        }
+        if (!room.player1.id && !room.player2.id) { clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
@@ -282,10 +293,23 @@ io.on('connection', (socket) => {
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
+    // 🔥 НОВОЕ: Передаем всю статистику при загрузке профиля
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
+        callback({ 
+            success: true, coins: u.coins, skin: u.skin, inventory: u.inventory,
+            matchesPlayed: u.matchesPlayed, matchesWon: u.matchesWon, 
+            maxRating: u.maxRating, avatar: u.avatar, regDate: u.regDate
+        });
+    });
+
+    // 🔥 НОВОЕ: Смена аватарки
+    socket.on('changeAvatar', async (avatarName, callback) => {
+        if (!socket.user) return;
+        const u = await User.findById(socket.user._id);
+        u.avatar = avatarName; await u.save(); socket.user = u;
+        callback({ success: true });
     });
 
     socket.on('buySkin', async (skinName, callback) => {
@@ -332,14 +356,13 @@ io.on('connection', (socket) => {
         
         if (role) {
             room[role].id = null;
-            
-            // Если оба вылетели — сразу удаляем комнату
+            if (room.player2.name === "..." || room.gameOver) {
+                if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
+                return;
+            }
             if (!room.player1.id && !room.player2.id) {
                 clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return;
             }
-
-            if (room.player2.name === "..." || room.gameOver) return;
-
             room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             room.disconnectTimeout = setTimeout(() => {
                 const winRole = role === 'player1' ? 'player2' : 'player1';

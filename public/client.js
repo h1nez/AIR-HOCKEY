@@ -13,7 +13,6 @@ const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
 const authError = document.getElementById('auth-error');
 
-// 🔥 НОВОЕ: Автоматически входим при ЛЮБОМ подключении (даже если свернули и развернули игру)
 socket.on('connect', () => {
     const savedName = localStorage.getItem('ah_name');
     const savedPass = localStorage.getItem('ah_pass');
@@ -22,13 +21,9 @@ socket.on('connect', () => {
     }
 });
 
-// 🔥 НОВОЕ: Если свернули вкладку - отключаемся мгновенно. Развернули - подключаемся!
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        socket.disconnect();
-    } else {
-        socket.connect();
-    }
+    if (document.visibilityState === 'hidden') { socket.disconnect(); } 
+    else { socket.connect(); }
 });
 
 document.getElementById('btn-login').onclick = () => {
@@ -43,18 +38,12 @@ document.getElementById('btn-register').onclick = () => {
 function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
-        
-        // Если мы вернулись прямо в бой
         if (res.rejoining) {
-            mainMenu.style.display = 'none'; 
-            gameWrapper.style.display = 'flex';
+            mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
             document.getElementById('btn-cancel-search').style.display = 'none';
         } else { 
-            // Иначе просто идем в меню
-            gameWrapper.style.display = 'none';
-            mainMenu.style.display = 'flex'; 
+            gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; 
         }
-        
         updateProfile(); 
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
@@ -64,11 +53,32 @@ function handleAuthResponse(res) {
     } else { authScreen.style.display = 'flex'; authError.innerText = res.msg; }
 }
 
+// 🔥 НОВОЕ: Загружаем все данные профиля
 function updateProfile() {
     socket.emit('getProfile', (data) => {
         if (data.success) {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
+            
+            // Статистика
+            document.getElementById('prof-played').innerText = data.matchesPlayed;
+            document.getElementById('prof-won').innerText = data.matchesWon;
+            document.getElementById('prof-max-mmr').innerText = data.maxRating;
+            const d = new Date(data.regDate);
+            document.getElementById('prof-date').innerText = d.toLocaleDateString('ru-RU');
+
+            // Аватарки
+            document.getElementById('menu-avatar').src = `/${data.avatar}.png`;
+            ['avatar1', 'avatar2', 'avatar3', 'avatar4'].forEach(av => {
+                const el = document.getElementById('av-' + av);
+                if (data.avatar === av) {
+                    el.style.borderColor = '#06d6a0'; el.style.boxShadow = '0 0 10px #06d6a0';
+                } else {
+                    el.style.borderColor = '#eee'; el.style.boxShadow = 'none';
+                }
+            });
+
+            // Скины
             ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'].forEach(skin => {
                 const el = document.getElementById('skin-' + skin);
                 const priceEl = document.getElementById('price-' + skin);
@@ -79,6 +89,19 @@ function updateProfile() {
         }
     });
 }
+
+// 🔥 НОВОЕ: Обработчики кнопок профиля
+document.getElementById('btn-profile').onclick = () => { 
+    updateProfile(); document.getElementById('profile-modal').style.display = 'flex'; 
+};
+document.getElementById('btn-close-profile').onclick = () => { 
+    document.getElementById('profile-modal').style.display = 'none'; 
+};
+window.changeAvatar = function(av) {
+    socket.emit('changeAvatar', av, (res) => {
+        if (res.success) updateProfile();
+    });
+};
 
 window.buySkin = function(skinName) {
     socket.emit('buySkin', skinName, (res) => {
