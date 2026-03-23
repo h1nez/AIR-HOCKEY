@@ -9,7 +9,13 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+// 🔥 НОВОЕ: Жесткий пинг. Если игрок свернул телефон на 4 секунды - сервер считает его отключенным
+const io = new Server(server, { 
+    cors: { origin: "*" },
+    pingInterval: 2000,
+    pingTimeout: 4000
+});
 
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
@@ -101,8 +107,8 @@ async function finishMatch(room, winRole, isDisconnect = false) {
         await User.findOneAndUpdate({ name: lose.name }, { rating: lose.rating, $inc: { coins: 5 } });
     } catch (err) {}
     room.rematch = { player1: false, player2: false };
-    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold" }); } 
-    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" }); }
+    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "#06d6a0" }); } 
+    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "#fb8500" }); }
     setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
 }
 
@@ -151,27 +157,38 @@ setInterval(() => {
 // ==========================================
 // 3. АВТОРИЗАЦИЯ И МЕНЮ
 // ==========================================
+
+// 🔥 НОВОЕ: Функция, которая принудительно выкидывает "призрака" и сажает живого игрока
 function tryRejoin(socket, user) {
     for (const id in rooms) {
         const r = rooms[id]; if (r.gameOver) continue;
-        if (r.player1.name === user.name && !r.player1.id) {
+        
+        if (r.player1.name === user.name) {
+            if (r.player1.id && r.player1.id !== socket.id) {
+                const oldSocket = io.sockets.sockets.get(r.player1.id);
+                if (oldSocket) { oldSocket.leave(id); oldSocket.roomId = null; oldSocket.disconnect(); }
+            }
             r.player1.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
             if (r.player2.id) r.paused = false; socket.emit('role', 'p1'); return true;
         }
-        if (r.player2.name === user.name && !r.player2.id) {
+        if (r.player2.name === user.name) {
+            if (r.player2.id && r.player2.id !== socket.id) {
+                const oldSocket = io.sockets.sockets.get(r.player2.id);
+                if (oldSocket) { oldSocket.leave(id); oldSocket.roomId = null; oldSocket.disconnect(); }
+            }
             r.player2.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
             if (r.player1.id) r.paused = false; socket.emit('role', 'p2'); return true;
         }
-    } return false;
+    } 
+    return false;
 }
 
 function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
     for (const id in rooms) { 
-        // 🔥 ИСПРАВЛЕНИЕ: Игнорируем комнаты, где матч уже завершен!
         if (rooms[id].gameOver) continue; 
         if (!rooms[id].player1.id || !rooms[id].player2.id) { myRoomId = id; break; } 
     }
@@ -238,9 +255,7 @@ io.on('connection', (socket) => {
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
-        // 🔥 Оповещаем противника, что мы ушли (чтобы он не ждал нас на экране реванша)
         socket.to(room.id).emit('opponentLeft');
-        
         if (room.player2.name !== "..." && !room.gameOver) finishMatch(room, winRole, true);
         
         if (room.player1.id === socket.id) room.player1.id = null;
@@ -307,7 +322,8 @@ io.on('connection', (socket) => {
         const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
         
         if (role) {
-            room[role].id = null;
+            room[role].id = null; // Отмечаем, что игрок временно пропал
+            
             if (room.player2.name === "..." || room.gameOver) {
                 if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
                 return;
@@ -315,6 +331,8 @@ io.on('connection', (socket) => {
             if (!room.player1.id && !room.player2.id) {
                 clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return;
             }
+            
+            // Запускаем таймер на 60 секунд
             room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             room.disconnectTimeout = setTimeout(() => {
                 const winRole = role === 'player1' ? 'player2' : 'player1';

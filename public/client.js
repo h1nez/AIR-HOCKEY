@@ -7,6 +7,7 @@ catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
+
 const nameInput = document.getElementById('username');
 const passInput = document.getElementById('password');
 const rememberCb = document.getElementById('remember');
@@ -75,9 +76,6 @@ document.getElementById('btn-close-shop').onclick = () => document.getElementByI
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; 
     socket.emit('play'); 
-    document.getElementById('goal-msg').textContent = "Ищем друга...";
-    document.getElementById('goal-msg').style.color = "#fb8500";
-    document.getElementById('btn-cancel-search').style.display = 'block';
 };
 
 document.getElementById('btn-cancel-search').onclick = () => {
@@ -103,8 +101,6 @@ document.getElementById('btn-new-game').onclick = () => {
     socket.emit('leaveMatch'); 
     clientState = null; serverState = null; myRole = null; 
     document.getElementById('end-screen').style.display = 'none';
-    document.getElementById('goal-msg').textContent = "Ищем друга...";
-    document.getElementById('btn-cancel-search').style.display = 'block';
     socket.emit('play'); 
 };
 
@@ -144,6 +140,7 @@ socket.on('goalNotify', data => {
     msgEl.textContent = data.msg; msgEl.style.color = data.color;
 });
 
+// 🔥 НОВОЕ: Умное восстановление интерфейса на основе данных сервера
 socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
@@ -155,10 +152,17 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('n1').textContent = s.player1.name;
     document.getElementById('n2').textContent = s.player2.name;
 
+    // Логика текста на экране
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
         document.getElementById('goal-msg').style.color = "#ffb703";
+        document.getElementById('btn-cancel-search').style.display = 'none';
     } 
+    else if (!s.gameOver && ((s.player1.id && !s.player2.id) || (!s.player1.id && s.player2.id))) {
+        document.getElementById('goal-msg').textContent = "Ищем друга...";
+        document.getElementById('goal-msg').style.color = "#fb8500";
+        document.getElementById('btn-cancel-search').style.display = 'block';
+    }
     else if (s.player1.id && s.player2.id && !s.gameOver) {
         document.getElementById('btn-cancel-search').style.display = 'none';
         if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
@@ -211,15 +215,10 @@ function drawPlayer(x, y, skinName, color) {
     }
 }
 
-// 🔥 НОВОЕ: МУЛЬТЯШНОЕ ПОЛЕ ТРИ КОТА
 function render(s) {
-    // 1. Светло-голубой лёд
-    ctx.fillStyle = '#f4faff'; 
-    ctx.fillRect(0, 0, 800, 400);
+    ctx.fillStyle = '#f4faff'; ctx.fillRect(0, 0, 800, 400);
 
-    // 2. Декорации (Лапки и звездочки)
-    ctx.font = '30px Arial';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
+    ctx.font = '30px Arial'; ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const decor = [
         {t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200},
@@ -229,39 +228,20 @@ function render(s) {
     decor.forEach(d => ctx.fillText(d.t, d.x, d.y));
 
     ctx.lineWidth = 6;
-    
-    // 3. Зоны ворот (Светло-синяя и светло-красная)
-    ctx.fillStyle = 'rgba(77, 166, 255, 0.2)';
-    ctx.beginPath(); ctx.arc(0, 200, 100, -Math.PI/2, Math.PI/2); ctx.fill();
-    ctx.fillStyle = 'rgba(255, 77, 77, 0.2)';
-    ctx.beginPath(); ctx.arc(800, 200, 100, Math.PI/2, -Math.PI/2); ctx.fill();
+    ctx.fillStyle = 'rgba(77, 166, 255, 0.2)'; ctx.beginPath(); ctx.arc(0, 200, 100, -Math.PI/2, Math.PI/2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 77, 77, 0.2)'; ctx.beginPath(); ctx.arc(800, 200, 100, Math.PI/2, -Math.PI/2); ctx.fill();
 
-    // 4. Линии поля
-    ctx.strokeStyle = '#ff4d4d'; // Красная в центре
-    ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
-    ctx.strokeStyle = '#4da6ff'; // Синие зоны
-    ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
+    ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
+    ctx.strokeStyle = '#4da6ff'; ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke(); ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
 
-    // 5. Центральный круг
-    ctx.strokeStyle = '#ff4d4d';
-    ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(400,200,77,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(400,200,77,0,Math.PI*2); ctx.fill();
 
-    // 6. Три кота в центре круга! (Если загружены картинки)
     const rCat = 22;
-    if (catImages['korzhik'].complete && catImages['korzhik'].naturalWidth > 0) {
-        ctx.drawImage(catImages['korzhik'], 400 - 45 - rCat, 200 - rCat, rCat*2, rCat*2);
-    }
-    if (catImages['karamelka'].complete && catImages['karamelka'].naturalWidth > 0) {
-        ctx.drawImage(catImages['karamelka'], 400 - rCat, 200 - 35 - rCat, rCat*2, rCat*2);
-    }
-    if (catImages['kompot'].complete && catImages['kompot'].naturalWidth > 0) {
-        ctx.drawImage(catImages['kompot'], 400 + 45 - rCat, 200 - rCat, rCat*2, rCat*2);
-    }
+    if (catImages['korzhik'].complete && catImages['korzhik'].naturalWidth > 0) ctx.drawImage(catImages['korzhik'], 400 - 45 - rCat, 200 - rCat, rCat*2, rCat*2);
+    if (catImages['karamelka'].complete && catImages['karamelka'].naturalWidth > 0) ctx.drawImage(catImages['karamelka'], 400 - rCat, 200 - 35 - rCat, rCat*2, rCat*2);
+    if (catImages['kompot'].complete && catImages['kompot'].naturalWidth > 0) ctx.drawImage(catImages['kompot'], 400 + 45 - rCat, 200 - rCat, rCat*2, rCat*2);
 
-    // 7. Сами ворота
     ctx.lineWidth = 12; 
     ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170);
     ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
@@ -274,7 +254,6 @@ function render(s) {
         if (dist < pR + 22) { px = myPlayer.x + (dx/dist)*(pR+22); py = myPlayer.y + (dy/dist)*(pR+22); }
     }
 
-    // Шайба (Сделали темной, чтобы контрастировала со светлым льдом)
     ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#333'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#111'; ctx.stroke();
     ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fillStyle = '#666'; ctx.fill();
