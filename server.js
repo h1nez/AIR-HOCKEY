@@ -28,7 +28,6 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
-// 🔥 НОВОЕ: Добавили поля для статистики и аватарки
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -43,7 +42,7 @@ const userSchema = new mongoose.Schema({
     regDate: { type: Date, default: Date.now },
     maxRating: { type: Number, default: 1000 },
     minRating: { type: Number, default: 1000 },
-    avatar: { type: String, default: '🐱' }
+    avatar: { type: String, default: 'avatar1' } // 🔥 Теперь по умолчанию стоит файл avatar1
 });
 const User = mongoose.model('User', userSchema);
 
@@ -107,7 +106,6 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
     win.rating += diff; lose.rating -= diff;
     
-    // 🔥 НОВОЕ: Обновляем статистику в БД
     try {
         await User.findOneAndUpdate({ name: win.name }, { 
             rating: win.rating, 
@@ -282,7 +280,6 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
-    // 🔥 НОВОЕ: Отправляем полную статистику для профиля
     socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends');
@@ -294,7 +291,6 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    // 🔥 НОВОЕ: Смена аватарки
     socket.on('setAvatar', async (avatar, callback) => {
         if (!socket.user) return;
         try {

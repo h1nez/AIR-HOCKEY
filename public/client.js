@@ -68,7 +68,6 @@ function updateProfile() {
     });
 }
 
-// 🔥 ПОЛНЫЙ ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
@@ -76,13 +75,17 @@ window.showProfile = function(username) {
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
             
             document.getElementById('profile-name').innerText = p.name;
-            document.getElementById('profile-avatar').innerText = p.avatar || '🐱';
+            
+            // 🔥 ЗАЩИТА: Если в базе остался старый смайлик, меняем на avatar1
+            let av = p.avatar || 'avatar1';
+            if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
+            document.getElementById('profile-avatar').src = '/' + av + '.png'; // Грузим картинку!
+
             document.getElementById('profile-mmr').innerText = p.rating;
             document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
             document.getElementById('profile-min-mmr').innerText = p.minRating || 1000;
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             
-            // Новая статистика
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
             
@@ -92,7 +95,6 @@ window.showProfile = function(username) {
             const date = new Date(p.regDate);
             document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
 
-            // Показываем выбор аватарки только в СВОЕМ профиле
             if (username === nameInput.value) {
                 document.getElementById('avatar-selector').style.display = 'block';
             } else {
@@ -109,7 +111,7 @@ window.showProfile = function(username) {
 window.setAvatar = function(av) {
     socket.emit('setAvatar', av, (res) => {
         if(res.success) {
-            document.getElementById('profile-avatar').innerText = av;
+            document.getElementById('profile-avatar').src = '/' + av + '.png'; // Меняем картинку
         }
     });
 }
@@ -192,8 +194,6 @@ window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) =
 window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
 window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
 window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
-
-// ==========================================
 
 window.buySkin = function(skinName) {
     socket.emit('buySkin', skinName, (res) => {
@@ -327,7 +327,6 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.tou
 
 function drawPlayer(x, y, skinName, color) {
     let r = skinName === 'karamelka' ? 43 : (skinName === 'gonya' ? 28 : 35);
-    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); 
         ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();
