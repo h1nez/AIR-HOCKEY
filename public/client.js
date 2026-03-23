@@ -21,10 +21,17 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
+    // Счёт
     document.getElementById('s1').textContent = s.player1.score;
-    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('s2').textContent = s.player2.score;
+    
+    // Рейтинг
+    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`;
     document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
+    
+    // ВЕРНУЛИ НИКИ НА МЕСТО:
+    document.getElementById('n1').textContent = s.player1.name;
+    document.getElementById('n2').textContent = s.player2.name;
 });
 
 canvas.addEventListener('mousemove', e => {
