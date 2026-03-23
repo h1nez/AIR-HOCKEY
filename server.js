@@ -14,7 +14,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -42,7 +41,7 @@ const userSchema = new mongoose.Schema({
     regDate: { type: Date, default: Date.now },
     maxRating: { type: Number, default: 1000 },
     minRating: { type: Number, default: 1000 },
-    avatar: { type: String, default: 'avatar1' } // 🔥 Теперь по умолчанию стоит файл avatar1
+    avatar: { type: String, default: 'avatar1' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -107,18 +106,21 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     win.rating += diff; lose.rating -= diff;
     
     try {
-        await User.findOneAndUpdate({ name: win.name }, { 
-            rating: win.rating, 
-            $inc: { coins: 25, gamesPlayed: 1, gamesWon: 1 },
-            $max: { maxRating: win.rating },
-            $min: { minRating: win.rating }
-        });
-        await User.findOneAndUpdate({ name: lose.name }, { 
-            rating: lose.rating, 
-            $inc: { coins: 5, gamesPlayed: 1 },
-            $max: { maxRating: lose.rating },
-            $min: { minRating: lose.rating }
-        });
+        const winnerDoc = await User.findOne({ name: win.name });
+        if (winnerDoc) {
+            winnerDoc.rating = win.rating; winnerDoc.coins += 25; winnerDoc.gamesPlayed += 1; winnerDoc.gamesWon += 1;
+            if (win.rating > (winnerDoc.maxRating || 1000)) winnerDoc.maxRating = win.rating;
+            if (win.rating < (winnerDoc.minRating || 1000)) winnerDoc.minRating = win.rating;
+            await winnerDoc.save();
+        }
+
+        const loserDoc = await User.findOne({ name: lose.name });
+        if (loserDoc) {
+            loserDoc.rating = lose.rating; loserDoc.coins += 5; loserDoc.gamesPlayed += 1;
+            if (lose.rating < (loserDoc.minRating || 1000)) loserDoc.minRating = lose.rating;
+            if (lose.rating > (loserDoc.maxRating || 1000)) loserDoc.maxRating = lose.rating;
+            await loserDoc.save();
+        }
     } catch (err) {}
     
     room.rematch = { player1: false, player2: false };
@@ -191,18 +193,24 @@ function tryRejoin(socket, user) {
 function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
-    for (const id in rooms) { 
-        if (rooms[id].gameOver) continue; 
-        if (!rooms[id].player1.id || !rooms[id].player2.id) { myRoomId = id; break; } 
+    
+    // 🔥 ИСПРАВЛЕНИЕ ПОИСКА: Ищем ТОЛЬКО комнаты, где второй слот девственно чист (name: "...")
+    for (const id in rooms) {
+        if (rooms[id].gameOver) continue;
+        if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
+            myRoomId = id; 
+            break; 
+        } 
     }
+    
     if (!myRoomId) myRoomId = createRoom();
 
     const room = rooms[myRoomId]; socket.join(myRoomId); socket.roomId = myRoomId;
 
-    if (!room.player1.id) {
+    if (!room.player1.id && room.player1.name === "...") {
         room.player1.id = socket.id; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
-    } else if (!room.player2.id) {
+    } else if (!room.player2.id && room.player2.name === "...") {
         room.player2.id = socket.id; room.player2.name = user.name; 
         room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
         room.paused = false; 
@@ -252,24 +260,36 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🔥 ИСПРАВЛЕНИЕ ВЫХОДА
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
-        socket.to(room.id).emit('opponentLeft');
-        if (room.player2.name !== "..." && !room.gameOver) finishMatch(room, winRole, true);
+        
+        if (room.player2.name !== "..." && !room.gameOver) {
+            // Если матч шел, присуждаем техническое поражение!
+            finishMatch(room, winRole, true);
+        } else {
+            // Оповещаем противника только если игра уже окончена
+            socket.to(room.id).emit('opponentLeft');
+        }
+        
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
-        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
+        
+        if (!room.player1.id && !room.player2.id) {
+            clearTimeout(room.disconnectTimeout);
+            delete rooms[socket.roomId]; 
+        }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
 
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (room.player1.id === socket.id) room.player1.id = null;
-        if (room.player2.id === socket.id) room.player2.id = null;
+        if (room.player1.id === socket.id) { room.player1.id = null; room.player1.name = "..."; }
+        if (room.player2.id === socket.id) { room.player2.id = null; room.player2.name = "..."; }
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
         socket.leave(socket.roomId); socket.roomId = null; 
     });
@@ -295,9 +315,7 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         try {
             const u = await User.findById(socket.user._id);
-            u.avatar = avatar;
-            await u.save();
-            socket.user = u;
+            u.avatar = avatar; await u.save(); socket.user = u;
             callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
@@ -410,7 +428,9 @@ io.on('connection', (socket) => {
         if (role) {
             room[role].id = null;
             if (room.player2.name === "..." || room.gameOver) {
-                if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId];
+                if (!room.player1.id && !room.player2.id) {
+                    clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId];
+                }
                 return;
             }
             if (!room.player1.id && !room.player2.id) {
