@@ -14,7 +14,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-// 🛑 ВСТАВЬ СВОЮ ССЫЛКУ СЮДА:
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
@@ -145,8 +144,12 @@ async function handleGoal(room, winRole) {
 function reset(room) {
     room.puck = { x: WIDTH/2, y: HEIGHT/2, vx: 0, vy: 0 }; 
     room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
-    room.paused = false;
-    io.to(room.id).emit('goalNotify', { msg: "", color: "" });
+    
+    // 🔥 ФИКС: Снимаем паузу ТОЛЬКО если оба игрока в онлайне!
+    if (room.player1.id && room.player2.id) {
+        room.paused = false;
+        io.to(room.id).emit('goalNotify', { msg: "", color: "" });
+    }
 }
 
 setInterval(() => {
@@ -181,12 +184,14 @@ function tryRejoin(socket, user) {
         if (r.player1.name === user.name && !r.player1.id) {
             r.player1.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
-            if (r.player2.id) r.paused = false; socket.emit('role', 'p1'); return true;
+            if (r.player2.id) { r.paused = false; io.to(id).emit('goalNotify', { msg: "", color: "" }); }
+            socket.emit('role', 'p1'); return true;
         }
         if (r.player2.name === user.name && !r.player2.id) {
             r.player2.id = socket.id; socket.join(id); socket.roomId = id;
             clearTimeout(r.disconnectTimeout); r.reconnectDeadline = null; r.timeLeft = null;
-            if (r.player1.id) r.paused = false; socket.emit('role', 'p2'); return true;
+            if (r.player1.id) { r.paused = false; io.to(id).emit('goalNotify', { msg: "", color: "" }); }
+            socket.emit('role', 'p2'); return true;
         }
     } return false;
 }
@@ -195,13 +200,10 @@ function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
     
-    for (const id in rooms) {
-        if (rooms[id].gameOver) continue;
-        if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
-            myRoomId = id; break; 
-        } 
+    for (const id in rooms) { 
+        if (rooms[id].gameOver) continue; 
+        if (!rooms[id].player1.id || !rooms[id].player2.id) { myRoomId = id; break; } 
     }
-    
     if (!myRoomId) myRoomId = createRoom();
 
     const room = rooms[myRoomId]; socket.join(myRoomId); socket.roomId = myRoomId;
@@ -265,6 +267,7 @@ io.on('connection', (socket) => {
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
+        // Если вышел сам (через кнопку В меню) — мгновенная техническая победа сопернику
         if (room.player2.name !== "..." && !room.gameOver) {
             finishMatch(room, winRole, true);
         } else {
@@ -273,10 +276,8 @@ io.on('connection', (socket) => {
         
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
-        
         if (!room.player1.id && !room.player2.id) {
-            clearTimeout(room.disconnectTimeout);
-            delete rooms[socket.roomId]; 
+            clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; 
         }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
@@ -296,7 +297,6 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
     });
 
-    // 🔥 ДОБАВИЛ .lean() во все запросы, чтобы сервер больше не падал от круговых ссылок!
     socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
@@ -332,7 +332,6 @@ io.on('connection', (socket) => {
         } else { return callback({ success: false, msg: "Не хватает монет!" }); }
     });
 
-    // 🔥 ДОБАВИЛ .lean()
     socket.on('getFriendsData', async (callback) => {
         if (!socket.user) return;
         try {
@@ -342,7 +341,6 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    // 🔥 ДОБАВИЛ .lean()
     socket.on('searchUser', async (query, callback) => {
         if (!socket.user || !query) return;
         try {
@@ -398,7 +396,6 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    // 🔥 ДОБАВИЛ .lean()
     socket.on('getLeaderboard', async (callback) => {
         try {
             const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id').lean();
@@ -434,7 +431,13 @@ io.on('connection', (socket) => {
             if (!room.player1.id && !room.player2.id) {
                 clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return;
             }
-            room.paused = true; room.reconnectDeadline = Date.now() + 60000;
+            
+            // 🔥 ФИКС: Запускаем таймер, только если кто-то действительно пропал
+            room.paused = true; 
+            room.reconnectDeadline = Date.now() + 60000;
+            
+            if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
+            
             room.disconnectTimeout = setTimeout(() => {
                 const winRole = role === 'player1' ? 'player2' : 'player1';
                 finishMatch(room, winRole, true);
