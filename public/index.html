@@ -93,6 +93,7 @@
     <div id="profile-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
+            
             <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin-bottom: 5px; text-transform: uppercase;">Имя</h2>
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
 
@@ -167,7 +168,7 @@
                     <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
                     <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
@@ -181,15 +182,18 @@
     <div id="game-wrapper" style="display: none;">
         <div id="ui">
             <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
-            <div><span id="s1" style="font-size: 48px; color: #1d3557;">0</span> <span style="font-size: 48px; color: #555;">:</span> <span id="s2" style="font-size: 48px; color: #9d0208;">0</span></div>
+            
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; margin-top: -10px;">
+                <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; margin-bottom: 5px; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 Выйти</button>
+                <div style="line-height: 0.9;"><span id="s1" style="font-size: 48px; color: #1d3557;">0</span> <span style="font-size: 48px; color: #555;">:</span> <span id="s2" style="font-size: 48px; color: #9d0208;">0</span></div>
+            </div>
+
             <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
         </div>
         
         <div id="game-container">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             
-            <button id="btn-in-game-quit" class="btn btn-red btn-small" style="position: absolute; top: 15px; left: 15px; display: none; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 Выйти</button>
-
             <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>
             
             <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); border-radius: 25px;">
