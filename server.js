@@ -144,18 +144,15 @@ async function handleGoal(room, winRole) {
 function reset(room) {
     room.puck = { x: WIDTH/2, y: HEIGHT/2, vx: 0, vy: 0 }; 
     room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
-    
-    // 🔥 ФИКС: Снимаем паузу ТОЛЬКО если оба игрока в онлайне!
-    if (room.player1.id && room.player2.id) {
-        room.paused = false;
-        io.to(room.id).emit('goalNotify', { msg: "", color: "" });
-    }
+    room.paused = false;
+    io.to(room.id).emit('goalNotify', { msg: "", color: "" });
 }
 
 setInterval(() => {
     for (const roomId in rooms) {
         const room = rooms[roomId];
         if (room.reconnectDeadline) room.timeLeft = Math.max(0, Math.ceil((room.reconnectDeadline - Date.now()) / 1000));
+        
         if (!room.paused && !room.gameOver) {
             room.puck.vx *= 0.995; room.puck.vy *= 0.995;
             room.puck.x += room.puck.vx; room.puck.y += room.puck.vy;
@@ -171,7 +168,18 @@ setInterval(() => {
             }
             resolveCollision(room.puck, room.player1); resolveCollision(room.puck, room.player2);
         }
-        io.to(roomId).emit('gameStateUpdate', room);
+        
+        // 🔥 ГЛАВНЫЙ ФИКС: Отправляем браузеру только безопасные "чистые" данные
+        // Никогда не отправляем системные таймеры (room.disconnectTimeout)
+        io.to(roomId).emit('gameStateUpdate', {
+            id: room.id,
+            puck: room.puck,
+            player1: room.player1,
+            player2: room.player2,
+            paused: room.paused,
+            gameOver: room.gameOver,
+            timeLeft: room.timeLeft
+        });
     }
 }, 20);
 
@@ -267,7 +275,6 @@ io.on('connection', (socket) => {
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
-        // Если вышел сам (через кнопку В меню) — мгновенная техническая победа сопернику
         if (room.player2.name !== "..." && !room.gameOver) {
             finishMatch(room, winRole, true);
         } else {
@@ -276,8 +283,10 @@ io.on('connection', (socket) => {
         
         if (room.player1.id === socket.id) room.player1.id = null;
         if (room.player2.id === socket.id) room.player2.id = null;
+        
         if (!room.player1.id && !room.player2.id) {
-            clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; 
+            clearTimeout(room.disconnectTimeout);
+            delete rooms[socket.roomId]; 
         }
         socket.leave(socket.roomId); socket.roomId = null; 
     });
@@ -431,11 +440,9 @@ io.on('connection', (socket) => {
             if (!room.player1.id && !room.player2.id) {
                 clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return;
             }
+            room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             
-            // 🔥 ФИКС: Запускаем таймер, только если кто-то действительно пропал
-            room.paused = true; 
-            room.reconnectDeadline = Date.now() + 60000;
-            
+            // Если таймер уже есть - сбрасываем старый
             if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
             
             room.disconnectTimeout = setTimeout(() => {
