@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema({
     regIp: { type: String, default: 'Скрыт' },
     clan: { type: String, default: null },
     clanInvites: { type: [String], default: [] },
-    title: { type: String, default: '' } // 🔥 Титул игрока
+    title: { type: String, default: '' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -86,11 +86,13 @@ function createRoom(isBotMatch = false, isFriendly = false) {
 
 function resolveCollision(puck, player) {
     let pR = 35; let res = 1.6; let pMaxSpeed = 28; 
-    if (player.skin === 'karamelka') pR = 43; 
+    
+    // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ
+    if (player.skin === 'kompot') pR = 43; // Теперь Компот большой
     if (player.skin === 'gonya') pR = 28; 
     if (player.skin === 'korzhik') res = 1.9; 
     if (player.skin === 'gonya') res = 2.2; 
-    if (player.skin === 'kompot') pMaxSpeed = 35; 
+    if (player.skin === 'karamelka') pMaxSpeed = 35; // Теперь Карамелька быстрая
 
     const dx = puck.x - player.x; const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy); const minDist = PUCK_R + pR;
@@ -187,7 +189,6 @@ function reset(room) {
     }
 }
 
-// Поиск комнаты по имени (нужно для режима зрителя)
 function getRoomIdByUserName(name) {
     for (let id in rooms) {
         if (!rooms[id].gameOver && (rooms[id].player1.name === name || rooms[id].player2.name === name)) {
@@ -310,9 +311,6 @@ function joinPlayerToRoom(socket, user) {
 
 io.on('connection', (socket) => {
     
-    // ==========================================
-    // 🔥 РЕЖИМ ЗРИТЕЛЯ
-    // ==========================================
     socket.on('spectate', (roomId) => {
         if (!socket.user || !rooms[roomId]) return;
         socket.join(roomId);
@@ -321,9 +319,6 @@ io.on('connection', (socket) => {
         socket.emit('forceStartGame');
     });
 
-    // ==========================================
-    // 🔥 СОЦИАЛЬНЫЕ ФИШКИ (ПОДАРКИ И ТИТУЛЫ)
-    // ==========================================
     socket.on('sendGift', async (data, callback) => {
         if (!socket.user || isNaN(data.amount) || data.amount <= 0) return callback({ success: false, msg: "Неверная сумма" });
         try {
@@ -334,11 +329,8 @@ io.on('connection', (socket) => {
             if (!target) return callback({ success: false, msg: "Игрок не найден!" });
             if (u.name === target.name) return callback({ success: false, msg: "Нельзя дарить самому себе :)" });
 
-            u.coins -= Number(data.amount);
-            target.coins += Number(data.amount);
-            await u.save();
-            await target.save();
-            socket.user = u;
+            u.coins -= Number(data.amount); target.coins += Number(data.amount);
+            await u.save(); await target.save(); socket.user = u;
             callback({ success: true, msg: `Вы успешно подарили ${data.amount} монет игроку ${target.name}!` });
         } catch(e) { callback({ success: false, msg: "Ошибка транзакции." }); }
     });
@@ -346,29 +338,16 @@ io.on('connection', (socket) => {
     socket.on('setTitle', async (title, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            u.title = title;
-            await u.save();
-            socket.user = u;
-            callback({ success: true });
+            const u = await User.findById(socket.user._id); u.title = title; await u.save(); socket.user = u; callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
-    // ==========================================
-    // 🔥 СИСТЕМА КЛАНОВ
-    // ==========================================
     socket.on('getClanData', async (callback) => {
         if (!socket.user) return callback({ success: false });
-        const u = await User.findById(socket.user._id);
-        socket.user = u;
-
+        const u = await User.findById(socket.user._id); socket.user = u;
         if (!u.clan) return callback({ success: true, clan: null, invites: u.clanInvites });
-        
         const clan = await Clan.findOne({ name: u.clan }).lean();
-        if (!clan) {
-            u.clan = null; await u.save();
-            return callback({ success: true, clan: null, invites: u.clanInvites });
-        }
+        if (!clan) { u.clan = null; await u.save(); return callback({ success: true, clan: null, invites: u.clanInvites }); }
         callback({ success: true, clan });
     });
 
@@ -380,21 +359,14 @@ io.on('connection', (socket) => {
             const existingClan = await Clan.findOne({ name: data.name });
             if (existingClan) return callback({ success: false, msg: "Клан с таким именем уже существует!" });
 
-            const newClan = new Clan({
-                name: data.name, maxMembers: data.maxMembers, isPrivate: data.isPrivate,
-                leader: u.name, members: [u.name]
-            });
-            await newClan.save();
-            u.clan = newClan.name; await u.save(); socket.user = u;
+            const newClan = new Clan({ name: data.name, maxMembers: data.maxMembers, isPrivate: data.isPrivate, leader: u.name, members: [u.name] });
+            await newClan.save(); u.clan = newClan.name; await u.save(); socket.user = u;
             callback({ success: true, msg: "Клан успешно создан!" });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера при создании." }); }
     });
 
     socket.on('searchClans', async (callback) => {
-        try {
-            const clans = await Clan.find().select('name leader members maxMembers isPrivate').limit(20).lean();
-            callback({ success: true, clans });
-        } catch(e) { callback({ success: false }); }
+        try { const clans = await Clan.find().select('name leader members maxMembers isPrivate').limit(20).lean(); callback({ success: true, clans }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('joinClan', async (clanName, callback) => {
@@ -402,14 +374,11 @@ io.on('connection', (socket) => {
         try {
             const u = await User.findById(socket.user._id);
             if (u.clan) return callback({ success: false, msg: "Вы уже в клане!" });
-
             const clan = await Clan.findOne({ name: clanName });
             if (!clan) return callback({ success: false, msg: "Клан не найден!" });
             if (clan.isPrivate) return callback({ success: false, msg: "Это закрытый клан! Вход только по приглашению." });
             if (clan.members.length >= clan.maxMembers) return callback({ success: false, msg: "Клан полностью заполнен!" });
-
-            clan.members.push(u.name); await clan.save();
-            u.clan = clan.name; await u.save(); socket.user = u;
+            clan.members.push(u.name); await clan.save(); u.clan = clan.name; await u.save(); socket.user = u;
             callback({ success: true, msg: "Вы успешно вступили в клан!" });
         } catch(e) { callback({ success: false }); }
     });
@@ -419,21 +388,14 @@ io.on('connection', (socket) => {
         try {
             const clan = await Clan.findOne({ name: socket.user.clan });
             if (!clan) return callback({ success: false, msg: "Клан не найден." });
-            if (clan.leader !== socket.user.name && !clan.deputies.includes(socket.user.name)) {
-                return callback({ success: false, msg: "Только лидер или зам может приглашать!" });
-            }
+            if (clan.leader !== socket.user.name && !clan.deputies.includes(socket.user.name)) return callback({ success: false, msg: "Только лидер или зам может приглашать!" });
             if (clan.members.length >= clan.maxMembers) return callback({ success: false, msg: "В клане больше нет мест!" });
-
             const target = await User.findOne({ name: targetName });
             if (!target) return callback({ success: false, msg: "Игрок не найден." });
             if (target.clan) return callback({ success: false, msg: "Игрок уже состоит в клане." });
             if (target.clanInvites.includes(clan.name)) return callback({ success: false, msg: "Приглашение уже было отправлено." });
-
-            target.clanInvites.push(clan.name);
-            await target.save();
-
-            const targetSocketId = connectedUsers[targetName];
-            if (targetSocketId) { io.to(targetSocketId).emit('incomingClanInvite', clan.name); }
+            target.clanInvites.push(clan.name); await target.save();
+            const targetSocketId = connectedUsers[targetName]; if (targetSocketId) { io.to(targetSocketId).emit('incomingClanInvite', clan.name); }
             callback({ success: true, msg: "Приглашение отправлено!" });
         } catch(e) { callback({ success: false }); }
     });
@@ -444,16 +406,10 @@ io.on('connection', (socket) => {
             const u = await User.findById(socket.user._id);
             if (u.clan) return callback({ success: false, msg: "Вы уже в клане." });
             if (!u.clanInvites.includes(clanName)) return callback({ success: false, msg: "Приглашение не найдено." });
-
-            const clan = await Clan.findOne({ name: clanName });
-            u.clanInvites = u.clanInvites.filter(c => c !== clanName);
-            
+            const clan = await Clan.findOne({ name: clanName }); u.clanInvites = u.clanInvites.filter(c => c !== clanName);
             if (!clan) { await u.save(); return callback({ success: false, msg: "Клан больше не существует." }); }
             if (clan.members.length >= clan.maxMembers) { await u.save(); return callback({ success: false, msg: "В клане больше нет мест." }); }
-
-            clan.members.push(u.name); await clan.save();
-            u.clan = clan.name; await u.save(); socket.user = u;
-            
+            clan.members.push(u.name); await clan.save(); u.clan = clan.name; await u.save(); socket.user = u;
             clan.members.forEach(member => { const sId = connectedUsers[member]; if (sId) io.to(sId).emit('clanUpdated'); });
             callback({ success: true, msg: `Вы вступили в клан ${clan.name}!` });
         } catch(e) { callback({ success: false }); }
@@ -461,31 +417,16 @@ io.on('connection', (socket) => {
 
     socket.on('rejectClanInvite', async (clanName, callback) => {
         if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id);
-            u.clanInvites = u.clanInvites.filter(c => c !== clanName);
-            await u.save(); callback({ success: true });
-        } catch(e) { callback({ success: false }); }
+        try { const u = await User.findById(socket.user._id); u.clanInvites = u.clanInvites.filter(c => c !== clanName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('leaveClan', async (callback) => {
         if (!socket.user || !socket.user.clan) return callback({ success: false });
         try {
-            const u = await User.findById(socket.user._id);
-            const clanName = u.clan; const clan = await Clan.findOne({ name: clanName });
-            
-            u.clan = null; await u.save(); socket.user = u;
-
+            const u = await User.findById(socket.user._id); const clanName = u.clan; const clan = await Clan.findOne({ name: clanName }); u.clan = null; await u.save(); socket.user = u;
             if (clan) {
-                clan.members = clan.members.filter(m => m !== u.name);
-                clan.deputies = clan.deputies.filter(m => m !== u.name);
-                
-                if (clan.members.length === 0) { await Clan.deleteOne({ name: clanName }); } 
-                else if (clan.leader === u.name) {
-                    if (clan.deputies.length > 0) clan.leader = clan.deputies[0]; else clan.leader = clan.members[0];
-                    await clan.save();
-                } else { await clan.save(); }
-                
+                clan.members = clan.members.filter(m => m !== u.name); clan.deputies = clan.deputies.filter(m => m !== u.name);
+                if (clan.members.length === 0) { await Clan.deleteOne({ name: clanName }); } else if (clan.leader === u.name) { if (clan.deputies.length > 0) clan.leader = clan.deputies[0]; else clan.leader = clan.members[0]; await clan.save(); } else { await clan.save(); }
                 clan.members.forEach(member => { const sId = connectedUsers[member]; if (sId) io.to(sId).emit('clanUpdated'); });
             }
             callback({ success: true });
@@ -495,35 +436,20 @@ io.on('connection', (socket) => {
     socket.on('clanAction', async (data, callback) => {
         if (!socket.user || !socket.user.clan) return callback({ success: false, msg: "Вы не в клане." });
         try {
-            const clan = await Clan.findOne({ name: socket.user.clan });
-            if (!clan) return callback({ success: false });
-
-            const isLeader = clan.leader === socket.user.name;
-            const isDeputy = clan.deputies.includes(socket.user.name);
-
+            const clan = await Clan.findOne({ name: socket.user.clan }); if (!clan) return callback({ success: false });
+            const isLeader = clan.leader === socket.user.name; const isDeputy = clan.deputies.includes(socket.user.name);
             if (data.action === 'kick') {
-                const targetIsLeader = clan.leader === data.targetName;
-                const targetIsDeputy = clan.deputies.includes(data.targetName);
-
+                const targetIsLeader = clan.leader === data.targetName; const targetIsDeputy = clan.deputies.includes(data.targetName);
                 if (!isLeader && !isDeputy) return callback({ success: false, msg: "Нет прав." });
                 if (targetIsLeader) return callback({ success: false, msg: "Нельзя кикнуть лидера." });
                 if (isDeputy && targetIsDeputy) return callback({ success: false, msg: "Зам не может кикнуть зама." });
-
-                clan.members = clan.members.filter(m => m !== data.targetName);
-                clan.deputies = clan.deputies.filter(m => m !== data.targetName);
-                await clan.save();
-
-                const targetUser = await User.findOne({ name: data.targetName });
-                if (targetUser) { targetUser.clan = null; await targetUser.save(); }
-                callback({ success: true });
+                clan.members = clan.members.filter(m => m !== data.targetName); clan.deputies = clan.deputies.filter(m => m !== data.targetName); await clan.save();
+                const targetUser = await User.findOne({ name: data.targetName }); if (targetUser) { targetUser.clan = null; await targetUser.save(); } callback({ success: true });
             } 
             else if (data.action === 'promote' || data.action === 'demote') {
                 if (!isLeader) return callback({ success: false, msg: "Только лидер может управлять замами." });
-                if (data.action === 'promote' && !clan.deputies.includes(data.targetName)) { clan.deputies.push(data.targetName); } 
-                else if (data.action === 'demote') { clan.deputies = clan.deputies.filter(m => m !== data.targetName); }
-                await clan.save(); callback({ success: true });
+                if (data.action === 'promote' && !clan.deputies.includes(data.targetName)) { clan.deputies.push(data.targetName); } else if (data.action === 'demote') { clan.deputies = clan.deputies.filter(m => m !== data.targetName); } await clan.save(); callback({ success: true });
             }
-            
             clan.members.forEach(member => { const sId = connectedUsers[member]; if (sId) io.to(sId).emit('clanUpdated'); });
         } catch(e) { callback({ success: false }); }
     });
@@ -531,36 +457,23 @@ io.on('connection', (socket) => {
     socket.on('sendClanChat', async (msg) => {
         if (!socket.user || !socket.user.clan || !msg || msg.trim() === '') return;
         try {
-            const clan = await Clan.findOne({ name: socket.user.clan });
-            if (!clan) return;
-
+            const clan = await Clan.findOne({ name: socket.user.clan }); if (!clan) return;
             let titleStr = socket.user.title ? `[${socket.user.title}] ` : "";
             const chatMsg = { name: titleStr + socket.user.name, msg: msg.substring(0, 100), time: Date.now() };
-            clan.chat.push(chatMsg);
-            if (clan.chat.length > 50) clan.chat.shift(); 
-            await clan.save();
-
+            clan.chat.push(chatMsg); if (clan.chat.length > 50) clan.chat.shift(); await clan.save();
             clan.members.forEach(member => { const sId = connectedUsers[member]; if (sId) io.to(sId).emit('newClanMsg', chatMsg); });
         } catch(e) {}
     });
 
-    // ==========================================
-    // ГЛОБАЛЬНЫЙ ЧАТ И ПРОЧЕЕ
-    // ==========================================
     socket.on('globalChat', (msg) => {
         if (!socket.user || !msg || msg.trim() === '') return;
-        let titleStr = socket.user.title ? `[${socket.user.title}] ` : "";
-        let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : "";
+        let titleStr = socket.user.title ? `[${socket.user.title}] ` : ""; let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : "";
         io.emit('chatMessage', { name: prefix + titleStr + socket.user.name, msg: msg.substring(0, 100) });
     });
 
     socket.on('sendEmoji', (emoji) => {
         if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return;
-        const room = rooms[socket.roomId];
-        let role = 'spectator';
-        if (socket.id === room.player1.id) role = 'p1';
-        else if (socket.id === room.player2.id) role = 'p2';
-        
+        const room = rooms[socket.roomId]; let role = 'spectator'; if (socket.id === room.player1.id) role = 'p1'; else if (socket.id === room.player2.id) role = 'p2';
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
@@ -572,15 +485,8 @@ io.on('connection', (socket) => {
     socket.on('adminAction', async (data, callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" });
         try {
-            const target = await User.findOne({ name: data.targetName });
-            if (!target) return callback({ success: false, msg: "Игрок не найден!" });
-            if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } 
-            else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } 
-            else if (data.action === 'ban') {
-                await User.deleteOne({ name: data.targetName });
-                const tSocketId = connectedUsers[data.targetName];
-                if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); }
-            }
+            const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" });
+            if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } else if (data.action === 'ban') { await User.deleteOne({ name: data.targetName }); const tSocketId = connectedUsers[data.targetName]; if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); } }
             callback({ success: true, msg: "Успешно!" });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
@@ -588,17 +494,9 @@ io.on('connection', (socket) => {
     socket.on('register', async (data, callback) => {
         try {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
-            const existing = await User.findOne({ name: data.name });
-            if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
-            
-            let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно";
-            let clientIp = rawIp.split(',')[0].trim();
-            if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)';
-            
-            const hashedPassword = await bcrypt.hash(data.password, 10);
-            const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp });
-            await newUser.save();
-            
+            const existing = await User.findOne({ name: data.name }); if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
+            let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно"; let clientIp = rawIp.split(',')[0].trim(); if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)';
+            const hashedPassword = await bcrypt.hash(data.password, 10); const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp }); await newUser.save();
             socket.user = newUser; connectedUsers[newUser.name] = socket.id;
             if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true }); else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
@@ -607,10 +505,8 @@ io.on('connection', (socket) => {
     socket.on('login', async (data, callback) => {
         try {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
-            const user = await User.findOne({ name: data.name });
-            if (!user) return callback({ success: false, msg: "Аккаунт не найден!" });
-            const isMatch = await bcrypt.compare(data.password, user.password);
-            if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
+            const user = await User.findOne({ name: data.name }); if (!user) return callback({ success: false, msg: "Аккаунт не найден!" });
+            const isMatch = await bcrypt.compare(data.password, user.password); if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
             socket.user = user; connectedUsers[user.name] = socket.id;
             if (tryRejoin(socket, user)) callback({ success: true, rejoining: true }); else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
@@ -629,25 +525,16 @@ io.on('connection', (socket) => {
     socket.on('rematch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (socket.id === room.player1.id) room.rematch.player1 = true;
-        if (socket.id === room.player2.id) room.rematch.player2 = true;
+        if (socket.id === room.player1.id) room.rematch.player1 = true; if (socket.id === room.player2.id) room.rematch.player2 = true;
         if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) room.rematch.player2 = true; 
         if (room.rematch.player1 && room.rematch.player2) { room.player1.score = 0; room.player2.score = 0; room.gameOver = false; reset(room); io.to(room.id).emit('hideEndScreen'); }
     });
 
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
-        const room = rooms[socket.roomId];
-        if (room.botTimer) clearTimeout(room.botTimer); 
-        
-        // Если выходит зритель, просто отключаем его от комнаты
+        const room = rooms[socket.roomId]; if (room.botTimer) clearTimeout(room.botTimer); 
         const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id);
-        if (!isPlayer) {
-            socket.leave(socket.roomId);
-            socket.roomId = null;
-            return;
-        }
-
+        if (!isPlayer) { socket.leave(socket.roomId); socket.roomId = null; return; }
         const role = room.player1.id === socket.id ? 'player1' : 'player2'; const winRole = role === 'player1' ? 'player2' : 'player1';
         if (room.player2.name !== "..." && !room.gameOver) { finishMatch(room, winRole, true); } else { socket.to(room.id).emit('opponentLeft'); }
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; } if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
@@ -657,12 +544,10 @@ io.on('connection', (socket) => {
 
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
-        const room = rooms[socket.roomId];
-        if (room.botTimer) clearTimeout(room.botTimer); 
+        const room = rooms[socket.roomId]; if (room.botTimer) clearTimeout(room.botTimer); 
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.name = "..."; room.player1.ip = null; }
         if (room.player2.id === socket.id) { room.player2.id = null; room.player2.name = "..."; room.player2.ip = null; }
-        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
-        socket.leave(socket.roomId); socket.roomId = null; 
+        if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; socket.leave(socket.roomId); socket.roomId = null; 
     });
 
     socket.on('inviteFriend', (friendName, callback) => {
@@ -676,15 +561,11 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         const senderSocketId = connectedUsers[senderName]; if (!senderSocketId) return;
         const senderSocket = io.sockets.sockets.get(senderSocketId); if (!senderSocket || senderSocket.roomId || socket.roomId) return;
-
         const roomId = createRoom(false, true); const room = rooms[roomId];
         const u1 = await User.findOne({ name: senderSocket.user.name }).lean(); const u2 = await User.findOne({ name: socket.user.name }).lean();
-
         room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0 };
         room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0 };
-        room.paused = false;
-
-        senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
+        room.paused = false; senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
         socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p2'); socket.emit('forceStartGame'); 
     });
 
@@ -723,30 +604,20 @@ io.on('connection', (socket) => {
         try {
             const u = await User.findById(socket.user._id);
             const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin').lean();
-            
-            // Проверяем, играет ли друг прямо сейчас (для режима зрителя)
-            const friendsWithStatus = friendsProfiles.map(f => {
-                const inGameRoom = getRoomIdByUserName(f.name);
-                return { ...f, inGameRoom: inGameRoom };
-            });
-
+            const friendsWithStatus = friendsProfiles.map(f => { const inGameRoom = getRoomIdByUserName(f.name); return { ...f, inGameRoom: inGameRoom }; });
             callback({ success: true, friends: friendsWithStatus, requests: u.requests });
         } catch(e) { callback({ success: false }); }
     });
 
     socket.on('searchUser', async (query, callback) => {
         if (!socket.user || !query) return;
-        try {
-            const users = await User.find({ $and: [{ name: new RegExp(query, 'i') }, { name: { $ne: socket.user.name } }] }).limit(5).select('name rating').lean();
-            callback({ success: true, users });
-        } catch(e) { callback({ success: false }); }
+        try { const users = await User.find({ $and: [{ name: new RegExp(query, 'i') }, { name: { $ne: socket.user.name } }] }).limit(5).select('name rating').lean(); callback({ success: true, users }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('sendFriendRequest', async (targetName, callback) => {
         if (!socket.user) return;
         try {
-            const target = await User.findOne({ name: targetName });
-            if (!target) return callback({ success: false, msg: "Игрок не найден" });
+            const target = await User.findOne({ name: targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден" });
             if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
             if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
             target.requests.push(socket.user.name); await target.save(); callback({ success: true, msg: "Запрос отправлен!" });
@@ -756,8 +627,7 @@ io.on('connection', (socket) => {
     socket.on('acceptFriend', async (senderName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id); const sender = await User.findOne({ name: senderName });
-            u.requests = u.requests.filter(n => n !== senderName);
+            const u = await User.findById(socket.user._id); const sender = await User.findOne({ name: senderName }); u.requests = u.requests.filter(n => n !== senderName);
             if (sender && !u.friends.includes(senderName)) { u.friends.push(senderName); if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); } }
             await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
@@ -771,8 +641,7 @@ io.on('connection', (socket) => {
     socket.on('removeFriend', async (friendName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName });
-            u.friends = u.friends.filter(n => n !== friendName);
+            const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName }); u.friends = u.friends.filter(n => n !== friendName);
             if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); }
             await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
@@ -784,33 +653,28 @@ io.on('connection', (socket) => {
 
     socket.on('input', (data) => {
         if (!socket.roomId || !rooms[socket.roomId]) return; 
-        const room = rooms[socket.roomId];
-        // Если игрок зритель, p будет null, и он не сможет двигать клюшку
-        const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
+        const room = rooms[socket.roomId]; const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
         if (p && !room.paused && !room.gameOver) {
             const oldX = p.x; const oldY = p.y;
-            let pR = p.skin === 'karamelka' ? 43 : (p.skin === 'gonya' ? 28 : 35);
+            
+            // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ
+            let pR = p.skin === 'kompot' ? 43 : (p.skin === 'gonya' ? 28 : 35);
+            
             let minX = p === room.player1 ? pR : 400 + pR; let maxX = p === room.player1 ? 400 - pR : 800 - pR;
-            p.x = Math.min(maxX, Math.max(minX, data.x)); p.y = Math.min(400 - pR, Math.max(pR, data.y));
-            p.speedX = p.x - oldX; p.speedY = p.y - oldY;
+            p.x = Math.min(maxX, Math.max(minX, data.x)); p.y = Math.min(400 - pR, Math.max(pR, data.y)); p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
 
     socket.on('disconnect', () => {
         if (socket.user && connectedUsers[socket.user.name] === socket.id) { delete connectedUsers[socket.user.name]; }
         if (!socket.roomId || !rooms[socket.roomId]) return;
-        const room = rooms[socket.roomId]; 
-        
-        const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id);
-        if (!isPlayer) return; // Зритель просто отключается без последствий
-
+        const room = rooms[socket.roomId]; const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id); if (!isPlayer) return; 
         const role = socket.id === room.player1.id ? 'player1' : 'player2';
         if (role) {
             room[role].id = null;
             if (room.player2.name === "..." || room.gameOver) { if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot' || room.player2.id === 'secret_bot')) delete rooms[socket.roomId]; return; }
             if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot' || room.player2.id === 'secret_bot')) { clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; return; }
-            room.paused = true; room.reconnectDeadline = Date.now() + 60000;
-            if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
+            room.paused = true; room.reconnectDeadline = Date.now() + 60000; if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
             room.disconnectTimeout = setTimeout(() => { const winRole = role === 'player1' ? 'player2' : 'player1'; finishMatch(room, winRole, true); }, 60000);
         }
     });

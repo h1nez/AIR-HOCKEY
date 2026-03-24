@@ -41,7 +41,6 @@
         .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
         .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
 
-        /* 🔥 ГЛОБАЛЬНЫЙ ЧАТ */
         #global-chat { position: fixed; bottom: 0; left: 20px; width: 320px; height: 300px; background: rgba(255,255,255,0.95); border: 4px solid #8ecae6; border-bottom: none; border-radius: 15px 15px 0 0; display: flex; flex-direction: column; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); z-index: 2500; transition: height 0.3s ease; }
         #global-chat.collapsed { height: 35px !important; }
         #global-chat.collapsed #chat-body { display: none !important; }
@@ -132,7 +131,7 @@
     </div>
 
     <div id="clans-modal" class="overlay" style="display: none; z-index: 1050;">
-        <div class="modal-box" style="border-color: #8338ec; max-width: 650px; width: 95%;">
+        <div class="modal-box" style="border-color: #8338ec; max-width: 650px; width: 95%; max-height: 90vh; overflow-y: auto;">
             <h2 id="clan-modal-title" style="color: #8338ec; margin-bottom: 15px;">🛡️ Система Кланов</h2>
             <div id="no-clan-block">
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
@@ -184,93 +183,75 @@
         </div>
     </div>
 
-    <div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
-        <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
-            <h2 style="color: #d90429;">👑 Панель Администратора</h2>
-            <div style="max-height: 400px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <thead><tr style="border-bottom: 2px solid #ccc; text-align: left;"><th style="padding: 5px;">Ник / IP</th><th style="padding: 5px;">ЭЛО</th><th style="padding: 5px;">Монеты</th><th style="padding: 5px;">Действия</th></tr></thead>
-                    <tbody id="admin-users-list"></tbody>
-                </table>
-            </div>
-            <button id="btn-close-admin" class="btn btn-blue" style="width: 100%;">Закрыть</button>
-        </div>
-    </div>
-
     <div id="profile-modal" class="overlay" style="display: none; z-index: 1050;">
-        <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
+        <div class="modal-box" style="border-color: #8ecae6; max-width: 450px; display: flex; flex-direction: column; max-height: 90vh; padding: 20px;">
             
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <img id="profile-avatar" src="" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; background: #f4faff;">
-                
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-shrink: 0;">
+                <img id="profile-avatar" src="" alt="Avatar" style="width: 80px; height: 80px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; background: #f4faff;">
                 <button id="btn-gift" class="btn btn-green btn-small" style="display: none; margin-top: 10px;">🎁 Подарить</button>
             </div>
 
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 0;">
-                <h2 id="profile-name" style="color: #219ebc; font-size: 36px; margin: 0; text-transform: uppercase;">Имя</h2>
-                <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
-            </div>
-            
-            <div id="profile-title-display" style="color: #ffb703; font-weight: bold; font-size: 16px; margin-bottom: 5px;"></div>
-            
-            <div style="font-size: 16px; color: #8338ec; font-weight: bold; margin-bottom: 5px;" id="profile-clan-name"></div>
-            <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
-            
-            <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 15px;">
-                <div><b style="color: #4da6ff; font-size: 20px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
-                <div><b style="color: #06d6a0; font-size: 20px;" id="profile-won">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ПОБЕД</span></div>
-                <div><b style="color: #fb8500; font-size: 20px;" id="profile-winrate">0%</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
-            </div>
-            <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 15px; font-size: 16px; font-weight:bold; color: #555;">
-                <div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
-                <div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
-                <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
-                <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
+            <div style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px;">
+                    <h2 id="profile-name" style="color: #219ebc; font-size: 32px; margin: 0; text-transform: uppercase;">Имя</h2>
+                    <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
+                </div>
+                
+                <div id="profile-title-display" style="color: #ffb703; font-weight: bold; font-size: 16px; margin-bottom: 5px;"></div>
+                <div style="font-size: 16px; color: #8338ec; font-weight: bold; margin-bottom: 5px;" id="profile-clan-name"></div>
+                <div style="font-size: 14px; color: #888; margin-bottom: 10px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
+                
+                <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 10px;">
+                    <div><b style="color: #4da6ff; font-size: 18px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
+                    <div><b style="color: #06d6a0; font-size: 18px;" id="profile-won">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ПОБЕД</span></div>
+                    <div><b style="color: #fb8500; font-size: 18px;" id="profile-winrate">0%</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
+                </div>
+                
+                <div style="text-align: left; background: #fffaf0; padding: 10px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 10px; font-size: 14px; font-weight:bold; color: #555;">
+                    <div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
+                    <div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
+                    <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
+                    <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
+                </div>
+
+                <div id="profile-edit-section" style="display: none; margin-bottom: 10px; border-top: 2px dashed #ccc; padding-top: 10px;">
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-weight:bold; margin-bottom:5px; color:#333;">Ваш титул:</div>
+                        <select id="title-selector" onchange="setMyTitle(this.value)" style="width: 100%; margin: 0; padding: 8px;">
+                            <option value="">Без титула</option>
+                            <option value="Новичок">Новичок</option>
+                            <option value="Подпивас">Подпивас</option>
+                            <option value="Табуретка">Табуретка</option>
+                            <option value="ZXC Гуль">ZXC Гуль</option>
+                            <option value="Гроза льда">Гроза льда</option>
+                            <option value="Киберспортсмен">Киберспортсмен</option>
+                            <option value="Легенда">Легенда</option>
+                        </select>
+                    </div>
+                    <div style="font-weight:bold; margin-bottom:5px; color:#333;">Сменить аватарку:</div>
+                    <div style="display: flex; justify-content: center; gap: 10px;">
+                        <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png" onerror="this.src=''">
+                        <img onclick="setAvatar('avatar2')" class="avatar-opt" src="/avatar2.png" onerror="this.src=''">
+                        <img onclick="setAvatar('avatar3')" class="avatar-opt" src="/avatar3.png" onerror="this.src=''">
+                        <img onclick="setAvatar('avatar4')" class="avatar-opt" src="/avatar4.png" onerror="this.src=''">
+                    </div>
+                </div>
             </div>
 
-            <div id="profile-edit-section" style="display: none; margin-bottom: 15px; border-top: 2px dashed #ccc; padding-top: 10px;">
-                <div style="margin-bottom: 10px;">
-                    <div style="font-weight:bold; margin-bottom:5px; color:#333;">Ваш титул:</div>
-                    <select id="title-selector" onchange="setMyTitle(this.value)" style="width: 100%; margin: 0; padding: 8px;">
-                        <option value="">Без титула</option>
-                        <option value="Новичок">Новичок</option>
-                        <option value="Подпивас">Подпивас</option>
-                        <option value="Табуретка">Табуретка</option>
-                        <option value="ZXC Гуль">ZXC Гуль</option>
-                        <option value="Гроза льда">Гроза льда</option>
-                        <option value="Киберспортсмен">Киберспортсмен</option>
-                        <option value="Легенда">Легенда</option>
-                    </select>
-                </div>
-                <div style="font-weight:bold; margin-bottom:5px; color:#333;">Сменить аватарку:</div>
-                <div style="display: flex; justify-content: center; gap: 10px;">
-                    <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png" onerror="this.src=''">
-                    <img onclick="setAvatar('avatar2')" class="avatar-opt" src="/avatar2.png" onerror="this.src=''">
-                    <img onclick="setAvatar('avatar3')" class="avatar-opt" src="/avatar3.png" onerror="this.src=''">
-                    <img onclick="setAvatar('avatar4')" class="avatar-opt" src="/avatar4.png" onerror="this.src=''">
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; width: 100%;">
+            <div style="display: flex; gap: 10px; width: 100%; flex-shrink: 0; margin-top: 10px;">
                 <button class="btn btn-blue" onclick="document.getElementById('profile-modal').style.display='none'" style="flex: 1;">Закрыть</button>
                 <button id="btn-logout" class="btn btn-red" style="display: none; flex: 1;">🚪 Выйти</button>
             </div>
+            
         </div>
     </div>
 
     <div id="friends-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #4da6ff; max-width: 600px;">
             <h2 style="color: #4da6ff;">👥 Мои Друзья</h2>
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('tab-list')">Список</button>
-                <button class="tab-btn" onclick="switchTab('tab-search')">Поиск</button>
-                <button class="tab-btn" onclick="switchTab('tab-reqs')">Запросы <span id="req-count" style="color:red;"></span></button>
-            </div>
+            <div class="tabs"><button class="tab-btn active" onclick="switchTab('tab-list')">Список</button><button class="tab-btn" onclick="switchTab('tab-search')">Поиск</button><button class="tab-btn" onclick="switchTab('tab-reqs')">Запросы <span id="req-count" style="color:red;"></span></button></div>
             <div id="tab-list" class="tab-content active"><div id="friends-list">Загрузка...</div></div>
-            <div id="tab-search" class="tab-content">
-                <div style="display:flex; gap:10px; margin-bottom:15px;"><input type="text" id="search-input" placeholder="Введите никнейм..." style="margin:0;"><button class="btn btn-blue btn-small" onclick="searchFriends()">Искать</button></div>
-                <div id="search-results"></div>
-            </div>
+            <div id="tab-search" class="tab-content"><div style="display:flex; gap:10px; margin-bottom:15px;"><input type="text" id="search-input" placeholder="Введите никнейм..." style="margin:0;"><button class="btn btn-blue btn-small" onclick="searchFriends()">Искать</button></div><div id="search-results"></div></div>
             <div id="tab-reqs" class="tab-content"><div id="requests-list">Загрузка...</div></div>
             <button id="btn-close-friends" class="btn btn-orange" style="width: 100%; margin-top: 15px;">Закрыть</button>
         </div>
@@ -330,14 +311,12 @@
             <div style="display: flex; flex-direction: column; align-items: flex-start;"><div class="p-name" style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;"><span id="n1">Игрок 1</span> <span id="r1" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-left: 5px;"></span></div><div id="s1" class="paw-icon" style="display: flex; gap: 8px; margin-top: 5px;"></div></div>
             <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 5px;">🚪 Выйти</button>
         </div>
-
         <div id="game-container" class="game-layout-limit" style="position: relative; aspect-ratio: 2/1;">
             <canvas id="gameCanvas" width="800" height="400" style="width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none;"></canvas>
             <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>
             <button id="btn-cancel-search" class="btn btn-red" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);">Отменить поиск</button>
             <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); border-radius: 25px;"><h2 style="color: #ffb703; font-size: 40px; margin-top: 0; margin-bottom: 15px; text-shadow: 2px 2px 0 #fff;">МАТЧ ОКОНЧЕН!</h2><div id="end-status" style="color: #333; font-size: 20px; margin-bottom: 20px; font-weight: bold;">Выберите действие:</div><div style="display: flex; gap: 15px;"><button id="btn-new-game" class="btn btn-green">Новая игра</button><button id="btn-leave-match" class="btn btn-red">В меню</button></div></div>
         </div>
-
         <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div id="emoji-panel" style="display: flex; gap: 10px;"><button class="emoji-btn" onclick="sendEmoji('😹')">😹</button><button class="emoji-btn" onclick="sendEmoji('😿')">😿</button><button class="emoji-btn" onclick="sendEmoji('😼')">😼</button><button class="emoji-btn" onclick="sendEmoji('😻')">😻</button><button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button></div>
             <div style="display: flex; flex-direction: column; align-items: flex-end;"><div id="s2" class="paw-icon" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div><div class="p-name" style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;"><span id="r2" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-right: 5px;"></span> <span id="n2">Игрок 2</span></div></div>
