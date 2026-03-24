@@ -210,23 +210,26 @@
         </div>
     </div>
 
-    <div id="game-wrapper" style="display: none;">
-        <div id="ui">
-            <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
+<div id="game-wrapper" style="display: none; flex-direction: column; align-items: center;">
+        
+        <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; margin-bottom: 10px; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 Выйти</button>
+        
+        <div id="game-container" style="position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1;">
             
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; margin-top: -10px;">
-                <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; margin-bottom: 5px; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 Выйти</button>
-                <div style="line-height: 1; display: flex; align-items: center;">
-                    <span id="s1" style="font-size: 32px; display: flex; gap: 3px;"></span> 
-                    <span style="font-size: 32px; color: #555; padding: 0 15px; font-weight: bold;">:</span> 
-                    <span id="s2" style="font-size: 32px; display: flex; gap: 3px;"></span>
+            <div style="position: absolute; top: 15px; left: 20px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: none; z-index: 10;">
+                <div style="font-size: 26px; font-weight: bold; color: #4da6ff; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;">
+                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555;">MMR: 1000</span>
+                </div>
+                <div id="s1" style="font-size: 32px; display: flex; gap: 5px; margin-top: 2px;"></div>
+            </div>
+
+            <div style="position: absolute; bottom: 15px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; z-index: 10;">
+                <div id="s2" style="font-size: 32px; display: flex; gap: 5px; margin-bottom: 2px; flex-direction: row-reverse;"></div>
+                <div style="font-size: 26px; font-weight: bold; color: #ff4d4d; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;">
+                    <span id="n2">Игрок 2</span> <span id="r2" style="font-size: 16px; color: #555;">MMR: 1000</span>
                 </div>
             </div>
 
-            <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
-        </div>
-        
-        <div id="game-container">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             
             <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>

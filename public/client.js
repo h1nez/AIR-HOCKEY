@@ -340,12 +340,13 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // 🔥 ГЕНЕРАТОР ЛАПОК
-    const renderPaws = (score) => {
+    // 🔥 ГЕНЕРАТОР ЦВЕТНЫХ ЛАПОК
+    const renderPaws = (score, color) => {
         let html = '';
-        for(let i = 0; i < 5; i++) { // До 5 очков!
+        for(let i = 0; i < 5; i++) {
             if(i < score) {
-                html += `<span style="opacity: 1; text-shadow: 0 0 5px #ffb703; transform: scale(1.1); transition: 0.2s;">🐾</span>`;
+                // Хитрый CSS-трюк: делаем сам эмодзи прозрачным, но отбрасываем яркую цветную тень!
+                html += `<span style="color: transparent; text-shadow: 0 0 0 ${color}; transform: scale(1.1); transition: 0.2s;">🐾</span>`;
             } else {
                 html += `<span style="opacity: 0.25; filter: grayscale(100%); transition: 0.2s;">🐾</span>`;
             }
@@ -353,11 +354,12 @@ socket.on('gameStateUpdate', s => {
         return html;
     };
 
-    document.getElementById('s1').innerHTML = renderPaws(s.player1.score); 
-    document.getElementById('s2').innerHTML = renderPaws(s.player2.score);
+    // Передаем цвета: Игрок 1 — синий, Игрок 2 — красный
+    document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); 
+    document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
     
-    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`; 
-    document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
+    document.getElementById('r1').textContent = `(MMR: ${Math.round(s.player1.rating)})`; 
+    document.getElementById('r2').textContent = `(MMR: ${Math.round(s.player2.rating)})`;
     document.getElementById('n1').textContent = s.player1.name; 
     document.getElementById('n2').textContent = s.player2.name;
 
