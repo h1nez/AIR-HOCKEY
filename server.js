@@ -107,7 +107,7 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     const win = winRole === 'player1' ? room.player1 : room.player2;
     const lose = winRole === 'player1' ? room.player2 : room.player1;
     if (lose.name === "...") return; 
-    if (isDisconnect) win.score = 11; 
+    if (isDisconnect) win.score = 5; // ИГРА ДО 5 ОЧКОВ
 
     if (room.isBotMatch || room.isFriendly) {
         room.rematch = { player1: false, player2: false };
@@ -157,7 +157,7 @@ async function handleGoal(room, winRole) {
     room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
     const win = winRole === 'player1' ? room.player1 : room.player2;
     win.score++;
-    if (win.score >= 11) { await finishMatch(room, winRole, false); } 
+    if (win.score >= 5) { await finishMatch(room, winRole, false); } // ИГРА ДО 5 ОЧКОВ
     else {
         io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d' });
         setTimeout(() => reset(room), 2000);
@@ -180,30 +180,20 @@ setInterval(() => {
         
         if (!room.paused && !room.gameOver) {
             
-            // 🔥 ОБНОВЛЕННАЯ ЛОГИКА БОТА С АНТИ-ЗАСТРЕВАНИЕМ
             if (room.player2.id === 'bot' || room.player2.id === 'secret_bot') {
                 const bot = room.player2; const puck = room.puck;
                 const oldX = bot.x; const oldY = bot.y;
                 
-                let targetY = puck.y; 
-                let targetX = 720; // Базовая позиция (защита)
+                let targetY = puck.y; let targetX = 720; 
                 
                 if (puck.x > 400) {
-                    if (puck.x > bot.x) {
-                        // Шайба за спиной! Быстро бежим защищать ворота
-                        targetX = 760;
-                        targetY = 200;
-                    } else {
-                        // Атакуем, стараемся быть правее шайбы
-                        targetX = puck.x + 20; 
-                    }
+                    if (puck.x > bot.x) { targetX = 760; targetY = 200; } 
+                    else { targetX = puck.x + 20; }
                 }
                 
-                // 🛑 АНТИ-ЗАСТРЕВАНИЕ В УГЛАХ
-                // Если шайба забилась глубоко в угол (справа, выше или ниже ворот)
+                // Анти-застревание бота
                 if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) {
-                    targetX = 680; // Бот отходит подальше от стены, давая шайбе вылететь
-                    targetY = 200; // И встает по центру ворот для защиты
+                    targetX = 680; targetY = 200;
                 }
                 
                 const botSpeed = room.player2.id === 'secret_bot' ? 7.5 : 6.0; 

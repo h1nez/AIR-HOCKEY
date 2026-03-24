@@ -8,18 +8,15 @@ catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 // ==========================================
 // 🔥 АУДИО ДВИЖОК (КАСТОМНЫЕ ЗВУКИ ИЗ ФАЙЛОВ)
 // ==========================================
-// Загружаем твои файлы (Они должны лежать в папке public)
 const sndHit = new Audio('/hit.mp3');
 const sndWall = new Audio('/wall.mp3');
 const sndGoalWin = new Audio('/goal_win.mp3');
 const sndGoalLose = new Audio('/goal_lose.mp3');
 
-// Функция проигрывания звука (cloneNode позволяет звукам накладываться друг на друга при быстрых ударах)
 function playSound(audioObj) {
     if (!audioObj.src || audioObj.src.includes('undefined')) return;
     const clone = audioObj.cloneNode();
-    clone.volume = 0.5; // Громкость (0.5 = 50%)
-    // Игнорируем системные ошибки браузера, если игрок еще не кликнул по экрану
+    clone.volume = 0.5; 
     clone.play().catch(() => {}); 
 }
 
@@ -46,7 +43,7 @@ function spawnConfetti() {
 }
 
 // ==========================================
-// ЛОГИКА МЕНЮ И АВТОРИЗАЦИИ
+// ЛОГИКА МЕНЮ
 // ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
@@ -121,7 +118,6 @@ window.showProfile = function(username) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
             document.getElementById('profile-name').innerText = p.name;
-            
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
@@ -132,7 +128,6 @@ window.showProfile = function(username) {
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
-            
             let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
             document.getElementById('profile-winrate').innerText = winrate + '%';
             const date = new Date(p.regDate);
@@ -159,7 +154,7 @@ document.getElementById('btn-logout').onclick = () => {
     }
 };
 
-// ДРУЗЬЯ И ПРИГЛАШЕНИЯ
+// ДРУЗЬЯ
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -311,7 +306,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
 // ==========================================
-// 🔥 ИГРОВАЯ ЛОГИКА (ВКЛЮЧАЕТ ЗВУКИ)
+// 🔥 ИГРОВАЯ ЛОГИКА
 // ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -326,14 +321,13 @@ socket.on('goalNotify', data => {
     document.getElementById('goal-msg').style.color = data.color; 
     
     if(data.msg) {
-        // Читаем текст, чтобы понять, наш это гол или чужой
         const myName = nameInput.value;
         const msgStr = data.msg;
         
         if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) {
-            playGoalWin(); // Ура! Это мы забили или победили!
+            playGoalWin(); 
         } else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) {
-            playGoalLose(); // Блин, забили нам :(
+            playGoalLose(); 
         }
 
         canvas.classList.add('shake');
@@ -346,9 +340,26 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    document.getElementById('s1').textContent = s.player1.score; document.getElementById('s2').textContent = s.player2.score;
-    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`; document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
-    document.getElementById('n1').textContent = s.player1.name; document.getElementById('n2').textContent = s.player2.name;
+    // 🔥 ГЕНЕРАТОР ЛАПОК
+    const renderPaws = (score) => {
+        let html = '';
+        for(let i = 0; i < 5; i++) { // До 5 очков!
+            if(i < score) {
+                html += `<span style="opacity: 1; text-shadow: 0 0 5px #ffb703; transform: scale(1.1); transition: 0.2s;">🐾</span>`;
+            } else {
+                html += `<span style="opacity: 0.25; filter: grayscale(100%); transition: 0.2s;">🐾</span>`;
+            }
+        }
+        return html;
+    };
+
+    document.getElementById('s1').innerHTML = renderPaws(s.player1.score); 
+    document.getElementById('s2').innerHTML = renderPaws(s.player2.score);
+    
+    document.getElementById('r1').textContent = `MMR: ${Math.round(s.player1.rating)}`; 
+    document.getElementById('r2').textContent = `MMR: ${Math.round(s.player2.rating)}`;
+    document.getElementById('n1').textContent = s.player1.name; 
+    document.getElementById('n2').textContent = s.player2.name;
 
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
@@ -483,25 +494,21 @@ function loop() {
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
         
-        // 🔥 ПРОСЛУШКА УДАРОВ ДЛЯ ЗВУКОВ
+        // ПРОСЛУШКА УДАРОВ
         if (!serverState.paused && !serverState.gameOver) {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;
 
-            // 🔥 ИСПРАВЛЕНИЕ: Берем точные координаты сервера и делаем зону чуть шире (26 и 374)
             if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) { 
-                playWall(); 
-                wallCooldown = 15; 
+                playWall(); wallCooldown = 15; 
             }
 
             const checkHit = (p) => {
                 let r = serverState[p].skin === 'karamelka' ? 43 : (serverState[p].skin === 'gonya' ? 28 : 35);
-                // Для клюшек оставляем clientState, чтобы звук совпадал с касанием на экране
                 let dx = clientState.puck.x - clientState[p].x;
                 let dy = clientState.puck.y - clientState[p].y;
                 if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 4 && hitCooldown === 0) { 
-                    playHit(); 
-                    hitCooldown = 15; 
+                    playHit(); hitCooldown = 15; 
                 }
             };
             checkHit('player1'); checkHit('player2');
@@ -511,5 +518,4 @@ function loop() {
     }
     requestAnimationFrame(loop);
 }
-loop();
 loop();

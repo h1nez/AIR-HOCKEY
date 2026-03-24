@@ -213,10 +213,16 @@
     <div id="game-wrapper" style="display: none;">
         <div id="ui">
             <div class="p1-info"><span id="n1">Игрок 1</span><span class="mmr" id="r1">MMR: 1000</span></div>
+            
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; margin-top: -10px;">
                 <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; margin-bottom: 5px; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🚪 Выйти</button>
-                <div style="line-height: 0.9;"><span id="s1" style="font-size: 48px; color: #1d3557;">0</span> <span style="font-size: 48px; color: #555;">:</span> <span id="s2" style="font-size: 48px; color: #9d0208;">0</span></div>
+                <div style="line-height: 1; display: flex; align-items: center;">
+                    <span id="s1" style="font-size: 32px; display: flex; gap: 3px;"></span> 
+                    <span style="font-size: 32px; color: #555; padding: 0 15px; font-weight: bold;">:</span> 
+                    <span id="s2" style="font-size: 32px; display: flex; gap: 3px;"></span>
+                </div>
             </div>
+
             <div class="p2-info"><span id="n2">Игрок 2</span><span class="mmr" id="r2">MMR: 1000</span></div>
         </div>
         
