@@ -14,7 +14,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/		';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -107,7 +107,7 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     const win = winRole === 'player1' ? room.player1 : room.player2;
     const lose = winRole === 'player1' ? room.player2 : room.player1;
     if (lose.name === "...") return; 
-    if (isDisconnect) win.score = 5; // ИГРА ДО 5 ОЧКОВ
+    if (isDisconnect) win.score = 5; 
 
     if (room.isBotMatch || room.isFriendly) {
         room.rematch = { player1: false, player2: false };
@@ -157,7 +157,7 @@ async function handleGoal(room, winRole) {
     room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
     const win = winRole === 'player1' ? room.player1 : room.player2;
     win.score++;
-    if (win.score >= 5) { await finishMatch(room, winRole, false); } // ИГРА ДО 5 ОЧКОВ
+    if (win.score >= 5) { await finishMatch(room, winRole, false); } 
     else {
         io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d' });
         setTimeout(() => reset(room), 2000);
@@ -191,7 +191,6 @@ setInterval(() => {
                     else { targetX = puck.x + 20; }
                 }
                 
-                // Анти-застревание бота
                 if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) {
                     targetX = 680; targetY = 200;
                 }
@@ -275,7 +274,7 @@ function joinPlayerToRoom(socket, user) {
         room.player1.id = socket.id; room.player1.ip = clientIp; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
 
-		room.botTimer = setTimeout(() => {
+        room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
                 
                 // 🔥 ГЕНЕРАТОР РЕАЛИСТИЧНЫХ STEAM-НИКОВ
@@ -287,20 +286,16 @@ function joinPlayerToRoom(socket, user) {
 
                     const type = Math.random();
                     if (type < 0.25) {
-                        // 25% шанс на чистого киберспортсмена
                         return pros[Math.floor(Math.random() * pros.length)];
                     } else if (type < 0.5) {
-                        // 25% шанс на Клантег + Имя (например: NaVi | Pudge)
                         const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
                         const root = roots[Math.floor(Math.random() * roots.length)];
                         return pref + root;
                     } else if (type < 0.75) {
-                        // 25% шанс на Имя + Цифры/Приписка (например: Demon228)
                         const root = roots[Math.floor(Math.random() * roots.length)];
                         const suf = suffixes[Math.floor(Math.random() * suffixes.length)];
                         return root + suf;
                     } else {
-                        // 25% шанс на лоу-капс трайхарда (например: ninja_zxc)
                         const root = roots[Math.floor(Math.random() * roots.length)].toLowerCase();
                         const suf = ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
                         return root + suf;
@@ -320,7 +315,15 @@ function joinPlayerToRoom(socket, user) {
                 room.player2.rating = fakeRating;
                 room.paused = false;
             }
-        }, 15000); // 15 секунд ожидания
+        }, 15000);
+
+    } else if (!room.player2.id && room.player2.name === "...") {
+        room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
+        room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
+        room.paused = false; 
+        if (room.botTimer) clearTimeout(room.botTimer); 
+    }
+}
 
 io.on('connection', (socket) => {
     
