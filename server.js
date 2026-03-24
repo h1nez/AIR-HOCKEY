@@ -45,14 +45,15 @@ const userSchema = new mongoose.Schema({
     avatar: { type: String, default: 'avatar1' },
     regIp: { type: String, default: 'Скрыт' },
     clan: { type: String, default: null },
-    clanInvites: { type: [String], default: [] } // 🔥 Сохраняем приглашения в закрытые кланы
+    clanInvites: { type: [String], default: [] },
+    title: { type: String, default: '' } // 🔥 Титул игрока
 });
 const User = mongoose.model('User', userSchema);
 
 const clanSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     maxMembers: { type: Number, default: 30 },
-    isPrivate: { type: Boolean, default: false }, // 🔥 Флаг закрытого клана
+    isPrivate: { type: Boolean, default: false },
     leader: { type: String, required: true },
     deputies: { type: [String], default: [] },
     members: { type: [String], default: [] },
@@ -186,6 +187,16 @@ function reset(room) {
     }
 }
 
+// Поиск комнаты по имени (нужно для режима зрителя)
+function getRoomIdByUserName(name) {
+    for (let id in rooms) {
+        if (!rooms[id].gameOver && (rooms[id].player1.name === name || rooms[id].player2.name === name)) {
+            return id;
+        }
+    }
+    return null;
+}
+
 setInterval(() => {
     for (const roomId in rooms) {
         const room = rooms[roomId];
@@ -300,6 +311,50 @@ function joinPlayerToRoom(socket, user) {
 io.on('connection', (socket) => {
     
     // ==========================================
+    // 🔥 РЕЖИМ ЗРИТЕЛЯ
+    // ==========================================
+    socket.on('spectate', (roomId) => {
+        if (!socket.user || !rooms[roomId]) return;
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.emit('role', 'spectator');
+        socket.emit('forceStartGame');
+    });
+
+    // ==========================================
+    // 🔥 СОЦИАЛЬНЫЕ ФИШКИ (ПОДАРКИ И ТИТУЛЫ)
+    // ==========================================
+    socket.on('sendGift', async (data, callback) => {
+        if (!socket.user || isNaN(data.amount) || data.amount <= 0) return callback({ success: false, msg: "Неверная сумма" });
+        try {
+            const u = await User.findById(socket.user._id);
+            if (u.coins < data.amount) return callback({ success: false, msg: "Недостаточно монет!" });
+            
+            const target = await User.findOne({ name: data.targetName });
+            if (!target) return callback({ success: false, msg: "Игрок не найден!" });
+            if (u.name === target.name) return callback({ success: false, msg: "Нельзя дарить самому себе :)" });
+
+            u.coins -= Number(data.amount);
+            target.coins += Number(data.amount);
+            await u.save();
+            await target.save();
+            socket.user = u;
+            callback({ success: true, msg: `Вы успешно подарили ${data.amount} монет игроку ${target.name}!` });
+        } catch(e) { callback({ success: false, msg: "Ошибка транзакции." }); }
+    });
+
+    socket.on('setTitle', async (title, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            u.title = title;
+            await u.save();
+            socket.user = u;
+            callback({ success: true });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // ==========================================
     // 🔥 СИСТЕМА КЛАНОВ
     // ==========================================
     socket.on('getClanData', async (callback) => {
@@ -359,7 +414,6 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    // 🔥 ПРИГЛАШЕНИЯ В КЛАН
     socket.on('inviteToClan', async (targetName, callback) => {
         if (!socket.user || !socket.user.clan) return callback({ success: false, msg: "Вы не в клане." });
         try {
@@ -379,9 +433,7 @@ io.on('connection', (socket) => {
             await target.save();
 
             const targetSocketId = connectedUsers[targetName];
-            if (targetSocketId) {
-                io.to(targetSocketId).emit('incomingClanInvite', clan.name);
-            }
+            if (targetSocketId) { io.to(targetSocketId).emit('incomingClanInvite', clan.name); }
             callback({ success: true, msg: "Приглашение отправлено!" });
         } catch(e) { callback({ success: false }); }
     });
@@ -482,7 +534,8 @@ io.on('connection', (socket) => {
             const clan = await Clan.findOne({ name: socket.user.clan });
             if (!clan) return;
 
-            const chatMsg = { name: socket.user.name, msg: msg.substring(0, 100), time: Date.now() };
+            let titleStr = socket.user.title ? `[${socket.user.title}] ` : "";
+            const chatMsg = { name: titleStr + socket.user.name, msg: msg.substring(0, 100), time: Date.now() };
             clan.chat.push(chatMsg);
             if (clan.chat.length > 50) clan.chat.shift(); 
             await clan.save();
@@ -496,14 +549,18 @@ io.on('connection', (socket) => {
     // ==========================================
     socket.on('globalChat', (msg) => {
         if (!socket.user || !msg || msg.trim() === '') return;
+        let titleStr = socket.user.title ? `[${socket.user.title}] ` : "";
         let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : "";
-        io.emit('chatMessage', { name: prefix + socket.user.name, msg: msg.substring(0, 100) });
+        io.emit('chatMessage', { name: prefix + titleStr + socket.user.name, msg: msg.substring(0, 100) });
     });
 
     socket.on('sendEmoji', (emoji) => {
         if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return;
         const room = rooms[socket.roomId];
-        const role = socket.id === room.player1.id ? 'p1' : 'p2';
+        let role = 'spectator';
+        if (socket.id === room.player1.id) role = 'p1';
+        else if (socket.id === room.player2.id) role = 'p2';
+        
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
@@ -582,8 +639,16 @@ io.on('connection', (socket) => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
         if (room.botTimer) clearTimeout(room.botTimer); 
-        const role = room.player1.id === socket.id ? 'player1' : 'player2'; const winRole = role === 'player1' ? 'player2' : 'player1';
         
+        // Если выходит зритель, просто отключаем его от комнаты
+        const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id);
+        if (!isPlayer) {
+            socket.leave(socket.roomId);
+            socket.roomId = null;
+            return;
+        }
+
+        const role = room.player1.id === socket.id ? 'player1' : 'player2'; const winRole = role === 'player1' ? 'player2' : 'player1';
         if (room.player2.name !== "..." && !room.gameOver) { finishMatch(room, winRole, true); } else { socket.to(room.id).emit('opponentLeft'); }
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; } if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
         if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot' || room.player2.id === 'secret_bot')) { clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; }
@@ -628,7 +693,7 @@ io.on('connection', (socket) => {
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME, clanName: u.clan });
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME, clanName: u.clan, title: u.title });
     });
 
     socket.on('getUserProfile', async (username, callback) => {
@@ -658,7 +723,14 @@ io.on('connection', (socket) => {
         try {
             const u = await User.findById(socket.user._id);
             const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin').lean();
-            callback({ success: true, friends: friendsProfiles, requests: u.requests });
+            
+            // Проверяем, играет ли друг прямо сейчас (для режима зрителя)
+            const friendsWithStatus = friendsProfiles.map(f => {
+                const inGameRoom = getRoomIdByUserName(f.name);
+                return { ...f, inGameRoom: inGameRoom };
+            });
+
+            callback({ success: true, friends: friendsWithStatus, requests: u.requests });
         } catch(e) { callback({ success: false }); }
     });
 
@@ -713,6 +785,7 @@ io.on('connection', (socket) => {
     socket.on('input', (data) => {
         if (!socket.roomId || !rooms[socket.roomId]) return; 
         const room = rooms[socket.roomId];
+        // Если игрок зритель, p будет null, и он не сможет двигать клюшку
         const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
         if (p && !room.paused && !room.gameOver) {
             const oldX = p.x; const oldY = p.y;
@@ -726,7 +799,12 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if (socket.user && connectedUsers[socket.user.name] === socket.id) { delete connectedUsers[socket.user.name]; }
         if (!socket.roomId || !rooms[socket.roomId]) return;
-        const room = rooms[socket.roomId]; const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
+        const room = rooms[socket.roomId]; 
+        
+        const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id);
+        if (!isPlayer) return; // Зритель просто отключается без последствий
+
+        const role = socket.id === room.player1.id ? 'player1' : 'player2';
         if (role) {
             room[role].id = null;
             if (room.player2.name === "..." || room.gameOver) { if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot' || room.player2.id === 'secret_bot')) delete rooms[socket.roomId]; return; }

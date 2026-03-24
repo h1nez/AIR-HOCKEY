@@ -6,18 +6,13 @@
     <title>Аэрохоккей Три Кота</title>
     <style>
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
-        
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
         .modal-box { background: #fff; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 6px solid #ffb703; text-align: center; width: 90%; max-width: 500px; box-sizing: border-box; }
-        
         h1 { color: #ff7000; font-size: 56px; margin-bottom: 20px; text-shadow: 3px 3px 0px #ffe5b4, -2px -2px 0px #fff; text-align: center; line-height: 1.1; }
         h2 { margin-top: 0; color: #fb8500; font-size: 32px; }
-        
-        input { width: 90%; padding: 12px; margin: 8px 0; border: 3px solid #8ecae6; border-radius: 15px; font-size: 16px; box-sizing: border-box; outline: none; font-family: inherit; }
-        input:focus { border-color: #219ebc; }
-        
+        input, select { width: 90%; padding: 12px; margin: 8px 0; border: 3px solid #8ecae6; border-radius: 15px; font-size: 16px; box-sizing: border-box; outline: none; font-family: inherit; }
+        input:focus, select:focus { border-color: #219ebc; }
         .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 16px; color: #555; font-weight: bold;}
-        
         .btn { padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-family: inherit; font-size: 20px; transition: 0.2s; box-shadow: 0 6px 0 rgba(0,0,0,0.2); text-transform: uppercase; }
         .btn:active { transform: translateY(6px); box-shadow: none; }
         .btn-blue { background: #4da6ff; color: white; }
@@ -26,35 +21,22 @@
         .btn-orange { background: #ffb703; color: white; }
         .btn-purple { background: #8338ec; color: white; }
         .btn-small { padding: 8px 15px; font-size: 14px; box-shadow: 0 3px 0 rgba(0,0,0,0.2); border-radius: 10px; }
-        
         #auth-error { color: #e63946; margin-top: 15px; font-size: 16px; min-height: 20px; font-weight: bold; }
-
         .tabs { display: flex; margin-bottom: 15px; gap: 5px; }
         .tab-btn { flex: 1; padding: 10px; background: #eee; border: 3px solid #ccc; border-bottom: none; cursor: pointer; font-weight: bold; border-radius: 15px 15px 0 0; font-size: 16px; font-family: inherit; }
         .tab-btn.active { background: #ffb703; color: white; border-color: #ffb703; }
         .tab-content { display: none; background: #fff; padding: 15px; border: 4px solid #ffb703; border-radius: 0 0 15px 15px; min-height: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
         .tab-content.active { display: block; }
-        
         .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 2px dashed #eee; }
         .friend-info { font-size: 18px; font-weight: bold; color: #333; }
         .friend-mmr { font-size: 14px; color: #888; font-weight: normal; display: flex; align-items: center; margin-top: 4px; }
-
         .avatar-opt { transition: 0.2s; border: 4px solid transparent; border-radius: 50%; cursor: pointer; width: 65px; height: 65px; object-fit: cover; }
         .avatar-opt:hover { transform: scale(1.1); border-color: #8ecae6; }
-
         @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-3px, -4px) rotate(-1deg); } 20% { transform: translate(-5px, 0px) rotate(1deg); } 30% { transform: translate(5px, 4px) rotate(0deg); } 40% { transform: translate(3px, -3px) rotate(1deg); } 50% { transform: translate(-3px, 4px) rotate(-1deg); } 60% { transform: translate(-5px, 3px) rotate(0deg); } 70% { transform: translate(5px, 3px) rotate(-1deg); } 80% { transform: translate(-3px, -3px) rotate(1deg); } 90% { transform: translate(3px, 4px) rotate(0deg); } 100% { transform: translate(1px, -4px) rotate(-1deg); } }
         .shake { animation: shake 0.4s; }
-
         @keyframes pulse-btn { 0% { transform: scale(1); box-shadow: 0 8px 0 #04a077; } 50% { transform: scale(1.05); box-shadow: 0 12px 20px rgba(6, 214, 160, 0.6), 0 8px 0 #04a077; } 100% { transform: scale(1); box-shadow: 0 8px 0 #04a077; } }
-
         .lvl-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-weight: 900; font-size: 13px; margin: 0 6px; vertical-align: middle; color: white; text-shadow: 1px 1px 0px rgba(0,0,0,0.5); box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid rgba(0,0,0,0.8); font-family: Arial, sans-serif; }
-        .lvl-1 { background: #eeeeee; color: #333; text-shadow: none; }
-        .lvl-2, .lvl-3 { background: #16e536; }
-        .lvl-4, .lvl-5, .lvl-6 { background: #ffcc00; color: #333; text-shadow: none; }
-        .lvl-7, .lvl-8 { background: #ff9900; }
-        .lvl-9 { background: #ff3300; }
-        .lvl-10 { background: #ff0000; }
-
+        .lvl-1 { background: #eeeeee; color: #333; text-shadow: none; } .lvl-2, .lvl-3 { background: #16e536; } .lvl-4, .lvl-5, .lvl-6 { background: #ffcc00; color: #333; text-shadow: none; } .lvl-7, .lvl-8 { background: #ff9900; } .lvl-9 { background: #ff3300; } .lvl-10 { background: #ff0000; }
         .game-layout-limit { width: 100%; max-width: min(800px, calc((100vh - 160px) * 2)); box-sizing: border-box; }
         .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
         .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
@@ -88,8 +70,6 @@
             #btn-in-game-quit { padding: 4px 8px !important; font-size: 10px !important; margin-bottom: 0 !important; }
             .panel-margin { margin-bottom: 2px !important; margin-top: 2px !important; }
         }
-
-        /* 🔥 СТИЛИ КЛАНОВ */
         .clan-member-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #eee; align-items: center; }
         .clan-controls button { margin-left: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; border: none; border-radius: 5px; color: white; font-weight: bold;}
         .btn-kick { background: #e63946; } .btn-promo { background: #fb8500; }
@@ -154,7 +134,6 @@
     <div id="clans-modal" class="overlay" style="display: none; z-index: 1050;">
         <div class="modal-box" style="border-color: #8338ec; max-width: 650px; width: 95%;">
             <h2 id="clan-modal-title" style="color: #8338ec; margin-bottom: 15px;">🛡️ Система Кланов</h2>
-            
             <div id="no-clan-block">
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
                     <div style="flex: 1; min-width: 250px; border: 2px dashed #ccc; padding: 15px; border-radius: 15px; background: #fafafa; text-align: left;">
@@ -165,8 +144,7 @@
                             <input type="range" id="new-clan-size" min="2" max="30" value="10" style="width:100%; cursor: pointer;" oninput="document.getElementById('clan-size-val').innerText=this.value">
                         </div>
                         <label style="display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; margin: 15px 0; font-weight: bold; color: #555;">
-                            <input type="checkbox" id="new-clan-private" style="width: auto; margin: 0; padding: 0;">
-                            Закрытый клан (вход по инвайтам)
+                            <input type="checkbox" id="new-clan-private" style="width: auto; margin: 0; padding: 0;"> Закрытый клан
                         </label>
                         <button class="btn btn-green btn-small" onclick="createClan()" style="width:100%; font-size:16px;">Создать</button>
                     </div>
@@ -178,13 +156,11 @@
                 </div>
                 <div id="clan-invites-list" style="margin-top: 15px; text-align: left; width: 100%;"></div>
             </div>
-
             <div id="my-clan-block" style="display: none;">
                 <div style="display: flex; flex-wrap: wrap; gap: 15px;">
                     <div style="flex: 1; min-width: 250px; border: 2px solid #ccc; border-radius: 15px; padding: 15px; display: flex; flex-direction: column; background: #fafafa;">
                         <h3 style="margin-top:0; color: #333;">Участники <span id="clan-count" style="color: #888; font-size: 16px;"></span></h3>
                         <div id="clan-members-list" style="flex: 1; max-height: 200px; overflow-y: auto; text-align: left; font-size: 16px;"></div>
-                        
                         <div id="clan-invite-block" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 2px dashed #ccc;">
                             <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">Пригласить игрока:</div>
                             <div style="display: flex; gap: 5px;">
@@ -192,7 +168,6 @@
                                 <button class="btn btn-blue btn-small" onclick="inviteToClan()">➔</button>
                             </div>
                         </div>
-
                         <button class="btn btn-red btn-small" onclick="leaveClan()" style="margin-top: 15px; font-size: 16px;">🚪 Покинуть клан</button>
                     </div>
                     <div style="flex: 1; min-width: 250px; border: 3px solid #8ecae6; border-radius: 15px; display: flex; flex-direction: column; background: #f4faff; overflow: hidden;">
@@ -205,21 +180,7 @@
                     </div>
                 </div>
             </div>
-
             <button id="btn-close-clans" class="btn btn-orange" style="width: 100%; margin-top: 15px;">Закрыть</button>
-        </div>
-    </div>
-
-    <div id="clan-invite-modal" class="overlay" style="display: none; z-index: 2050;">
-        <div class="modal-box" style="border-color: #8338ec; max-width: 400px;">
-            <h2 style="color: #8338ec; font-size: 28px; margin-bottom: 5px;">🛡️ ПРИГЛАШЕНИЕ!</h2>
-            <div style="font-size: 18px; margin-bottom: 20px; color: #555; font-weight: bold;">
-                Вас приглашают в закрытый клан <br><span id="clan-invite-name" style="color: #ffb703; font-size: 26px;">...</span>!
-            </div>
-            <div style="display: flex; gap: 15px;">
-                <button id="btn-accept-clan-invite" class="btn btn-green" style="flex:1;">Вступить</button>
-                <button id="btn-decline-clan-invite" class="btn btn-red" style="flex:1;">Отклонить</button>
-            </div>
         </div>
     </div>
 
@@ -238,11 +199,20 @@
 
     <div id="profile-modal" class="overlay" style="display: none; z-index: 1050;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
-            <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px;">
-                <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin: 0; text-transform: uppercase;">Имя</h2>
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <img id="profile-avatar" src="" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; background: #f4faff;">
+                
+                <button id="btn-gift" class="btn btn-green btn-small" style="display: none; margin-top: 10px;">🎁 Подарить</button>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 0;">
+                <h2 id="profile-name" style="color: #219ebc; font-size: 36px; margin: 0; text-transform: uppercase;">Имя</h2>
                 <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
             </div>
+            
+            <div id="profile-title-display" style="color: #ffb703; font-weight: bold; font-size: 16px; margin-bottom: 5px;"></div>
+            
             <div style="font-size: 16px; color: #8338ec; font-weight: bold; margin-bottom: 5px;" id="profile-clan-name"></div>
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
             
@@ -257,7 +227,21 @@
                 <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
                 <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
             </div>
-            <div id="avatar-selector" style="display: none; margin-bottom: 15px;">
+
+            <div id="profile-edit-section" style="display: none; margin-bottom: 15px; border-top: 2px dashed #ccc; padding-top: 10px;">
+                <div style="margin-bottom: 10px;">
+                    <div style="font-weight:bold; margin-bottom:5px; color:#333;">Ваш титул:</div>
+                    <select id="title-selector" onchange="setMyTitle(this.value)" style="width: 100%; margin: 0; padding: 8px;">
+                        <option value="">Без титула</option>
+                        <option value="Новичок">Новичок</option>
+                        <option value="Подпивас">Подпивас</option>
+                        <option value="Табуретка">Табуретка</option>
+                        <option value="ZXC Гуль">ZXC Гуль</option>
+                        <option value="Гроза льда">Гроза льда</option>
+                        <option value="Киберспортсмен">Киберспортсмен</option>
+                        <option value="Легенда">Легенда</option>
+                    </select>
+                </div>
                 <div style="font-weight:bold; margin-bottom:5px; color:#333;">Сменить аватарку:</div>
                 <div style="display: flex; justify-content: center; gap: 10px;">
                     <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png" onerror="this.src=''">
@@ -266,6 +250,7 @@
                     <img onclick="setAvatar('avatar4')" class="avatar-opt" src="/avatar4.png" onerror="this.src=''">
                 </div>
             </div>
+
             <div style="display: flex; gap: 10px; width: 100%;">
                 <button class="btn btn-blue" onclick="document.getElementById('profile-modal').style.display='none'" style="flex: 1;">Закрыть</button>
                 <button id="btn-logout" class="btn btn-red" style="display: none; flex: 1;">🚪 Выйти</button>
@@ -321,6 +306,14 @@
             </div>
             <div id="shop-error" style="color: #e63946; margin: 5px 0; min-height: 20px; font-weight: bold;"></div>
             <button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="clan-invite-modal" class="overlay" style="display: none; z-index: 2050;">
+        <div class="modal-box" style="border-color: #8338ec; max-width: 400px;">
+            <h2 style="color: #8338ec; font-size: 28px; margin-bottom: 5px;">🛡️ ПРИГЛАШЕНИЕ!</h2>
+            <div style="font-size: 18px; margin-bottom: 20px; color: #555; font-weight: bold;">Вас приглашают в закрытый клан <br><span id="clan-invite-name" style="color: #ffb703; font-size: 26px;">...</span>!</div>
+            <div style="display: flex; gap: 15px;"><button id="btn-accept-clan-invite" class="btn btn-green" style="flex:1;">Вступить</button><button id="btn-decline-clan-invite" class="btn btn-red" style="flex:1;">Отклонить</button></div>
         </div>
     </div>
 
