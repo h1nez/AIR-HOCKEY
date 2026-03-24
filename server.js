@@ -12,9 +12,10 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
-// 1. БАЗА ДАННЫХ MONGODB
+// 1. НАСТРОЙКИ БАЗЫ И АДМИНА
 // ==========================================
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
+const ADMIN_NICKNAME = "davidik12"; // 🔥 ВПИШИ СЮДА СВОЙ ТОЧНЫЙ НИКНЕЙМ!
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -183,28 +184,18 @@ setInterval(() => {
                 const oldX = bot.x; const oldY = bot.y;
                 
                 let targetY = puck.y; let targetX = 720; 
-                
-                if (puck.x > 400) {
-                    if (puck.x > bot.x) { targetX = 760; targetY = 200; } 
-                    else { targetX = puck.x + 20; }
-                }
-                if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) {
-                    targetX = 680; targetY = 200;
-                }
+                if (puck.x > 400) { if (puck.x > bot.x) { targetX = 760; targetY = 200; } else { targetX = puck.x + 20; } }
+                if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) { targetX = 680; targetY = 200; }
                 
                 const botSpeed = room.player2.id === 'secret_bot' ? 7.5 : 6.0; 
-                if (bot.y < targetY - botSpeed) bot.y += botSpeed;
-                else if (bot.y > targetY + botSpeed) bot.y -= botSpeed;
-                if (bot.x < targetX - botSpeed) bot.x += botSpeed;
-                else if (bot.x > targetX + botSpeed) bot.x -= botSpeed;
+                if (bot.y < targetY - botSpeed) bot.y += botSpeed; else if (bot.y > targetY + botSpeed) bot.y -= botSpeed;
+                if (bot.x < targetX - botSpeed) bot.x += botSpeed; else if (bot.x > targetX + botSpeed) bot.x -= botSpeed;
 
-                bot.x = Math.max(435, Math.min(765, bot.x));
-                bot.y = Math.max(35, Math.min(365, bot.y));
+                bot.x = Math.max(435, Math.min(765, bot.x)); bot.y = Math.max(35, Math.min(365, bot.y));
                 bot.speedX = bot.x - oldX; bot.speedY = bot.y - oldY;
             }
 
-            room.puck.vx *= 0.995; room.puck.vy *= 0.995;
-            room.puck.x += room.puck.vx; room.puck.y += room.puck.vy;
+            room.puck.vx *= 0.995; room.puck.vy *= 0.995; room.puck.x += room.puck.vx; room.puck.y += room.puck.vy;
             if (room.puck.y < PUCK_R) { room.puck.y = PUCK_R; room.puck.vy *= -1; }
             if (room.puck.y > HEIGHT - PUCK_R) { room.puck.y = HEIGHT - PUCK_R; room.puck.vy *= -1; }
             if (room.puck.x < PUCK_R) {
@@ -249,7 +240,6 @@ function tryRejoin(socket, user) {
 function joinPlayerToRoom(socket, user) {
     if (socket.roomId) return;
     let myRoomId = null;
-    
     let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "";
     let clientIp = rawIp.split(',')[0].trim();
     if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1'; 
@@ -257,13 +247,10 @@ function joinPlayerToRoom(socket, user) {
     for (const id in rooms) { 
         if (rooms[id].gameOver || rooms[id].isBotMatch || rooms[id].isFriendly) continue; 
         if (rooms[id].player1.id && rooms[id].player1.ip === clientIp) continue;
-        if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
-            myRoomId = id; break; 
-        } 
+        if (rooms[id].player1.id && rooms[id].player2.name === "...") { myRoomId = id; break; } 
     }
     
     if (!myRoomId) myRoomId = createRoom(false, false);
-
     const room = rooms[myRoomId]; socket.join(myRoomId); socket.roomId = myRoomId;
 
     if (!room.player1.id && room.player1.name === "...") {
@@ -283,23 +270,17 @@ function joinPlayerToRoom(socket, user) {
                     else if (type < 0.75) return roots[Math.floor(Math.random() * roots.length)] + suffixes[Math.floor(Math.random() * suffixes.length)];
                     else return roots[Math.floor(Math.random() * roots.length)].toLowerCase() + ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
                 };
-
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
-                const fakeName = generateSteamName();
-                const fakeSkin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
-                const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
-
                 room.player2.id = 'secret_bot'; room.player2.ip = 'bot_ip';
-                room.player2.name = fakeName; room.player2.skin = fakeSkin;
-                room.player2.rating = fakeRating; room.paused = false;
+                room.player2.name = generateSteamName(); room.player2.skin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
+                room.player2.rating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
+                room.paused = false;
             }
         }, 15000);
-
     } else if (!room.player2.id && room.player2.name === "...") {
         room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
         room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
-        room.paused = false; 
-        if (room.botTimer) clearTimeout(room.botTimer); 
+        room.paused = false; if (room.botTimer) clearTimeout(room.botTimer); 
     }
 }
 
@@ -308,8 +289,8 @@ io.on('connection', (socket) => {
     // 🔥 ГЛОБАЛЬНЫЙ ЧАТ
     socket.on('globalChat', (msg) => {
         if (!socket.user || !msg || msg.trim() === '') return;
-        // Рассылаем всем подключенным игрокам
-        io.emit('chatMessage', { name: socket.user.name, msg: msg.substring(0, 100) });
+        let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : "";
+        io.emit('chatMessage', { name: prefix + socket.user.name, msg: msg.substring(0, 100) });
     });
 
     // 🔥 ИГРОВЫЕ ЭМОДЗИ
@@ -317,8 +298,40 @@ io.on('connection', (socket) => {
         if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return;
         const room = rooms[socket.roomId];
         const role = socket.id === room.player1.id ? 'p1' : 'p2';
-        // Отправляем эмодзи только в ту комнату, где идет игра
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
+    });
+
+    // 🔥 АДМИН ПАНЕЛЬ: ПОЛУЧИТЬ ИГРОКОВ
+    socket.on('adminGetUsers', async (callback) => {
+        if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false });
+        try {
+            const users = await User.find().select('name rating coins regIp').lean();
+            callback({ success: true, users });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    // 🔥 АДМИН ПАНЕЛЬ: ДЕЙСТВИЯ (МОНЕТЫ, ЭЛО, БАН)
+    socket.on('adminAction', async (data, callback) => {
+        if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" });
+        try {
+            const target = await User.findOne({ name: data.targetName });
+            if (!target) return callback({ success: false, msg: "Игрок не найден!" });
+
+            if (data.action === 'addCoins') {
+                target.coins += Number(data.amount); await target.save();
+            } else if (data.action === 'setElo') {
+                target.rating = Number(data.amount); await target.save();
+            } else if (data.action === 'ban') {
+                await User.deleteOne({ name: data.targetName });
+                const tSocketId = connectedUsers[data.targetName];
+                if (tSocketId) {
+                    io.to(tSocketId).emit('forceReload');
+                    const ts = io.sockets.sockets.get(tSocketId);
+                    if (ts) ts.disconnect();
+                }
+            }
+            callback({ success: true, msg: "Успешно!" });
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
 
     socket.on('register', async (data, callback) => {
@@ -335,8 +348,7 @@ io.on('connection', (socket) => {
             const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp });
             await newUser.save();
             
-            socket.user = newUser; 
-            connectedUsers[newUser.name] = socket.id;
+            socket.user = newUser; connectedUsers[newUser.name] = socket.id;
             if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true });
             else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
@@ -349,8 +361,7 @@ io.on('connection', (socket) => {
             if (!user) return callback({ success: false, msg: "Аккаунт не найден!" });
             const isMatch = await bcrypt.compare(data.password, user.password);
             if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" });
-            socket.user = user; 
-            connectedUsers[user.name] = socket.id;
+            socket.user = user; connectedUsers[user.name] = socket.id;
             if (tryRejoin(socket, user)) callback({ success: true, rejoining: true });
             else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
@@ -360,12 +371,10 @@ io.on('connection', (socket) => {
 
     socket.on('playBot', () => {
         if (!socket.user || socket.roomId) return;
-        const roomId = createRoom(true, false);
-        const room = rooms[roomId];
+        const roomId = createRoom(true, false); const room = rooms[roomId];
         room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0 };
         room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0 };
-        room.paused = false;
-        socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
+        room.paused = false; socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
     });
 
     socket.on('rematch', () => {
@@ -373,15 +382,9 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId];
         if (socket.id === room.player1.id) room.rematch.player1 = true;
         if (socket.id === room.player2.id) room.rematch.player2 = true;
-
-        if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) {
-            room.rematch.player2 = true; 
-        }
-
+        if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) room.rematch.player2 = true; 
         if (room.rematch.player1 && room.rematch.player2) {
-            room.player1.score = 0; room.player2.score = 0;
-            room.gameOver = false; reset(room);
-            io.to(room.id).emit('hideEndScreen');
+            room.player1.score = 0; room.player2.score = 0; room.gameOver = false; reset(room); io.to(room.id).emit('hideEndScreen');
         }
     });
 
@@ -389,7 +392,6 @@ io.on('connection', (socket) => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
         if (room.botTimer) clearTimeout(room.botTimer); 
-
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
@@ -398,7 +400,6 @@ io.on('connection', (socket) => {
         
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; }
         if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
-        
         if (!room.player1.id && (!room.player2.id || room.player2.id === 'bot' || room.player2.id === 'secret_bot')) {
             clearTimeout(room.disconnectTimeout); delete rooms[socket.roomId]; 
         }
@@ -421,58 +422,43 @@ io.on('connection', (socket) => {
         if (!targetSocketId) return callback({ success: false, msg: "Игрок сейчас не в сети!" });
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket && targetSocket.roomId) return callback({ success: false, msg: "Игрок уже в матче!" });
-
-        io.to(targetSocketId).emit('incomingInvite', socket.user.name);
-        callback({ success: true, msg: "Приглашение на бой отправлено!" });
+        io.to(targetSocketId).emit('incomingInvite', socket.user.name); callback({ success: true, msg: "Приглашение отправлено!" });
     });
 
     socket.on('acceptInvite', async (senderName) => {
         if (!socket.user) return;
-        const senderSocketId = connectedUsers[senderName];
-        if (!senderSocketId) return;
-
-        const senderSocket = io.sockets.sockets.get(senderSocketId);
-        if (!senderSocket || senderSocket.roomId || socket.roomId) return;
+        const senderSocketId = connectedUsers[senderName]; if (!senderSocketId) return;
+        const senderSocket = io.sockets.sockets.get(senderSocketId); if (!senderSocket || senderSocket.roomId || socket.roomId) return;
 
         const roomId = createRoom(false, true); const room = rooms[roomId];
-        const u1 = await User.findOne({ name: senderSocket.user.name }).lean();
-        const u2 = await User.findOne({ name: socket.user.name }).lean();
+        const u1 = await User.findOne({ name: senderSocket.user.name }).lean(); const u2 = await User.findOne({ name: socket.user.name }).lean();
 
         room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0 };
         room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0 };
         room.paused = false;
 
-        senderSocket.join(roomId); senderSocket.roomId = roomId;
-        senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
-
-        socket.join(roomId); socket.roomId = roomId;
-        socket.emit('role', 'p2'); socket.emit('forceStartGame'); 
+        senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
+        socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p2'); socket.emit('forceStartGame'); 
     });
 
-    socket.on('declineInvite', (senderName) => {
-        const senderSocketId = connectedUsers[senderName];
-        if (senderSocketId) io.to(senderSocketId).emit('inviteDeclined', socket.user.name);
-    });
+    socket.on('declineInvite', (senderName) => { const senderSocketId = connectedUsers[senderName]; if (senderSocketId) io.to(senderSocketId).emit('inviteDeclined', socket.user.name); });
 
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length });
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME });
     });
 
     socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
-            if (target) callback({ success: true, profile: target });
-            else callback({ success: false, msg: "Игрок не найден" });
+            if (target) callback({ success: true, profile: target }); else callback({ success: false, msg: "Игрок не найден" });
         } catch(e) { callback({ success: false }); }
     });
 
     socket.on('setAvatar', async (avatar, callback) => {
         if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id); u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true });
-        } catch(e) { callback({ success: false }); }
+        try { const u = await User.findById(socket.user._id); u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('buySkin', async (skinName, callback) => {
@@ -480,8 +466,7 @@ io.on('connection', (socket) => {
         const prices = { korzhik: 50, karamelka: 50, kompot: 50, gonya: 75, default: 0 };
         const u = await User.findById(socket.user._id);
         if (u.inventory.includes(skinName)) {
-            u.skin = skinName; await u.save(); socket.user = u;
-            return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
+            u.skin = skinName; await u.save(); socket.user = u; return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
         }
         if (u.coins >= prices[skinName]) {
             u.coins -= prices[skinName]; u.inventory.push(skinName); u.skin = skinName; await u.save(); socket.user = u;
@@ -513,20 +498,17 @@ io.on('connection', (socket) => {
             if (!target) return callback({ success: false, msg: "Игрок не найден" });
             if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
             if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
-            target.requests.push(socket.user.name); await target.save();
-            callback({ success: true, msg: "Запрос отправлен!" });
+            target.requests.push(socket.user.name); await target.save(); callback({ success: true, msg: "Запрос отправлен!" });
         } catch(e) { callback({ success: false, msg: "Ошибка" }); }
     });
 
     socket.on('acceptFriend', async (senderName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            const sender = await User.findOne({ name: senderName });
+            const u = await User.findById(socket.user._id); const sender = await User.findOne({ name: senderName });
             u.requests = u.requests.filter(n => n !== senderName);
             if (sender && !u.friends.includes(senderName)) {
-                u.friends.push(senderName);
-                if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); }
+                u.friends.push(senderName); if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); }
             }
             await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
@@ -534,16 +516,13 @@ io.on('connection', (socket) => {
 
     socket.on('rejectFriend', async (senderName, callback) => {
         if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true });
-        } catch(e) { callback({ success: false }); }
+        try { const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('removeFriend', async (friendName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            const friend = await User.findOne({ name: friendName });
+            const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName });
             u.friends = u.friends.filter(n => n !== friendName);
             if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); }
             await u.save(); callback({ success: true });
@@ -551,10 +530,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getLeaderboard', async (callback) => {
-        try {
-            const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id').lean();
-            callback({ success: true, leaderboard: topUsers });
-        } catch(e) { callback({ success: false }); }
+        try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('input', (data) => {
@@ -572,7 +548,6 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         if (socket.user && connectedUsers[socket.user.name] === socket.id) { delete connectedUsers[socket.user.name]; }
-
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
         const role = socket.id === room.player1.id ? 'player1' : (socket.id === room.player2.id ? 'player2' : null);
@@ -587,9 +562,7 @@ io.on('connection', (socket) => {
             }
             room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
-            room.disconnectTimeout = setTimeout(() => {
-                const winRole = role === 'player1' ? 'player2' : 'player1'; finishMatch(room, winRole, true);
-            }, 60000);
+            room.disconnectTimeout = setTimeout(() => { const winRole = role === 'player1' ? 'player2' : 'player1'; finishMatch(room, winRole, true); }, 60000);
         }
     });
 });

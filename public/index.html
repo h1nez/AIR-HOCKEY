@@ -64,45 +64,27 @@
         .lvl-9 { background: #ff3300; }
         .lvl-10 { background: #ff0000; }
 
-        /* Умное ограничение ширины игрового поля */
         .game-layout-limit { width: 100%; max-width: min(800px, calc((100vh - 160px) * 2)); box-sizing: border-box; }
         .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
         .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
 
-        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ (ЛАНДШАФТ) */
-        @media screen and (max-height: 500px) and (orientation: landscape) {
-            /* Сужаем игру */
-            .game-layout-limit { max-width: min(800px, calc((100vh - 90px) * 2)); }
-            .p-name { font-size: 16px !important; }
-            .p-elo { font-size: 11px !important; }
-            .paw-icon { transform: scale(0.7) !important; margin: 0 !important; gap: 2px !important;}
-            .emoji-btn { width: 30px !important; height: 30px !important; font-size: 16px !important; border-width: 2px !important;}
-            #btn-in-game-quit { padding: 4px 10px !important; font-size: 12px !important; margin-bottom: 0 !important; }
-            .panel-margin { margin-bottom: 2px !important; margin-top: 2px !important; }
-            
-            /* Сужаем главное меню */
-            h1 { font-size: 32px !important; margin-bottom: 5px !important; line-height: 1 !important; }
-            h1 span { font-size: 22px !important; }
+        /* МОБИЛЬНЫЙ ГОРИЗОНТАЛЬНЫЙ РЕЖИМ */
+        @media screen and (max-height: 600px) and (orientation: landscape) {
+            .overlay { justify-content: flex-start !important; overflow-y: auto !important; padding-top: 20px !important; padding-bottom: 20px !important; }
+            #global-chat { position: relative !important; bottom: auto !important; left: auto !important; margin: 20px auto !important; width: 90% !important; max-width: 400px !important; height: 140px !important; flex-shrink: 0; }
+            h1 { font-size: 32px !important; margin-top: 10px !important; margin-bottom: 10px !important; line-height: 1.1 !important; }
+            h1 span { font-size: 20px !important; }
             #menu-coins { font-size: 20px !important; margin-bottom: 10px !important; }
-            #main-menu .btn { padding: 6px 12px !important; font-size: 13px !important; }
-            #btn-play { font-size: 20px !important; padding: 10px 30px !important; }
-            #btn-play-bot { font-size: 14px !important; padding: 10px 20px !important; }
-            
-            /* Сужаем Чат в меню */
-            #global-chat { width: 220px !important; height: 130px !important; bottom: 5px !important; left: 5px !important; border-width: 2px !important;}
-            #global-chat > div:first-child { padding: 2px !important; font-size: 12px !important; }
-            #chat-input { padding: 4px !important; font-size: 12px !important; }
-            #chat-messages { font-size: 12px !important; padding: 5px !important;}
-
-            /* Сужаем модальные окна (Профиль, Магазин) */
-            .modal-box { padding: 15px !important; max-height: 95vh; overflow-y: auto; }
-            h2 { font-size: 22px !important; margin-bottom: 5px !important; }
-            #profile-avatar { width: 60px !important; height: 60px !important; border-width: 3px !important; margin-bottom: 5px !important;}
-            #profile-name { font-size: 24px !important; }
-            #shop-item-preview-border { width: 70px !important; height: 70px !important; border-width: 3px !important; margin-bottom: 5px !important;}
-            #shop-item-name { font-size: 20px !important; margin-bottom: 5px !important;}
-            #shop-item-price { font-size: 16px !important; margin: 5px 0 !important;}
-            #btn-shop-action { padding: 8px !important; font-size: 14px !important;}
+            #main-menu .btn { padding: 6px 12px !important; font-size: 14px !important; border-radius: 8px !important; }
+            #btn-play { font-size: 18px !important; padding: 8px 30px !important; }
+            #btn-play-bot { font-size: 14px !important; padding: 8px 15px !important; }
+            .game-layout-limit { max-width: min(800px, calc((100vh - 80px) * 2)); }
+            .p-name { font-size: 14px !important; }
+            .p-elo { font-size: 10px !important; }
+            .paw-icon { transform: scale(0.6) !important; margin: 0 !important; gap: 2px !important;}
+            .emoji-btn { width: 28px !important; height: 28px !important; font-size: 14px !important; border-width: 2px !important;}
+            #btn-in-game-quit { padding: 4px 8px !important; font-size: 10px !important; margin-bottom: 0 !important; }
+            .panel-margin { margin-bottom: 2px !important; margin-top: 2px !important; }
         }
     </style>
 </head>
@@ -131,6 +113,7 @@
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:14px;">0</span></button>
             <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
+            <button id="btn-admin" class="btn btn-red" style="display: none; background: #d90429;">👑 Админ</button>
         </div>
         
         <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
@@ -145,6 +128,26 @@
                 <input type="text" id="chat-input" placeholder="Написать..." style="flex: 1; border: none; border-radius: 0; margin: 0; padding: 10px; font-size: 14px; outline: none;">
                 <button id="btn-send-chat" style="border: none; background: #4da6ff; color: white; cursor: pointer; padding: 0 15px; font-weight: bold; font-size: 16px;">➔</button>
             </div>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
+        <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
+            <h2 style="color: #d90429;">👑 Панель Администратора</h2>
+            <div style="max-height: 400px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #ccc; text-align: left;">
+                            <th style="padding: 5px;">Ник / IP</th>
+                            <th style="padding: 5px;">ЭЛО</th>
+                            <th style="padding: 5px;">Монеты</th>
+                            <th style="padding: 5px;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-list"></tbody>
+                </table>
+            </div>
+            <button id="btn-close-admin" class="btn btn-blue" style="width: 100%;">Закрыть</button>
         </div>
     </div>
 
