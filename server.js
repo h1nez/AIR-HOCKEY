@@ -63,9 +63,9 @@ function createRoom(isBotMatch = false, isFriendly = false) {
         player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
         disconnectTimeout: null, reconnectDeadline: null, timeLeft: null,
-        botTimer: null, // 🔥 Таймер для скрытого бота на 15 секунд
-        isBotMatch: isBotMatch, // Явная тренировка
-        isFriendly: isFriendly  // Дружеский матч
+        botTimer: null,
+        isBotMatch: isBotMatch,
+        isFriendly: isFriendly 
     };
     return roomId;
 }
@@ -102,14 +102,13 @@ function resolveCollision(puck, player) {
 
 async function finishMatch(room, winRole, isDisconnect = false) {
     room.paused = true; room.gameOver = true;
-    if (room.botTimer) clearTimeout(room.botTimer); // На всякий случай чистим таймер
+    if (room.botTimer) clearTimeout(room.botTimer);
     
     const win = winRole === 'player1' ? room.player1 : room.player2;
     const lose = winRole === 'player1' ? room.player2 : room.player1;
     if (lose.name === "...") return; 
     if (isDisconnect) win.score = 11; 
 
-    // Если это явная тренировка или вызов друга (Без MMR)
     if (room.isBotMatch || room.isFriendly) {
         room.rematch = { player1: false, player2: false };
         let msg = "";
@@ -123,12 +122,10 @@ async function finishMatch(room, winRole, isDisconnect = false) {
         return;
     }
     
-    // 🔥 РАСЧЕТ MMR (Работает и для реальных людей, и для скрытых ботов)
     const K = 32; const diff = Math.round(K * (1 - 1/(1+Math.pow(10,(lose.rating-win.rating)/400))));
     win.rating += diff; lose.rating -= diff;
     
     try {
-        // Обновляем победителя (только если это не скрытый бот)
         if (win.id !== 'secret_bot') {
             const winnerDoc = await User.findOne({ name: win.name });
             if (winnerDoc) {
@@ -138,8 +135,6 @@ async function finishMatch(room, winRole, isDisconnect = false) {
                 await winnerDoc.save();
             }
         }
-
-        // Обновляем проигравшего (только если это не скрытый бот)
         if (lose.id !== 'secret_bot') {
             const loserDoc = await User.findOne({ name: lose.name });
             if (loserDoc) {
@@ -185,15 +180,33 @@ setInterval(() => {
         
         if (!room.paused && !room.gameOver) {
             
-            // 🔥 ЛОГИКА ДВИЖЕНИЯ БОТА (И для Тренировки, и для Скрытого бота)
+            // 🔥 ОБНОВЛЕННАЯ ЛОГИКА БОТА С АНТИ-ЗАСТРЕВАНИЕМ
             if (room.player2.id === 'bot' || room.player2.id === 'secret_bot') {
                 const bot = room.player2; const puck = room.puck;
                 const oldX = bot.x; const oldY = bot.y;
-                let targetY = puck.y; let targetX = 720; 
-                if (puck.x > 400) targetX = Math.max(450, puck.x + 10);
                 
-                // Скрытый бот чуть умнее и быстрее обычного, чтобы было интереснее на рейтинг
-                const botSpeed = room.player2.id === 'secret_bot' ? 7.5 : 6.5; 
+                let targetY = puck.y; 
+                let targetX = 720; // Базовая позиция (защита)
+                
+                if (puck.x > 400) {
+                    if (puck.x > bot.x) {
+                        // Шайба за спиной! Быстро бежим защищать ворота
+                        targetX = 760;
+                        targetY = 200;
+                    } else {
+                        // Атакуем, стараемся быть правее шайбы
+                        targetX = puck.x + 20; 
+                    }
+                }
+                
+                // 🛑 АНТИ-ЗАСТРЕВАНИЕ В УГЛАХ
+                // Если шайба забилась глубоко в угол (справа, выше или ниже ворот)
+                if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) {
+                    targetX = 680; // Бот отходит подальше от стены, давая шайбе вылететь
+                    targetY = 200; // И встает по центру ворот для защиты
+                }
+                
+                const botSpeed = room.player2.id === 'secret_bot' ? 7.5 : 6.0; 
                 
                 if (bot.y < targetY - botSpeed) bot.y += botSpeed;
                 else if (bot.y > targetY + botSpeed) bot.y -= botSpeed;
@@ -259,7 +272,6 @@ function joinPlayerToRoom(socket, user) {
     for (const id in rooms) { 
         if (rooms[id].gameOver || rooms[id].isBotMatch || rooms[id].isFriendly) continue; 
         if (rooms[id].player1.id && rooms[id].player1.ip === clientIp) continue;
-        
         if (rooms[id].player1.id && rooms[id].player2.name === "...") { 
             myRoomId = id; break; 
         } 
@@ -273,15 +285,12 @@ function joinPlayerToRoom(socket, user) {
         room.player1.id = socket.id; room.player1.ip = clientIp; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
 
-        // 🔥 МАТЧМЕЙКИНГ: Запускаем таймер на 15 секунд. Если никто не зайдет, кидаем Скрытого Бота!
         room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
-                // Создаем реалистичного фейка
                 const fakeNames = ['КиберКот', 'Ледокол', 'Мурзик_Про', 'Шайбоед', 'Gamer777', 'ProIgroK', 'NoobMaster', 'SuperCat', 'Alex_2012', 'Nagibator'];
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
                 const fakeName = fakeNames[Math.floor(Math.random() * fakeNames.length)] + Math.floor(Math.random()*100);
                 const fakeSkin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
-                // Рейтинг плюс-минус 50 от рейтинга игрока
                 const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 100) - 50);
 
                 room.player2.id = 'secret_bot';
@@ -291,13 +300,13 @@ function joinPlayerToRoom(socket, user) {
                 room.player2.rating = fakeRating;
                 room.paused = false;
             }
-        }, 15000); // 15 секунд ожидания
+        }, 15000);
 
     } else if (!room.player2.id && room.player2.name === "...") {
         room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
         room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
         room.paused = false; 
-        if (room.botTimer) clearTimeout(room.botTimer); // 🔥 Реальный человек зашел вовремя — отменяем таймер бота!
+        if (room.botTimer) clearTimeout(room.botTimer); 
     }
 }
 
@@ -351,7 +360,6 @@ io.on('connection', (socket) => {
         if (socket.id === room.player1.id) room.rematch.player1 = true;
         if (socket.id === room.player2.id) room.rematch.player2 = true;
 
-        // Если это Бот Вася ИЛИ скрытый бот — они соглашаются на реванш моментально!
         if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) {
             room.rematch.player2 = true; 
         }
@@ -366,7 +374,7 @@ io.on('connection', (socket) => {
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (room.botTimer) clearTimeout(room.botTimer); // 🔥 Очищаем таймер бота, если ушли
+        if (room.botTimer) clearTimeout(room.botTimer); 
 
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
@@ -389,8 +397,7 @@ io.on('connection', (socket) => {
     socket.on('cancelPlay', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
-        if (room.botTimer) clearTimeout(room.botTimer); // 🔥 Очищаем таймер бота при отмене
-
+        if (room.botTimer) clearTimeout(room.botTimer); 
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.name = "..."; room.player1.ip = null; }
         if (room.player2.id === socket.id) { room.player2.id = null; room.player2.name = "..."; room.player2.ip = null; }
         if (!room.player1.id && !room.player2.id) delete rooms[socket.roomId]; 
