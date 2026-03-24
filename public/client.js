@@ -488,15 +488,21 @@ function loop() {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;
 
-            if ((clientState.puck.y <= 22 + 2 || clientState.puck.y >= 400 - 22 - 2) && wallCooldown === 0) { 
-                playWall(); wallCooldown = 10; 
+            // 🔥 ИСПРАВЛЕНИЕ: Берем точные координаты сервера и делаем зону чуть шире (26 и 374)
+            if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) { 
+                playWall(); 
+                wallCooldown = 15; 
             }
 
             const checkHit = (p) => {
                 let r = serverState[p].skin === 'karamelka' ? 43 : (serverState[p].skin === 'gonya' ? 28 : 35);
+                // Для клюшек оставляем clientState, чтобы звук совпадал с касанием на экране
                 let dx = clientState.puck.x - clientState[p].x;
                 let dy = clientState.puck.y - clientState[p].y;
-                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 3 && hitCooldown === 0) { playHit(); hitCooldown = 15; }
+                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 4 && hitCooldown === 0) { 
+                    playHit(); 
+                    hitCooldown = 15; 
+                }
             };
             checkHit('player1'); checkHit('player2');
         }
@@ -505,4 +511,5 @@ function loop() {
     }
     requestAnimationFrame(loop);
 }
+loop();
 loop();
