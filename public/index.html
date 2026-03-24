@@ -154,7 +154,10 @@
     <div id="profile-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
-            <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin-bottom: 5px; text-transform: uppercase;">Имя</h2>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px;">
+                <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin: 0; text-transform: uppercase;">Имя</h2>
+                <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
+            </div>
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
             <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 15px;">
                 <div><b style="color: #4da6ff; font-size: 20px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>

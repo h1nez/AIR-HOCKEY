@@ -243,6 +243,18 @@ window.showProfile = function(username) {
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
             document.getElementById('profile-name').innerText = p.name;
             
+            // 🔥 КРАСИМ КРУЖОЧЕК ОНЛАЙНА
+            const statusDot = document.getElementById('profile-online-status');
+            if (res.isOnline) {
+                statusDot.style.backgroundColor = '#06d6a0'; // Ярко-зеленый
+                statusDot.style.boxShadow = '0 0 8px #06d6a0';
+                statusDot.title = 'В сети';
+            } else {
+                statusDot.style.backgroundColor = '#ccc'; // Серый
+                statusDot.style.boxShadow = 'none';
+                statusDot.title = 'Не в сети';
+            }
+            
             let av = p.avatar || 'avatar1'; 
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1'; 
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 

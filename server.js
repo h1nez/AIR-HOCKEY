@@ -449,10 +449,15 @@ io.on('connection', (socket) => {
         callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME });
     });
 
-    socket.on('getUserProfile', async (username, callback) => {
+	socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
-            if (target) callback({ success: true, profile: target }); else callback({ success: false, msg: "Игрок не найден" });
+            if (target) {
+                // 🔥 ПРОВЕРЯЕМ ОНЛАЙН: если игрок есть в connectedUsers, значит он в игре
+                const isOnline = !!connectedUsers[username];
+                callback({ success: true, profile: target, isOnline: isOnline });
+            }
+            else callback({ success: false, msg: "Игрок не найден" });
         } catch(e) { callback({ success: false }); }
     });
 
