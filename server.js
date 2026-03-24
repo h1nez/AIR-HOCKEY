@@ -42,7 +42,7 @@ const userSchema = new mongoose.Schema({
     maxRating: { type: Number, default: 1000 },
     minRating: { type: Number, default: 1000 },
     avatar: { type: String, default: 'avatar1' },
-    regIp: { type: String, default: 'Скрыт' } // 🔥 Поле для сохранения IP адреса
+    regIp: { type: String, default: 'Скрыт' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -64,9 +64,7 @@ function createRoom(isBotMatch = false, isFriendly = false) {
         player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
         disconnectTimeout: null, reconnectDeadline: null, timeLeft: null,
-        botTimer: null,
-        isBotMatch: isBotMatch,
-        isFriendly: isFriendly 
+        botTimer: null, isBotMatch: isBotMatch, isFriendly: isFriendly 
     };
     return roomId;
 }
@@ -180,7 +178,6 @@ setInterval(() => {
         if (room.reconnectDeadline) room.timeLeft = Math.max(0, Math.ceil((room.reconnectDeadline - Date.now()) / 1000));
         
         if (!room.paused && !room.gameOver) {
-            
             if (room.player2.id === 'bot' || room.player2.id === 'secret_bot') {
                 const bot = room.player2; const puck = room.puck;
                 const oldX = bot.x; const oldY = bot.y;
@@ -191,13 +188,11 @@ setInterval(() => {
                     if (puck.x > bot.x) { targetX = 760; targetY = 200; } 
                     else { targetX = puck.x + 20; }
                 }
-                
                 if (puck.x > 730 && (puck.y < 125 || puck.y > 275)) {
                     targetX = 680; targetY = 200;
                 }
                 
                 const botSpeed = room.player2.id === 'secret_bot' ? 7.5 : 6.0; 
-                
                 if (bot.y < targetY - botSpeed) bot.y += botSpeed;
                 else if (bot.y > targetY + botSpeed) bot.y -= botSpeed;
                 if (bot.x < targetX - botSpeed) bot.x += botSpeed;
@@ -277,13 +272,11 @@ function joinPlayerToRoom(socket, user) {
 
         room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
-                
                 const generateSteamName = () => {
                     const pros = ['s1mple', 'donk', 'Yatoro', 'm0NESY', 'Collapse', 'sh1ro', 'Dendi', 'Miracle-', 'Nisha', 'ZywOo', 'NiKo', 'b1t', 'ropz', 'Nightfall', 'Puppey', 'Arteezy', 'Topson', 'Jame', 'Ax1Le', 'TORONTOTOKYO'];
                     const prefixes = ['NaVi | ', 'Virtus.pro ', 'Team Spirit ', 'FaZe ', 'Liquid ', 'OG ', 'zxc ', '1000-7 ', 'Shadow_', 'Lil_', 'toxic_'];
                     const roots = ['Ghoul', 'Sniper', 'Demon', 'Angel', 'Bebra', 'Monster', 'Tractor', 'Pudge', 'Pivo', 'Gamer', 'Killer', 'Ninja', 'Samurai', 'Hokage', 'DeadInside'];
                     const suffixes = ['_pro', '2010', '228', '1337', '99', '_rus', 'God', 'XD', 'QQ', '_enjoyer'];
-
                     const type = Math.random();
                     if (type < 0.25) return pros[Math.floor(Math.random() * pros.length)];
                     else if (type < 0.5) return prefixes[Math.floor(Math.random() * prefixes.length)] + roots[Math.floor(Math.random() * roots.length)];
@@ -296,12 +289,9 @@ function joinPlayerToRoom(socket, user) {
                 const fakeSkin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
                 const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
 
-                room.player2.id = 'secret_bot';
-                room.player2.ip = 'bot_ip';
-                room.player2.name = fakeName;
-                room.player2.skin = fakeSkin;
-                room.player2.rating = fakeRating;
-                room.paused = false;
+                room.player2.id = 'secret_bot'; room.player2.ip = 'bot_ip';
+                room.player2.name = fakeName; room.player2.skin = fakeSkin;
+                room.player2.rating = fakeRating; room.paused = false;
             }
         }, 15000);
 
@@ -315,20 +305,33 @@ function joinPlayerToRoom(socket, user) {
 
 io.on('connection', (socket) => {
     
+    // 🔥 ГЛОБАЛЬНЫЙ ЧАТ
+    socket.on('globalChat', (msg) => {
+        if (!socket.user || !msg || msg.trim() === '') return;
+        // Рассылаем всем подключенным игрокам
+        io.emit('chatMessage', { name: socket.user.name, msg: msg.substring(0, 100) });
+    });
+
+    // 🔥 ИГРОВЫЕ ЭМОДЗИ
+    socket.on('sendEmoji', (emoji) => {
+        if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return;
+        const room = rooms[socket.roomId];
+        const role = socket.id === room.player1.id ? 'p1' : 'p2';
+        // Отправляем эмодзи только в ту комнату, где идет игра
+        io.to(socket.roomId).emit('showEmoji', { role, emoji });
+    });
+
     socket.on('register', async (data, callback) => {
         try {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const existing = await User.findOne({ name: data.name });
             if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
             
-            // 🔥 ОПРЕДЕЛЯЕМ IP ИГРОКА ПРИ РЕГИСТРАЦИИ
             let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно";
             let clientIp = rawIp.split(',')[0].trim();
             if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)';
             
             const hashedPassword = await bcrypt.hash(data.password, 10);
-            
-            // 🔥 СОХРАНЯЕМ IP В БАЗУ
             const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp });
             await newUser.save();
             
@@ -362,7 +365,6 @@ io.on('connection', (socket) => {
         room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0 };
         room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0 };
         room.paused = false;
-        
         socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
     });
 
@@ -391,11 +393,8 @@ io.on('connection', (socket) => {
         const role = room.player1.id === socket.id ? 'player1' : 'player2';
         const winRole = role === 'player1' ? 'player2' : 'player1';
         
-        if (room.player2.name !== "..." && !room.gameOver) {
-            finishMatch(room, winRole, true);
-        } else {
-            socket.to(room.id).emit('opponentLeft');
-        }
+        if (room.player2.name !== "..." && !room.gameOver) { finishMatch(room, winRole, true); } 
+        else { socket.to(room.id).emit('opponentLeft'); }
         
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; }
         if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
@@ -420,7 +419,6 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         const targetSocketId = connectedUsers[friendName];
         if (!targetSocketId) return callback({ success: false, msg: "Игрок сейчас не в сети!" });
-
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket && targetSocket.roomId) return callback({ success: false, msg: "Игрок уже в матче!" });
 
@@ -436,9 +434,7 @@ io.on('connection', (socket) => {
         const senderSocket = io.sockets.sockets.get(senderSocketId);
         if (!senderSocket || senderSocket.roomId || socket.roomId) return;
 
-        const roomId = createRoom(false, true); 
-        const room = rooms[roomId];
-
+        const roomId = createRoom(false, true); const room = rooms[roomId];
         const u1 = await User.findOne({ name: senderSocket.user.name }).lean();
         const u2 = await User.findOne({ name: socket.user.name }).lean();
 
@@ -475,8 +471,7 @@ io.on('connection', (socket) => {
     socket.on('setAvatar', async (avatar, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true });
+            const u = await User.findById(socket.user._id); u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
@@ -489,8 +484,7 @@ io.on('connection', (socket) => {
             return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
         }
         if (u.coins >= prices[skinName]) {
-            u.coins -= prices[skinName]; u.inventory.push(skinName); u.skin = skinName;
-            await u.save(); socket.user = u;
+            u.coins -= prices[skinName]; u.inventory.push(skinName); u.skin = skinName; await u.save(); socket.user = u;
             return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory });
         } else { return callback({ success: false, msg: "Не хватает монет!" }); }
     });
@@ -541,9 +535,7 @@ io.on('connection', (socket) => {
     socket.on('rejectFriend', async (senderName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            u.requests = u.requests.filter(n => n !== senderName);
-            await u.save(); callback({ success: true });
+            const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true });
         } catch(e) { callback({ success: false }); }
     });
 
@@ -572,18 +564,14 @@ io.on('connection', (socket) => {
         if (p && !room.paused && !room.gameOver) {
             const oldX = p.x; const oldY = p.y;
             let pR = p.skin === 'karamelka' ? 43 : (p.skin === 'gonya' ? 28 : 35);
-            let minX = p === room.player1 ? pR : 400 + pR;
-            let maxX = p === room.player1 ? 400 - pR : 800 - pR;
-            p.x = Math.min(maxX, Math.max(minX, data.x));
-            p.y = Math.min(400 - pR, Math.max(pR, data.y));
+            let minX = p === room.player1 ? pR : 400 + pR; let maxX = p === room.player1 ? 400 - pR : 800 - pR;
+            p.x = Math.min(maxX, Math.max(minX, data.x)); p.y = Math.min(400 - pR, Math.max(pR, data.y));
             p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
     });
 
     socket.on('disconnect', () => {
-        if (socket.user && connectedUsers[socket.user.name] === socket.id) {
-            delete connectedUsers[socket.user.name]; 
-        }
+        if (socket.user && connectedUsers[socket.user.name] === socket.id) { delete connectedUsers[socket.user.name]; }
 
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId];
@@ -600,8 +588,7 @@ io.on('connection', (socket) => {
             room.paused = true; room.reconnectDeadline = Date.now() + 60000;
             if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
             room.disconnectTimeout = setTimeout(() => {
-                const winRole = role === 'player1' ? 'player2' : 'player1';
-                finishMatch(room, winRole, true);
+                const winRole = role === 'player1' ? 'player2' : 'player1'; finishMatch(room, winRole, true);
             }, 60000);
         }
     });

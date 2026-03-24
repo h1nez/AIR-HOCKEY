@@ -1,8 +1,5 @@
 const socket = io();
 
-// ==========================================
-// 🔥 ГРАФИКА И ЗВУКИ
-// ==========================================
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
@@ -12,11 +9,27 @@ const sndWall = new Audio('/wall.mp3');
 const sndGoalWin = new Audio('/goal_win.mp3');
 const sndGoalLose = new Audio('/goal_lose.mp3');
 
+// Звук для эмодзи (чтобы не качать файл, генерируем звук "Поньк!" математически)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+window.addEventListener('click', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); });
+
+function playPop() {
+    if(audioCtx.state === 'suspended') return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+
 function playSound(audioObj) {
     if (!audioObj.src || audioObj.src.includes('undefined')) return;
     const clone = audioObj.cloneNode();
-    clone.volume = 0.5; 
-    clone.play().catch(() => {}); 
+    clone.volume = 0.5; clone.play().catch(() => {}); 
 }
 
 function playHit() { playSound(sndHit); }
@@ -24,11 +37,9 @@ function playWall() { playSound(sndWall); }
 function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
-// ==========================================
-// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
-// ==========================================
 let puckTrail = []; 
 let confetti = [];  
+let activeEmojis = []; // 🔥 Хранилище летящих эмодзи на экране
 
 function getLvlHtml(elo) {
     let lvl = 1, cls = 'lvl-1';
@@ -49,15 +60,11 @@ function spawnConfetti() {
         confetti.push({
             x: 400, y: 200, 
             vx: (Math.random() - 0.5) * 25, vy: (Math.random() - 0.5) * 25,
-            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-            size: Math.random() * 8 + 4, life: 1
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`, size: Math.random() * 8 + 4, life: 1
         });
     }
 }
 
-// ==========================================
-// 🔥 АВТОРИЗАЦИЯ
-// ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -102,12 +109,33 @@ function handleAuthResponse(res) {
     } else { authScreen.style.display = 'flex'; authError.innerText = res.msg; }
 }
 
-// ==========================================
-// 🔥 ПРОФИЛЬ
-// ==========================================
-let userInventory = ['default'];
-let userCurrentSkin = 'default';
-let shopIndex = 0;
+// 🔥 ЛОГИКА ГЛОБАЛЬНОГО ЧАТА
+const chatInput = document.getElementById('chat-input');
+const chatMsgs = document.getElementById('chat-messages');
+
+document.getElementById('btn-send-chat').onclick = sendChat;
+chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+function sendChat() {
+    const msg = chatInput.value.trim();
+    if (msg) {
+        socket.emit('globalChat', msg);
+        chatInput.value = '';
+    }
+}
+
+socket.on('chatMessage', (data) => {
+    const el = document.createElement('div');
+    // Раскрашиваем ник в зависимости от того, наш он или чужой
+    const isMe = data.name === nameInput.value;
+    const nameColor = isMe ? '#4da6ff' : '#ffb703';
+    
+    el.innerHTML = `<b style="color: ${nameColor};">${data.name}:</b> <span style="color: #333;">${data.msg}</span>`;
+    chatMsgs.appendChild(el);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight; // Автоскролл вниз
+});
+
+let userInventory = ['default']; let userCurrentSkin = 'default'; let shopIndex = 0;
 
 function updateProfile() {
     socket.emit('getProfile', (data) => {
@@ -117,10 +145,7 @@ function updateProfile() {
             const reqBadge = document.getElementById('req-badge');
             if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; }
             else { reqBadge.style.display = 'none'; }
-
-            userInventory = data.inventory;
-            userCurrentSkin = data.skin;
-            renderShopItem();
+            userInventory = data.inventory; userCurrentSkin = data.skin; renderShopItem();
         }
     });
 }
@@ -148,11 +173,9 @@ window.showProfile = function(username) {
             document.getElementById('profile-regdate').innerText = new Date(p.regDate).toLocaleDateString('ru-RU');
 
             if (username === nameInput.value) {
-                document.getElementById('avatar-selector').style.display = 'block';
-                document.getElementById('btn-logout').style.display = 'block';
+                document.getElementById('avatar-selector').style.display = 'block'; document.getElementById('btn-logout').style.display = 'block';
             } else {
-                document.getElementById('avatar-selector').style.display = 'none';
-                document.getElementById('btn-logout').style.display = 'none';
+                document.getElementById('avatar-selector').style.display = 'none'; document.getElementById('btn-logout').style.display = 'none';
             }
             document.getElementById('profile-modal').style.display = 'flex';
         } else alert("Не удалось загрузить профиль");
@@ -161,17 +184,8 @@ window.showProfile = function(username) {
 
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
+document.getElementById('btn-logout').onclick = () => { if (confirm("Вы уверены, что хотите выйти из аккаунта?")) { localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass'); window.location.reload(); } };
 
-document.getElementById('btn-logout').onclick = () => {
-    if (confirm("Вы уверены, что хотите выйти из аккаунта?")) {
-        localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass');
-        window.location.reload(); 
-    }
-};
-
-// ==========================================
-// 🔥 ДРУЗЬЯ И ПРИГЛАШЕНИЯ
-// ==========================================
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -190,26 +204,14 @@ function loadFriendsData() {
         if (res.friends.length === 0) list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>";
         else {
             list.innerHTML = res.friends.map(f => `
-                <div class="friend-item">
-                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div>
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>
-                        <button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button>
-                        <button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button>
-                    </div>
-                </div>
-            `).join('');
+                <div class="friend-item"><div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div>
+                <div style="display:flex; gap:5px;"><button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button><button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button><button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button></div></div>`).join('');
         }
         const reqList = document.getElementById('requests-list');
         document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
         if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
         else {
-            reqList.innerHTML = res.requests.map(r => `
-                <div class="friend-item"><div class="friend-info">${r}</div><div>
-                <button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button>
-                <button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button>
-                </div></div>
-            `).join('');
+            reqList.innerHTML = res.requests.map(r => `<div class="friend-item"><div class="friend-info">${r}</div><div><button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button><button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button></div></div>`).join('');
         }
     });
 }
@@ -218,18 +220,13 @@ window.searchFriends = function() {
     socket.emit('searchUser', q, (res) => {
         const resBox = document.getElementById('search-results');
         if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
-        resBox.innerHTML = res.users.map(u => `
-            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div>
-            <div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
-            <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>
-        `).join('');
+        resBox.innerHTML = res.users.map(u => `<div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div><div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button><button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>`).join('');
     });
 };
 window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); };
 window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
 window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
 window.removeFriend = function(name) { if(confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
-
 window.inviteFriendToMatch = function(name) { socket.emit('inviteFriend', name, (res) => { alert(res.msg); }); };
 
 let currentInviter = "";
@@ -249,9 +246,6 @@ socket.on('forceStartGame', () => {
     document.getElementById('btn-in-game-quit').style.display = 'block';
 });
 
-// ==========================================
-// 🔥 ЛОГИКА МАГАЗИНА
-// ==========================================
 const shopItems = [
     { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
     { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 50, color: '#fb8500' },
@@ -262,48 +256,26 @@ const shopItems = [
 
 function renderShopItem() {
     const item = shopItems[shopIndex];
-    document.getElementById('shop-item-name').innerText = item.name;
-    document.getElementById('shop-item-boost').innerText = item.boost;
-    
-    const border = document.getElementById('shop-item-preview-border');
-    const img = document.getElementById('shop-item-preview');
-    const text = document.getElementById('shop-item-preview-text');
-    
+    document.getElementById('shop-item-name').innerText = item.name; document.getElementById('shop-item-boost').innerText = item.boost;
+    const border = document.getElementById('shop-item-preview-border'); const img = document.getElementById('shop-item-preview'); const text = document.getElementById('shop-item-preview-text');
     border.style.borderColor = item.color;
     
-    if (item.id === 'default') {
-        img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color;
-    } else {
-        img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff';
-    }
+    if (item.id === 'default') { img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color; } 
+    else { img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff'; }
 
-    const actionBtn = document.getElementById('btn-shop-action');
-    const priceText = document.getElementById('shop-item-price');
+    const actionBtn = document.getElementById('btn-shop-action'); const priceText = document.getElementById('shop-item-price');
 
-    if (userCurrentSkin === item.id) {
-        priceText.innerText = "Надето"; priceText.style.color = "#219ebc";
-        actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true;
-    } else if (userInventory.includes(item.id)) {
-        priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0";
-        actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false;
-        actionBtn.onclick = () => window.buySkin(item.id); 
-    } else {
-        priceText.innerText = item.price > 0 ? `${item.price} монет` : "Бесплатно"; priceText.style.color = "#fb8500";
-        actionBtn.innerText = "КУПИТЬ"; actionBtn.className = "btn btn-orange"; actionBtn.disabled = false;
-        actionBtn.onclick = () => window.buySkin(item.id);
-    }
+    if (userCurrentSkin === item.id) { priceText.innerText = "Надето"; priceText.style.color = "#219ebc"; actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true; } 
+    else if (userInventory.includes(item.id)) { priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0"; actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false; actionBtn.onclick = () => window.buySkin(item.id); } 
+    else { priceText.innerText = item.price > 0 ? `${item.price} монет` : "Бесплатно"; priceText.style.color = "#fb8500"; actionBtn.innerText = "КУПИТЬ"; actionBtn.className = "btn btn-orange"; actionBtn.disabled = false; actionBtn.onclick = () => window.buySkin(item.id); }
 }
 
 document.getElementById('btn-shop-prev').onclick = () => { shopIndex = (shopIndex - 1 + shopItems.length) % shopItems.length; document.getElementById('shop-error').innerText = ""; renderShopItem(); };
 document.getElementById('btn-shop-next').onclick = () => { shopIndex = (shopIndex + 1) % shopItems.length; document.getElementById('shop-error').innerText = ""; renderShopItem(); };
-
 window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => { if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } else { document.getElementById('shop-error').innerText = res.msg; } }); };
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
-// ==========================================
-// 🔥 КНОПКИ ИГРЫ
-// ==========================================
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); 
     document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
@@ -330,28 +302,28 @@ document.getElementById('btn-in-game-quit').onclick = () => {
     if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
     
     if (confirm(msg)) {
-        socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
+        socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = [];
         document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none';
         document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
     }
 };
 
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
-socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; });
+socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; activeEmojis = []; });
 
 socket.on('opponentLeft', () => {
-    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = [];
     document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none';
     document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
 });
 
 document.getElementById('btn-new-game').onclick = () => {
-    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = [];
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = [];
     document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none';
     document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('btn-cancel-search').style.display = 'block'; socket.emit('play'); 
 };
 document.getElementById('btn-leave-match').onclick = () => {
-    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = [];
+    socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = [];
     document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none';
     document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
 };
@@ -373,7 +345,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
 // ==========================================
-// 🔥 ИГРОВАЯ ЛОГИКА (ХОККЕЙ)
+// 🔥 ИГРОВАЯ ЛОГИКА (ХОККЕЙ И ЭМОДЗИ)
 // ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -381,6 +353,19 @@ let serverState = null; let clientState = null; let myRole = null;
 let hitCooldown = 0; let wallCooldown = 0;
 
 socket.on('role', role => myRole = role);
+
+// 🔥 ОТПРАВКА И ПРИЕМ ЭМОДЗИ
+window.sendEmoji = function(emoji) {
+    socket.emit('sendEmoji', emoji);
+};
+
+socket.on('showEmoji', (data) => {
+    playPop(); // Смешной звук
+    // Появляется над клюшкой игрока (Лево или Право)
+    let startX = data.role === 'p1' ? 150 : 650;
+    let startY = 200;
+    activeEmojis.push({ text: data.emoji, x: startX + (Math.random()*40 - 20), y: startY + (Math.random()*40 - 20), life: 1.0 });
+});
 
 socket.on('goalNotify', data => { 
     document.getElementById('goal-msg').textContent = data.msg; 
@@ -392,9 +377,7 @@ socket.on('goalNotify', data => {
         if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) { playGoalWin(); } 
         else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) { playGoalLose(); }
 
-        canvas.classList.add('shake');
-        setTimeout(() => canvas.classList.remove('shake'), 400);
-        spawnConfetti();
+        canvas.classList.add('shake'); setTimeout(() => canvas.classList.remove('shake'), 400); spawnConfetti();
     }
 });
 
@@ -402,11 +385,8 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // ГЕНЕРАЦИЯ ЛАПОК 🐾
     const renderPaws = (score, color) => {
-        const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-            <path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" />
-        </svg>`;
+        const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" /></svg>`;
         let html = '';
         for(let i = 0; i < 5; i++) {
             if(i < score) html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
@@ -420,8 +400,7 @@ socket.on('gameStateUpdate', s => {
     
     document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`; 
     document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
-    document.getElementById('n1').textContent = s.player1.name; 
-    document.getElementById('n2').textContent = s.player2.name;
+    document.getElementById('n1').textContent = s.player1.name; document.getElementById('n2').textContent = s.player2.name;
 
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
         document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
@@ -449,11 +428,8 @@ function sendInput(clientX, clientY) {
     
     const me = myRole === 'p1' ? 'player1' : 'player2';
     let pR = serverState[me].skin === 'karamelka' ? 43 : (serverState[me].skin === 'gonya' ? 28 : 35);
-    let minX = myRole === 'p1' ? pR : 400 + pR;
-    let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
-    
-    clientState[me].x = Math.min(maxX, Math.max(minX, x));
-    clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
+    let minX = myRole === 'p1' ? pR : 400 + pR; let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
+    clientState[me].x = Math.min(maxX, Math.max(minX, x)); clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
     socket.emit('input', { x, y });
 }
 
@@ -501,9 +477,7 @@ function render(s) {
     if (catImages['karamelka'].complete && catImages['karamelka'].naturalWidth > 0) ctx.drawImage(catImages['karamelka'], 400 - rCat, 200 - 35 - rCat, rCat*2, rCat*2);
     if (catImages['kompot'].complete && catImages['kompot'].naturalWidth > 0) ctx.drawImage(catImages['kompot'], 400 + 45 - rCat, 200 - rCat, rCat*2, rCat*2);
 
-    ctx.lineWidth = 12; 
-    ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170);
-    ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
+    ctx.lineWidth = 12; ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170); ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
 
     let px = s.puck.x; let py = s.puck.y;
     if (myRole && !serverState.paused && !serverState.gameOver) {
@@ -513,17 +487,12 @@ function render(s) {
         if (dist < pR + 22) { px = myPlayer.x + (dx/dist)*(pR+22); py = myPlayer.y + (dy/dist)*(pR+22); }
     }
 
-    if(!serverState.paused && !serverState.gameOver) {
-        puckTrail.push({x: px, y: py});
-        if(puckTrail.length > 10) puckTrail.shift(); 
-    } else { puckTrail = []; }
+    if(!serverState.paused && !serverState.gameOver) { puckTrail.push({x: px, y: py}); if(puckTrail.length > 10) puckTrail.shift(); } 
+    else { puckTrail = []; }
 
     ctx.save();
     for(let i=0; i<puckTrail.length; i++) {
-        ctx.beginPath();
-        ctx.arc(puckTrail[i].x, puckTrail[i].y, 22 * (i/puckTrail.length), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`; 
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(puckTrail[i].x, puckTrail[i].y, 22 * (i/puckTrail.length), 0, Math.PI * 2); ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`; ctx.fill();
     }
     ctx.restore();
 
@@ -536,14 +505,31 @@ function render(s) {
 
     if (confetti.length > 0) {
         confetti.forEach((c, index) => {
-            c.x += c.vx; c.y += c.vy; c.vy += 0.8; 
-            c.life -= 0.015; 
-            ctx.globalAlpha = Math.max(0, c.life);
-            ctx.fillStyle = c.color;
-            ctx.fillRect(c.x, c.y, c.size, c.size);
+            c.x += c.vx; c.y += c.vy; c.vy += 0.8; c.life -= 0.015; 
+            ctx.globalAlpha = Math.max(0, c.life); ctx.fillStyle = c.color; ctx.fillRect(c.x, c.y, c.size, c.size);
             if (c.life <= 0) confetti.splice(index, 1);
         });
         ctx.globalAlpha = 1.0;
+    }
+
+    // 🔥 РИСУЕМ ЛЕТЯЩИЕ ЭМОДЗИ
+    if (activeEmojis.length > 0) {
+        activeEmojis.forEach((em, index) => {
+            em.y -= 1.5; // Эмодзи летит вверх
+            em.life -= 0.015; // Эмодзи плавно исчезавает
+            
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, em.life);
+            ctx.font = '50px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Небольшая тень для красоты
+            ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 5;
+            ctx.fillText(em.text, em.x, em.y);
+            ctx.restore();
+            
+            if (em.life <= 0) activeEmojis.splice(index, 1);
+        });
     }
 }
 
@@ -560,17 +546,12 @@ function loop() {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;
 
-            if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) { 
-                playWall(); wallCooldown = 15; 
-            }
+            if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) { playWall(); wallCooldown = 15; }
 
             const checkHit = (p) => {
                 let r = serverState[p].skin === 'karamelka' ? 43 : (serverState[p].skin === 'gonya' ? 28 : 35);
-                let dx = clientState.puck.x - clientState[p].x;
-                let dy = clientState.puck.y - clientState[p].y;
-                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 4 && hitCooldown === 0) { 
-                    playHit(); hitCooldown = 15; 
-                }
+                let dx = clientState.puck.x - clientState[p].x; let dy = clientState.puck.y - clientState[p].y;
+                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 4 && hitCooldown === 0) { playHit(); hitCooldown = 15; }
             };
             checkHit('player1'); checkHit('player2');
         }
