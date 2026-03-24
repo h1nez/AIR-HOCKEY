@@ -28,16 +28,6 @@
         
         #auth-error { color: #e63946; margin-top: 15px; font-size: 16px; min-height: 20px; font-weight: bold; }
 
-        .p1-info { color: #1d3557; display: flex; flex-direction: column; align-items: flex-start; }
-        .p2-info { color: #9d0208; display: flex; flex-direction: column; align-items: flex-end; }
-        .mmr { font-size: 16px; color: #555; font-weight: normal; display: flex; align-items: center; }
-        
-        .shop-item { background: #fdfdfd; padding: 10px; border-radius: 20px; margin: 5px; width: 140px; display: inline-block; cursor: pointer; transition: 0.2s; border: 4px solid #eee; vertical-align: top; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .shop-item:hover { transform: scale(1.05); border-color: #ffd166; }
-        .shop-item.equipped { border-color: #06d6a0; background: #eafff5; }
-        .shop-item h3 { margin: 5px 0; font-size: 20px; color: #333; }
-        .shop-item .boost { font-size: 13px; color: #023047; min-height: 35px; display: block; margin-bottom: 5px; font-style: italic; }
-
         .tabs { display: flex; margin-bottom: 15px; gap: 5px; }
         .tab-btn { flex: 1; padding: 10px; background: #eee; border: 3px solid #ccc; border-bottom: none; cursor: pointer; font-weight: bold; border-radius: 15px 15px 0 0; font-size: 16px; font-family: inherit; }
         .tab-btn.active { background: #ffb703; color: white; border-color: #ffb703; }
@@ -66,7 +56,7 @@
         }
         .shake { animation: shake 0.4s; }
 
-        /* 🔥 СТИЛИ ЗНАЧКОВ FACEIT */
+        /* 🔥 СТИЛИ ЗНАЧКОВ УРОВНЕЙ */
         .lvl-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-weight: 900; font-size: 13px; margin: 0 6px; vertical-align: middle; color: white; text-shadow: 1px 1px 0px rgba(0,0,0,0.5); box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid rgba(0,0,0,0.8); font-family: Arial, sans-serif; }
         .lvl-1 { background: #eeeeee; color: #333; text-shadow: none; }
         .lvl-2, .lvl-3 { background: #16e536; }
@@ -74,6 +64,8 @@
         .lvl-7, .lvl-8 { background: #ff9900; }
         .lvl-9 { background: #ff3300; }
         .lvl-10 { background: #ff0000; }
+        
+        #game-container canvas { width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none; }
     </style>
 </head>
 <body>
@@ -175,26 +167,27 @@
     </div>
 
     <div id="shop-modal" class="overlay" style="display: none;">
-        <div class="modal-box" style="max-width: 600px; overflow-y: auto; max-height: 90vh;">
+        <div class="modal-box" style="max-width: 400px; width: 90%;">
             <h2>🛒 Магазин Способностей</h2>
             <div id="shop-coins" style="color: #ffb703; margin-bottom: 20px; font-size: 24px; font-weight: bold;">Ваши монеты: 0</div>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center;">
-                <div class="shop-item" onclick="buySkin('default')" id="skin-default">
-                    <h3>Обычный</h3><span class="boost">Нет бонусов</span><p id="price-default" style="color: #888; margin:0; font-weight:bold;">Бесплатно</p>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <button id="btn-shop-prev" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&lt;</button>
+                <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+                    <h3 id="shop-item-name" style="margin: 0 0 10px 0; font-size: 28px; color: #333; text-transform: uppercase;">Обычный</h3>
+                    
+                    <div id="shop-item-preview-border" style="width: 130px; height: 130px; border-radius: 50%; border: 6px solid #4da6ff; background: #f4faff; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; box-shadow: 0 6px 15px rgba(0,0,0,0.15); transition: 0.3s;">
+                        <img id="shop-item-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                        <span id="shop-item-preview-text" style="font-size: 24px; font-weight: bold; color: white; display: none;">БАЗА</span>
+                    </div>
+
+                    <span id="shop-item-boost" style="font-size: 16px; color: #023047; font-style: italic; min-height: 24px; font-weight: bold;">Нет бонусов</span>
+                    <p id="shop-item-price" style="font-size: 22px; font-weight: bold; color: #fb8500; margin: 10px 0;">Бесплатно</p>
+                    <button id="btn-shop-action" class="btn btn-orange" style="width: 90%; padding: 15px; font-size: 18px;">КУПИТЬ</button>
                 </div>
-                <div class="shop-item" onclick="buySkin('korzhik')" id="skin-korzhik">
-                    <h3>Коржик</h3><span class="boost">Сильный удар</span><p id="price-korzhik" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
-                </div>
-                <div class="shop-item" onclick="buySkin('karamelka')" id="skin-karamelka">
-                    <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
-                </div>
-                <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
-                </div>
-                <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
-                    <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
-                </div>
+                <button id="btn-shop-next" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&gt;</button>
             </div>
+            
             <div id="shop-error" style="color: #e63946; margin: 10px 0; min-height: 20px; font-weight: bold;"></div>
             <button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button>
         </div>

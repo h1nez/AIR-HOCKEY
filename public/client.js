@@ -1,11 +1,12 @@
 const socket = io();
 
-// Картинки
+// ==========================================
+// 🔥 ГРАФИКА И ЗВУКИ
+// ==========================================
 const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': new Image(), 'gonya': new Image() };
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 
-// АУДИО ДВИЖОК
 const sndHit = new Audio('/hit.mp3');
 const sndWall = new Audio('/wall.mp3');
 const sndGoalWin = new Audio('/goal_win.mp3');
@@ -23,16 +24,17 @@ function playWall() { playSound(sndWall); }
 function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
-// ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
+// ==========================================
+// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
+// ==========================================
 let puckTrail = []; 
 let confetti = [];  
 
-// 🔥 ФУНКЦИЯ: РАСЧЕТ УРОВНЯ FACEIT ПО ЭЛО
 function getLvlHtml(elo) {
     let lvl = 1, cls = 'lvl-1';
     if (elo >= 800 && elo < 900) { lvl = 2; cls = 'lvl-2'; }
     else if (elo >= 900 && elo < 1000) { lvl = 3; cls = 'lvl-3'; }
-    else if (elo >= 1000 && elo < 1100) { lvl = 4; cls = 'lvl-4'; } // Базовый 1000 ЭЛО = 4 лвл
+    else if (elo >= 1000 && elo < 1100) { lvl = 4; cls = 'lvl-4'; } 
     else if (elo >= 1100 && elo < 1200) { lvl = 5; cls = 'lvl-5'; }
     else if (elo >= 1200 && elo < 1300) { lvl = 6; cls = 'lvl-6'; }
     else if (elo >= 1300 && elo < 1400) { lvl = 7; cls = 'lvl-7'; }
@@ -53,7 +55,9 @@ function spawnConfetti() {
     }
 }
 
-// ЛОГИКА МЕНЮ
+// ==========================================
+// 🔥 АВТОРИЗАЦИЯ
+// ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -98,6 +102,13 @@ function handleAuthResponse(res) {
     } else { authScreen.style.display = 'flex'; authError.innerText = res.msg; }
 }
 
+// ==========================================
+// 🔥 ПРОФИЛЬ
+// ==========================================
+let userInventory = ['default'];
+let userCurrentSkin = 'default';
+let shopIndex = 0;
+
 function updateProfile() {
     socket.emit('getProfile', (data) => {
         if (data.success) {
@@ -107,18 +118,13 @@ function updateProfile() {
             if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; }
             else { reqBadge.style.display = 'none'; }
 
-            ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'].forEach(skin => {
-                const el = document.getElementById('skin-' + skin);
-                const priceEl = document.getElementById('price-' + skin);
-                el.classList.remove('equipped');
-                if (data.inventory.includes(skin)) { priceEl.innerText = "Куплено"; priceEl.style.color = "#06d6a0"; }
-                if (data.skin === skin) { el.classList.add('equipped'); priceEl.innerText = "Надето"; priceEl.style.color = "#219ebc"; }
-            });
+            userInventory = data.inventory;
+            userCurrentSkin = data.skin;
+            renderShopItem();
         }
     });
 }
 
-// ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
@@ -130,7 +136,6 @@ window.showProfile = function(username) {
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
 
-            // 🔥 ВСТАВЛЯЕМ УРОВНИ И ЭЛО
             document.getElementById('profile-mmr').innerHTML = `${getLvlHtml(p.rating)} ${p.rating}`;
             document.getElementById('profile-max-mmr').innerHTML = `${getLvlHtml(p.maxRating || 1000)} ${p.maxRating || 1000}`;
             document.getElementById('profile-min-mmr').innerHTML = `${getLvlHtml(p.minRating || 1000)} ${p.minRating || 1000}`;
@@ -138,11 +143,9 @@ window.showProfile = function(username) {
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
-            
             let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
             document.getElementById('profile-winrate').innerText = winrate + '%';
-            const date = new Date(p.regDate);
-            document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
+            document.getElementById('profile-regdate').innerText = new Date(p.regDate).toLocaleDateString('ru-RU');
 
             if (username === nameInput.value) {
                 document.getElementById('avatar-selector').style.display = 'block';
@@ -155,6 +158,7 @@ window.showProfile = function(username) {
         } else alert("Не удалось загрузить профиль");
     });
 };
+
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
@@ -165,7 +169,9 @@ document.getElementById('btn-logout').onclick = () => {
     }
 };
 
-// ДРУЗЬЯ
+// ==========================================
+// 🔥 ДРУЗЬЯ И ПРИГЛАШЕНИЯ
+// ==========================================
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -235,6 +241,7 @@ socket.on('incomingInvite', (senderName) => {
 document.getElementById('btn-accept-invite').onclick = () => { socket.emit('acceptInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
 document.getElementById('btn-decline-invite').onclick = () => { socket.emit('declineInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
 socket.on('inviteDeclined', (name) => { alert(`Игрок ${name} отклонил приглашение.`); });
+
 socket.on('forceStartGame', () => {
     document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
@@ -242,12 +249,61 @@ socket.on('forceStartGame', () => {
     document.getElementById('btn-in-game-quit').style.display = 'block';
 });
 
-// МАГАЗИН
+// ==========================================
+// 🔥 ЛОГИКА МАГАЗИНА
+// ==========================================
+const shopItems = [
+    { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
+    { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 50, color: '#fb8500' },
+    { id: 'karamelka', name: 'Карамелька', boost: 'Большая клюшка', price: 50, color: '#e63946' },
+    { id: 'kompot', name: 'Компот', boost: 'Супер-скорость шайбы', price: 50, color: '#06d6a0' },
+    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 75, color: '#8338ec' }
+];
+
+function renderShopItem() {
+    const item = shopItems[shopIndex];
+    document.getElementById('shop-item-name').innerText = item.name;
+    document.getElementById('shop-item-boost').innerText = item.boost;
+    
+    const border = document.getElementById('shop-item-preview-border');
+    const img = document.getElementById('shop-item-preview');
+    const text = document.getElementById('shop-item-preview-text');
+    
+    border.style.borderColor = item.color;
+    
+    if (item.id === 'default') {
+        img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color;
+    } else {
+        img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff';
+    }
+
+    const actionBtn = document.getElementById('btn-shop-action');
+    const priceText = document.getElementById('shop-item-price');
+
+    if (userCurrentSkin === item.id) {
+        priceText.innerText = "Надето"; priceText.style.color = "#219ebc";
+        actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true;
+    } else if (userInventory.includes(item.id)) {
+        priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0";
+        actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false;
+        actionBtn.onclick = () => window.buySkin(item.id); 
+    } else {
+        priceText.innerText = item.price > 0 ? `${item.price} монет` : "Бесплатно"; priceText.style.color = "#fb8500";
+        actionBtn.innerText = "КУПИТЬ"; actionBtn.className = "btn btn-orange"; actionBtn.disabled = false;
+        actionBtn.onclick = () => window.buySkin(item.id);
+    }
+}
+
+document.getElementById('btn-shop-prev').onclick = () => { shopIndex = (shopIndex - 1 + shopItems.length) % shopItems.length; document.getElementById('shop-error').innerText = ""; renderShopItem(); };
+document.getElementById('btn-shop-next').onclick = () => { shopIndex = (shopIndex + 1) % shopItems.length; document.getElementById('shop-error').innerText = ""; renderShopItem(); };
+
 window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => { if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } else { document.getElementById('shop-error').innerText = res.msg; } }); };
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
-// КНОПКИ ИГРЫ
+// ==========================================
+// 🔥 КНОПКИ ИГРЫ
+// ==========================================
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); 
     document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
@@ -308,7 +364,6 @@ document.getElementById('btn-leaderboard').onclick = () => {
             const list = document.getElementById('leaderboard-list'); list.innerHTML = ''; 
             res.leaderboard.forEach(user => {
                 const li = document.createElement('li'); li.style.margin = "8px 0";
-                // 🔥 УРОВНИ В ЛИДЕРБОРДЕ
                 li.innerHTML = `<b>${user.name}</b> — ЭЛО: ${getLvlHtml(user.rating)} ${user.rating}`; list.appendChild(li);
             });
             document.getElementById('leaderboard-modal').style.display = 'flex';
@@ -317,7 +372,9 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// ИГРОВАЯ ЛОГИКА
+// ==========================================
+// 🔥 ИГРОВАЯ ЛОГИКА (ХОККЕЙ)
+// ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -345,6 +402,7 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
+    // ГЕНЕРАЦИЯ ЛАПОК 🐾
     const renderPaws = (score, color) => {
         const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
             <path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" />
@@ -360,7 +418,6 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); 
     document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
     
-    // 🔥 ЭЛО СО ЗНАЧКОМ УРОВНЯ В ИГРЕ
     document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`; 
     document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
     document.getElementById('n1').textContent = s.player1.name; 
