@@ -23,9 +23,24 @@ function playWall() { playSound(sndWall); }
 function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
-// ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
+// ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
 let puckTrail = []; 
 let confetti = [];  
+
+// 🔥 ФУНКЦИЯ: РАСЧЕТ УРОВНЯ FACEIT ПО ЭЛО
+function getLvlHtml(elo) {
+    let lvl = 1, cls = 'lvl-1';
+    if (elo >= 800 && elo < 900) { lvl = 2; cls = 'lvl-2'; }
+    else if (elo >= 900 && elo < 1000) { lvl = 3; cls = 'lvl-3'; }
+    else if (elo >= 1000 && elo < 1100) { lvl = 4; cls = 'lvl-4'; } // Базовый 1000 ЭЛО = 4 лвл
+    else if (elo >= 1100 && elo < 1200) { lvl = 5; cls = 'lvl-5'; }
+    else if (elo >= 1200 && elo < 1300) { lvl = 6; cls = 'lvl-6'; }
+    else if (elo >= 1300 && elo < 1400) { lvl = 7; cls = 'lvl-7'; }
+    else if (elo >= 1400 && elo < 1500) { lvl = 8; cls = 'lvl-8'; }
+    else if (elo >= 1500 && elo < 1600) { lvl = 9; cls = 'lvl-9'; }
+    else if (elo >= 1600) { lvl = 10; cls = 'lvl-10'; }
+    return `<span class="lvl-badge ${cls}">${lvl}</span>`;
+}
 
 function spawnConfetti() {
     for(let i = 0; i < 100; i++) {
@@ -53,7 +68,6 @@ const savedPass = localStorage.getItem('ah_pass');
 if (savedName && savedPass) {
     nameInput.value = savedName; passInput.value = savedPass;
     authError.innerText = "Автоматический вход..."; authError.style.color = "#4da6ff";
-    
     const doAutoLogin = () => { socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse); };
     if (socket.connected) { doAutoLogin(); } else { socket.on('connect', doAutoLogin); }
 }
@@ -89,7 +103,6 @@ function updateProfile() {
         if (data.success) {
             document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
-            
             const reqBadge = document.getElementById('req-badge');
             if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; }
             else { reqBadge.style.display = 'none'; }
@@ -117,9 +130,11 @@ window.showProfile = function(username) {
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
 
-            document.getElementById('profile-mmr').innerText = p.rating;
-            document.getElementById('profile-max-mmr').innerText = p.maxRating || 1000;
-            document.getElementById('profile-min-mmr').innerText = p.minRating || 1000;
+            // 🔥 ВСТАВЛЯЕМ УРОВНИ И ЭЛО
+            document.getElementById('profile-mmr').innerHTML = `${getLvlHtml(p.rating)} ${p.rating}`;
+            document.getElementById('profile-max-mmr').innerHTML = `${getLvlHtml(p.maxRating || 1000)} ${p.maxRating || 1000}`;
+            document.getElementById('profile-min-mmr').innerHTML = `${getLvlHtml(p.minRating || 1000)} ${p.minRating || 1000}`;
+            
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
@@ -170,7 +185,7 @@ function loadFriendsData() {
         else {
             list.innerHTML = res.friends.map(f => `
                 <div class="friend-item">
-                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${f.rating}</span></div>
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div>
                     <div style="display:flex; gap:5px;">
                         <button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>
                         <button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button>
@@ -198,7 +213,7 @@ window.searchFriends = function() {
         const resBox = document.getElementById('search-results');
         if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
         resBox.innerHTML = res.users.map(u => `
-            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${u.rating})</span></div>
+            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div>
             <div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
             <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>
         `).join('');
@@ -293,7 +308,8 @@ document.getElementById('btn-leaderboard').onclick = () => {
             const list = document.getElementById('leaderboard-list'); list.innerHTML = ''; 
             res.leaderboard.forEach(user => {
                 const li = document.createElement('li'); li.style.margin = "8px 0";
-                li.innerHTML = `<b>${user.name}</b> — ЭЛО: ${user.rating}`; list.appendChild(li);
+                // 🔥 УРОВНИ В ЛИДЕРБОРДЕ
+                li.innerHTML = `<b>${user.name}</b> — ЭЛО: ${getLvlHtml(user.rating)} ${user.rating}`; list.appendChild(li);
             });
             document.getElementById('leaderboard-modal').style.display = 'flex';
         }
@@ -301,7 +317,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// ИГРОВАЯ ЛОГИКА И ЭФФЕКТЫ
+// ИГРОВАЯ ЛОГИКА
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -316,12 +332,8 @@ socket.on('goalNotify', data => {
     if(data.msg) {
         const myName = nameInput.value;
         const msgStr = data.msg;
-        
-        if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) {
-            playGoalWin(); 
-        } else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) {
-            playGoalLose(); 
-        }
+        if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) { playGoalWin(); } 
+        else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) { playGoalLose(); }
 
         canvas.classList.add('shake');
         setTimeout(() => canvas.classList.remove('shake'), 400);
@@ -337,14 +349,10 @@ socket.on('gameStateUpdate', s => {
         const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
             <path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" />
         </svg>`;
-        
         let html = '';
         for(let i = 0; i < 5; i++) {
-            if(i < score) {
-                html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
-            } else {
-                html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`;
-            }
+            if(i < score) html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
+            else html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`;
         }
         return html;
     };
@@ -352,8 +360,9 @@ socket.on('gameStateUpdate', s => {
     document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); 
     document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
     
-    document.getElementById('r1').textContent = `(ЭЛО: ${Math.round(s.player1.rating)})`; 
-    document.getElementById('r2').textContent = `(ЭЛО: ${Math.round(s.player2.rating)})`;
+    // 🔥 ЭЛО СО ЗНАЧКОМ УРОВНЯ В ИГРЕ
+    document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`; 
+    document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
     document.getElementById('n1').textContent = s.player1.name; 
     document.getElementById('n2').textContent = s.player2.name;
 

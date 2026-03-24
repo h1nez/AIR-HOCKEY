@@ -30,7 +30,7 @@
 
         .p1-info { color: #1d3557; display: flex; flex-direction: column; align-items: flex-start; }
         .p2-info { color: #9d0208; display: flex; flex-direction: column; align-items: flex-end; }
-        .mmr { font-size: 16px; color: #555; font-weight: normal; }
+        .mmr { font-size: 16px; color: #555; font-weight: normal; display: flex; align-items: center; }
         
         .shop-item { background: #fdfdfd; padding: 10px; border-radius: 20px; margin: 5px; width: 140px; display: inline-block; cursor: pointer; transition: 0.2s; border: 4px solid #eee; vertical-align: top; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .shop-item:hover { transform: scale(1.05); border-color: #ffd166; }
@@ -46,7 +46,7 @@
         
         .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 2px dashed #eee; }
         .friend-info { font-size: 18px; font-weight: bold; color: #333; }
-        .friend-mmr { font-size: 14px; color: #888; font-weight: normal; }
+        .friend-mmr { font-size: 14px; color: #888; font-weight: normal; display: flex; align-items: center; margin-top: 4px; }
 
         .avatar-opt { transition: 0.2s; border: 4px solid transparent; border-radius: 50%; cursor: pointer; width: 65px; height: 65px; object-fit: cover; }
         .avatar-opt:hover { transform: scale(1.1); border-color: #8ecae6; }
@@ -65,6 +65,15 @@
             100% { transform: translate(1px, -4px) rotate(-1deg); }
         }
         .shake { animation: shake 0.4s; }
+
+        /* 🔥 СТИЛИ ЗНАЧКОВ FACEIT */
+        .lvl-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-weight: 900; font-size: 13px; margin: 0 6px; vertical-align: middle; color: white; text-shadow: 1px 1px 0px rgba(0,0,0,0.5); box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid rgba(0,0,0,0.8); font-family: Arial, sans-serif; }
+        .lvl-1 { background: #eeeeee; color: #333; text-shadow: none; }
+        .lvl-2, .lvl-3 { background: #16e536; }
+        .lvl-4, .lvl-5, .lvl-6 { background: #ffcc00; color: #333; text-shadow: none; }
+        .lvl-7, .lvl-8 { background: #ff9900; }
+        .lvl-9 { background: #ff3300; }
+        .lvl-10 { background: #ff0000; }
     </style>
 </head>
 <body>
@@ -113,9 +122,9 @@
             </div>
 
             <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 20px; font-size: 18px; font-weight:bold; color: #555;">
-                <div>🏆 Текущее ЭЛО: <b id="profile-mmr" style="color: #fb8500;">1000</b></div>
-                <div style="margin: 5px 0;">📈 Макс. ЭЛО: <b id="profile-max-mmr" style="color: #06d6a0;">1000</b></div>
-                <div>📉 Мин. ЭЛО: <b id="profile-min-mmr" style="color: #e63946;">1000</b></div>
+                <div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
+                <div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
+                <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
                 <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
             </div>
 
@@ -209,8 +218,8 @@
         
         <div style="width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                <div style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff;">
-                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555;">(ЭЛО: 1000)</span>
+                <div style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
+                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-left: 5px;"></span>
                 </div>
                 <div id="s1" style="display: flex; gap: 8px; margin-top: 5px;"></div>
             </div>
@@ -237,8 +246,8 @@
         <div style="width: 100%; max-width: 800px; display: flex; justify-content: flex-end; align-items: flex-start; margin-top: 10px;">
             <div style="display: flex; flex-direction: column; align-items: flex-end;">
                 <div id="s2" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div>
-                <div style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff;">
-                    <span id="r2" style="font-size: 16px; color: #555;">(ЭЛО: 1000)</span> <span id="n2">Игрок 2</span> 
+                <div style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
+                    <span id="r2" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-right: 5px;"></span> <span id="n2">Игрок 2</span> 
                 </div>
             </div>
         </div>
