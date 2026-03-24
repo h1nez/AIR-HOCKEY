@@ -75,8 +75,7 @@ function getLvlHtml(elo) {
 function spawnConfetti() {
     for (let i = 0; i < 100; i++) {
         confetti.push({
-            x: 400,
-            y: 200,
+            x: 400, y: 200,
             vx: (Math.random() - 0.5) * 25,
             vy: (Math.random() - 0.5) * 25,
             color: `hsl(${Math.random() * 360}, 100%, 50%)`,
@@ -85,6 +84,21 @@ function spawnConfetti() {
         });
     }
 }
+
+// ==========================================
+// 🔥 ДАННЫЕ МАГАЗИНА (Должны быть сверху!)
+// ==========================================
+let userInventory = ['default'];
+let userCurrentSkin = 'default';
+let shopIndex = 0;
+
+const shopItems = [
+    { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
+    { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 50, color: '#fb8500' },
+    { id: 'karamelka', name: 'Карамелька', boost: 'Супер-скорость', price: 50, color: '#e63946' },
+    { id: 'kompot', name: 'Компот', boost: 'Большая клюшка', price: 50, color: '#06d6a0' },
+    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 75, color: '#8338ec' }
+];
 
 // ==========================================
 // 🔥 АВТОРИЗАЦИЯ
@@ -203,10 +217,6 @@ socket.on('chatMessage', (data) => {
 // ==========================================
 // 🔥 ПРОФИЛЬ И АДМИН-ПАНЕЛЬ
 // ==========================================
-let userInventory = ['default'];
-let userCurrentSkin = 'default';
-let shopIndex = 0;
-
 function updateProfile() {
     socket.emit('getProfile', (data) => {
         if (data.success) {
@@ -238,6 +248,7 @@ function updateProfile() {
     });
 }
 
+// Функционал Админки
 document.getElementById('btn-admin').onclick = () => {
     loadAdminUsers();
     document.getElementById('admin-modal').style.display = 'flex';
@@ -287,6 +298,7 @@ window.adminAction = function(targetName, action) {
     });
 };
 
+// Функционал Профиля
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
@@ -628,7 +640,6 @@ window.rejectClanInvite = function(clanName) {
     });
 };
 
-
 // ==========================================
 // 🔥 ДРУЗЬЯ И ЗРИТЕЛИ
 // ==========================================
@@ -764,14 +775,6 @@ socket.on('forceStartGame', () => {
 // ==========================================
 // 🔥 МАГАЗИН СКИНОВ
 // ==========================================
-const shopItems = [
-    { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
-    { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 50, color: '#fb8500' },
-    { id: 'karamelka', name: 'Карамелька', boost: 'Супер-скорость', price: 50, color: '#e63946' },
-    { id: 'kompot', name: 'Компот', boost: 'Большая клюшка', price: 50, color: '#06d6a0' },
-    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 75, color: '#8338ec' }
-];
-
 function renderShopItem() {
     const item = shopItems[shopIndex];
     document.getElementById('shop-item-name').innerText = item.name;
@@ -1037,7 +1040,6 @@ socket.on('showEmoji', (data) => {
     } else if (data.role === 'p2') {
         startX = 650;
     } else {
-        // Эмодзи зрителя падают сверху по центру!
         startX = 400;
         startY = 50;
     }
@@ -1122,7 +1124,7 @@ function sendInput(clientX, clientY) {
     
     const me = myRole === 'p1' ? 'player1' : 'player2';
     
-    // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ (Локальная обработка)
+    // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ
     let pR = serverState[me].skin === 'kompot' ? 43 : (serverState[me].skin === 'gonya' ? 28 : 35);
     
     let minX = myRole === 'p1' ? pR : 400 + pR;
