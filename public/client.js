@@ -5,9 +5,7 @@ const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': 
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 
-// ==========================================
-// 🔥 АУДИО ДВИЖОК (КАСТОМНЫЕ ЗВУКИ ИЗ ФАЙЛОВ)
-// ==========================================
+// АУДИО ДВИЖОК
 const sndHit = new Audio('/hit.mp3');
 const sndWall = new Audio('/wall.mp3');
 const sndGoalWin = new Audio('/goal_win.mp3');
@@ -25,9 +23,7 @@ function playWall() { playSound(sndWall); }
 function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
-// ==========================================
 // ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
-// ==========================================
 let puckTrail = []; 
 let confetti = [];  
 
@@ -42,9 +38,7 @@ function spawnConfetti() {
     }
 }
 
-// ==========================================
 // ЛОГИКА МЕНЮ
-// ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -118,6 +112,7 @@ window.showProfile = function(username) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
             document.getElementById('profile-name').innerText = p.name;
+            
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
@@ -128,6 +123,7 @@ window.showProfile = function(username) {
             document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
             document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
             document.getElementById('profile-won').innerText = p.gamesWon || 0;
+            
             let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
             document.getElementById('profile-winrate').innerText = winrate + '%';
             const date = new Date(p.regDate);
@@ -174,7 +170,7 @@ function loadFriendsData() {
         else {
             list.innerHTML = res.friends.map(f => `
                 <div class="friend-item">
-                    <div class="friend-info">${f.name} <br><span class="friend-mmr">MMR: ${f.rating}</span></div>
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${f.rating}</span></div>
                     <div style="display:flex; gap:5px;">
                         <button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>
                         <button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button>
@@ -202,7 +198,7 @@ window.searchFriends = function() {
         const resBox = document.getElementById('search-results');
         if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
         resBox.innerHTML = res.users.map(u => `
-            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(MMR: ${u.rating})</span></div>
+            <div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${u.rating})</span></div>
             <div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button>
             <button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>
         `).join('');
@@ -258,7 +254,7 @@ document.getElementById('btn-in-game-quit').onclick = () => {
     if (!serverState) return;
     const isBot = serverState.isBotMatch;
     const isFriendly = serverState.isFriendly;
-    let msg = "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снят MMR!";
+    let msg = "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снято ЭЛО!";
     if (isBot) msg = "Вы уверены, что хотите прервать тренировку?";
     if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
     
@@ -297,7 +293,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
             const list = document.getElementById('leaderboard-list'); list.innerHTML = ''; 
             res.leaderboard.forEach(user => {
                 const li = document.createElement('li'); li.style.margin = "8px 0";
-                li.innerHTML = `<b>${user.name}</b> — MMR: ${user.rating}`; list.appendChild(li);
+                li.innerHTML = `<b>${user.name}</b> — ЭЛО: ${user.rating}`; list.appendChild(li);
             });
             document.getElementById('leaderboard-modal').style.display = 'flex';
         }
@@ -305,9 +301,7 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// ==========================================
-// 🔥 ИГРОВАЯ ЛОГИКА
-// ==========================================
+// ИГРОВАЯ ЛОГИКА И ЭФФЕКТЫ
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -315,7 +309,6 @@ let hitCooldown = 0; let wallCooldown = 0;
 
 socket.on('role', role => myRole = role);
 
-// Обработка голов и умный выбор звука
 socket.on('goalNotify', data => { 
     document.getElementById('goal-msg').textContent = data.msg; 
     document.getElementById('goal-msg').style.color = data.color; 
@@ -340,9 +333,7 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // 🔥 ГЕНЕРАТОР ОДИНОЧНЫХ ВЕКТОРНЫХ ЛАПОК (ИДЕАЛЬНАЯ ЛАПКА)
     const renderPaws = (score, color) => {
-        // Красивая и правильная кошачья лапка
         const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
             <path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" />
         </svg>`;
@@ -350,22 +341,19 @@ socket.on('gameStateUpdate', s => {
         let html = '';
         for(let i = 0; i < 5; i++) {
             if(i < score) {
-                // Яркая цветная лапка с тенью
                 html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
             } else {
-                // Серая полупрозрачная пустая лапка
                 html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`;
             }
         }
         return html;
     };
 
-    // Передаем цвета: Игрок 1 — синий, Игрок 2 — красный
     document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); 
     document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
     
-    document.getElementById('r1').textContent = `(MMR: ${Math.round(s.player1.rating)})`; 
-    document.getElementById('r2').textContent = `(MMR: ${Math.round(s.player2.rating)})`;
+    document.getElementById('r1').textContent = `(ЭЛО: ${Math.round(s.player1.rating)})`; 
+    document.getElementById('r2').textContent = `(ЭЛО: ${Math.round(s.player2.rating)})`;
     document.getElementById('n1').textContent = s.player1.name; 
     document.getElementById('n2').textContent = s.player2.name;
 
@@ -386,7 +374,6 @@ socket.on('gameStateUpdate', s => {
         clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
     }
 });
-
 
 function sendInput(clientX, clientY) {
     if (!myRole || !clientState || !serverState || serverState.paused || serverState.gameOver) return;
@@ -503,7 +490,6 @@ function loop() {
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
         
-        // ПРОСЛУШКА УДАРОВ
         if (!serverState.paused && !serverState.gameOver) {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;

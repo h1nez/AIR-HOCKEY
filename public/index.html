@@ -51,11 +51,6 @@
         .avatar-opt { transition: 0.2s; border: 4px solid transparent; border-radius: 50%; cursor: pointer; width: 65px; height: 65px; object-fit: cover; }
         .avatar-opt:hover { transform: scale(1.1); border-color: #8ecae6; }
 
-        #game-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #ui { display: flex; justify-content: space-between; width: 100%; max-width: 800px; padding: 10px 15px; box-sizing: border-box; font-size: 24px; font-weight: bold; }
-        #game-container { position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1; }
-        canvas { width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none; }
-
         @keyframes shake {
             0% { transform: translate(1px, 1px) rotate(0deg); }
             10% { transform: translate(-3px, -4px) rotate(-1deg); }
@@ -118,9 +113,9 @@
             </div>
 
             <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 20px; font-size: 18px; font-weight:bold; color: #555;">
-                <div>🏆 Текущий MMR: <b id="profile-mmr" style="color: #fb8500;">1000</b></div>
-                <div style="margin: 5px 0;">📈 Макс. MMR: <b id="profile-max-mmr" style="color: #06d6a0;">1000</b></div>
-                <div>📉 Мин. MMR: <b id="profile-min-mmr" style="color: #e63946;">1000</b></div>
+                <div>🏆 Текущее ЭЛО: <b id="profile-mmr" style="color: #fb8500;">1000</b></div>
+                <div style="margin: 5px 0;">📈 Макс. ЭЛО: <b id="profile-max-mmr" style="color: #06d6a0;">1000</b></div>
+                <div>📉 Мин. ЭЛО: <b id="profile-min-mmr" style="color: #e63946;">1000</b></div>
                 <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
             </div>
 
@@ -185,7 +180,7 @@
                     <h3>Карамелька</h3><span class="boost">Большая клюшка</span><p id="price-karamelka" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('kompot')" id="skin-kompot">
-                    <h3>Компот</h3><span class="boost">Супер-скорость шайбы</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
+                    <h3>Компот</h3><span class="boost">Супер-скорость</span><p id="price-kompot" style="color: #fb8500; margin:0; font-weight:bold;">50 монет</p>
                 </div>
                 <div class="shop-item" onclick="buySkin('gonya')" id="skin-gonya" style="border-color: #8338ec;">
                     <h3>Гоня 👽</h3><span class="boost">Меткий и бешеный!</span><p id="price-gonya" style="color: #fb8500; margin:0; font-weight:bold;">75 монет</p>
@@ -201,7 +196,7 @@
             <h2 style="color: #06d6a0; font-size: 36px; margin-bottom: 5px;">⚔️ ВЫЗОВ!</h2>
             <div style="font-size: 20px; margin-bottom: 25px; color: #555; font-weight: bold;">
                 Игрок <span id="invite-sender-name" style="color: #ffb703; font-size: 24px;">...</span> зовет вас в матч!
-                <div style="font-size: 14px; color: #888; font-weight: normal; margin-top: 5px;">(Матч пройдет без потери MMR)</div>
+                <div style="font-size: 14px; color: #888; font-weight: normal; margin-top: 5px;">(Матч пройдет без потери ЭЛО)</div>
             </div>
             <div style="display: flex; gap: 15px;">
                 <button id="btn-accept-invite" class="btn btn-green" style="flex:1;">Принять</button>
@@ -210,12 +205,12 @@
         </div>
     </div>
 
-<div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
         
         <div style="width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <div style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff;">
-                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555;">(MMR: 1000)</span>
+                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555;">(ЭЛО: 1000)</span>
                 </div>
                 <div id="s1" style="display: flex; gap: 8px; margin-top: 5px;"></div>
             </div>
@@ -243,7 +238,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-end;">
                 <div id="s2" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div>
                 <div style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff;">
-                    <span id="r2" style="font-size: 16px; color: #555;">(MMR: 1000)</span> <span id="n2">Игрок 2</span> 
+                    <span id="r2" style="font-size: 16px; color: #555;">(ЭЛО: 1000)</span> <span id="n2">Игрок 2</span> 
                 </div>
             </div>
         </div>
