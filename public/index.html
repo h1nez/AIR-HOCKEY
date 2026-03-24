@@ -63,12 +63,28 @@
         .lvl-7, .lvl-8 { background: #ff9900; }
         .lvl-9 { background: #ff3300; }
         .lvl-10 { background: #ff0000; }
-        
-        #game-container canvas { width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none; }
 
-        /* 🔥 СТИЛИ КНОПОК ЭМОДЗИ */
-        .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
-        .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
+        /* 🔥 УМНОЕ ОГРАНИЧЕНИЕ РАЗМЕРА (АВТО-ПОДГОНКА ПОД ВЫСОТУ) */
+        .game-layout-limit {
+            width: 100%;
+            /* Поле не может быть больше 800px, но и не может быть выше, чем позволяет экран */
+            max-width: min(800px, calc((100vh - 160px) * 2));
+            box-sizing: border-box;
+        }
+
+        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            .game-layout-limit {
+                /* Жестко ужимаем интерфейс по высоте, чтобы игра влезла */
+                max-width: min(800px, calc((100vh - 90px) * 2));
+            }
+            .p-name { font-size: 18px !important; }
+            .p-elo { font-size: 12px !important; }
+            .paw-icon { transform: scale(0.8) !important; margin: 0 !important;}
+            .emoji-btn { width: 32px !important; height: 32px !important; font-size: 16px !important; }
+            #btn-in-game-quit { padding: 4px 10px !important; font-size: 12px !important; margin-bottom: 0 !important; }
+            .panel-margin { margin-bottom: 2px !important; margin-top: 2px !important; }
+        }
     </style>
 </head>
 <body>
@@ -211,20 +227,20 @@
         </div>
     </div>
 
-    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0 10px; box-sizing: border-box;">
         
-        <div style="width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+        <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                <div style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
-                    <span id="n1">Игрок 1</span> <span id="r1" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-left: 5px;"></span>
+                <div class="p-name" style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
+                    <span id="n1">Игрок 1</span> <span id="r1" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-left: 5px;"></span>
                 </div>
-                <div id="s1" style="display: flex; gap: 8px; margin-top: 5px;"></div>
+                <div id="s1" class="paw-icon" style="display: flex; gap: 8px; margin-top: 5px;"></div>
             </div>
             <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 5px;">🚪 Выйти</button>
         </div>
 
-        <div id="game-container" style="position: relative; width: 100%; max-width: 800px; aspect-ratio: 2/1;">
-            <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="game-container" class="game-layout-limit" style="position: relative; aspect-ratio: 2/1;">
+            <canvas id="gameCanvas" width="800" height="400" style="width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; border-radius: 40px; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none;"></canvas>
             <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>
             <button id="btn-cancel-search" class="btn btn-red" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);">Отменить поиск</button>
             
@@ -238,8 +254,7 @@
             </div>
         </div>
 
-        <div style="width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
-            
+        <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div id="emoji-panel" style="display: flex; gap: 10px;">
                 <button class="emoji-btn" onclick="sendEmoji('😹')">😹</button>
                 <button class="emoji-btn" onclick="sendEmoji('😿')">😿</button>
@@ -249,9 +264,9 @@
             </div>
 
             <div style="display: flex; flex-direction: column; align-items: flex-end;">
-                <div id="s2" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div>
-                <div style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
-                    <span id="r2" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-right: 5px;"></span> <span id="n2">Игрок 2</span> 
+                <div id="s2" class="paw-icon" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div>
+                <div class="p-name" style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;">
+                    <span id="r2" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-right: 5px;"></span> <span id="n2">Игрок 2</span> 
                 </div>
             </div>
         </div>
