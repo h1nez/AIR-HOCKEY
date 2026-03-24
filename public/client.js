@@ -340,15 +340,21 @@ socket.on('gameStateUpdate', s => {
     serverState = s;
     if (!clientState) clientState = JSON.parse(JSON.stringify(s));
     
-    // 🔥 ГЕНЕРАТОР ЦВЕТНЫХ ЛАПОК
+    // 🔥 ГЕНЕРАТОР ОДИНОЧНЫХ ВЕКТОРНЫХ ЛАПОК (SVG)
     const renderPaws = (score, color) => {
+        // Код идеальной одиночной лапки
+        const pawSVG = `<svg viewBox="0 0 512 512" width="28" height="28" fill="currentColor">
+            <path d="M256 224c-53.02 0-96 42.98-96 96s42.98 96 96 96 96-42.98 96-96-42.98-96-96-96zm-106.67-42.67c-35.35 0-64 28.65-64 64s28.65 64 64 64 64-28.65 64-64-28.65-64-64-64zm213.34 0c-35.35 0-64 28.65-64 64s28.65 64 64 64 64-28.65 64-64-28.65-64-64-64zM160 96c-35.35 0-64 28.65-64 64s28.65 64 64 64 64-28.65 64-64-28.65-64-64-64zm192 0c-35.35 0-64 28.65-64 64s28.65 64 64 64 64-28.65 64-64-28.65-64-64-64z"/>
+        </svg>`;
+        
         let html = '';
         for(let i = 0; i < 5; i++) {
             if(i < score) {
-                // Хитрый CSS-трюк: делаем сам эмодзи прозрачным, но отбрасываем яркую цветную тень!
-                html += `<span style="color: transparent; text-shadow: 0 0 0 ${color}; transform: scale(1.1); transition: 0.2s;">🐾</span>`;
+                // Яркая цветная лапка с тенью
+                html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
             } else {
-                html += `<span style="opacity: 0.25; filter: grayscale(100%); transition: 0.2s;">🐾</span>`;
+                // Серая полупрозрачная пустая лапка
+                html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`;
             }
         }
         return html;
@@ -380,6 +386,7 @@ socket.on('gameStateUpdate', s => {
         clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
     }
 });
+
 
 function sendInput(clientX, clientY) {
     if (!myRole || !clientState || !serverState || serverState.paused || serverState.gameOver) return;
