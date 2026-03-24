@@ -64,26 +64,45 @@
         .lvl-9 { background: #ff3300; }
         .lvl-10 { background: #ff0000; }
 
-        /* 🔥 УМНОЕ ОГРАНИЧЕНИЕ РАЗМЕРА (АВТО-ПОДГОНКА ПОД ВЫСОТУ) */
-        .game-layout-limit {
-            width: 100%;
-            /* Поле не может быть больше 800px, но и не может быть выше, чем позволяет экран */
-            max-width: min(800px, calc((100vh - 160px) * 2));
-            box-sizing: border-box;
-        }
+        /* Умное ограничение ширины игрового поля */
+        .game-layout-limit { width: 100%; max-width: min(800px, calc((100vh - 160px) * 2)); box-sizing: border-box; }
+        .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
+        .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
 
-        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ */
+        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ (ЛАНДШАФТ) */
         @media screen and (max-height: 500px) and (orientation: landscape) {
-            .game-layout-limit {
-                /* Жестко ужимаем интерфейс по высоте, чтобы игра влезла */
-                max-width: min(800px, calc((100vh - 90px) * 2));
-            }
-            .p-name { font-size: 18px !important; }
-            .p-elo { font-size: 12px !important; }
-            .paw-icon { transform: scale(0.8) !important; margin: 0 !important;}
-            .emoji-btn { width: 32px !important; height: 32px !important; font-size: 16px !important; }
+            /* Сужаем игру */
+            .game-layout-limit { max-width: min(800px, calc((100vh - 90px) * 2)); }
+            .p-name { font-size: 16px !important; }
+            .p-elo { font-size: 11px !important; }
+            .paw-icon { transform: scale(0.7) !important; margin: 0 !important; gap: 2px !important;}
+            .emoji-btn { width: 30px !important; height: 30px !important; font-size: 16px !important; border-width: 2px !important;}
             #btn-in-game-quit { padding: 4px 10px !important; font-size: 12px !important; margin-bottom: 0 !important; }
             .panel-margin { margin-bottom: 2px !important; margin-top: 2px !important; }
+            
+            /* Сужаем главное меню */
+            h1 { font-size: 32px !important; margin-bottom: 5px !important; line-height: 1 !important; }
+            h1 span { font-size: 22px !important; }
+            #menu-coins { font-size: 20px !important; margin-bottom: 10px !important; }
+            #main-menu .btn { padding: 6px 12px !important; font-size: 13px !important; }
+            #btn-play { font-size: 20px !important; padding: 10px 30px !important; }
+            #btn-play-bot { font-size: 14px !important; padding: 10px 20px !important; }
+            
+            /* Сужаем Чат в меню */
+            #global-chat { width: 220px !important; height: 130px !important; bottom: 5px !important; left: 5px !important; border-width: 2px !important;}
+            #global-chat > div:first-child { padding: 2px !important; font-size: 12px !important; }
+            #chat-input { padding: 4px !important; font-size: 12px !important; }
+            #chat-messages { font-size: 12px !important; padding: 5px !important;}
+
+            /* Сужаем модальные окна (Профиль, Магазин) */
+            .modal-box { padding: 15px !important; max-height: 95vh; overflow-y: auto; }
+            h2 { font-size: 22px !important; margin-bottom: 5px !important; }
+            #profile-avatar { width: 60px !important; height: 60px !important; border-width: 3px !important; margin-bottom: 5px !important;}
+            #profile-name { font-size: 24px !important; }
+            #shop-item-preview-border { width: 70px !important; height: 70px !important; border-width: 3px !important; margin-bottom: 5px !important;}
+            #shop-item-name { font-size: 20px !important; margin-bottom: 5px !important;}
+            #shop-item-price { font-size: 16px !important; margin: 5px 0 !important;}
+            #btn-shop-action { padding: 8px !important; font-size: 14px !important;}
         }
     </style>
 </head>
@@ -107,7 +126,7 @@
         <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
         <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 20px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
-        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 15px;">
             <button id="btn-my-profile" class="btn btn-blue">👤 Профиль</button>
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:14px;">0</span></button>
@@ -134,20 +153,20 @@
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
             <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin-bottom: 5px; text-transform: uppercase;">Имя</h2>
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
-            <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 15px; border-radius: 15px; margin-bottom: 15px;">
-                <div><b style="color: #4da6ff; font-size: 24px;" id="profile-played">0</b><br><span style="font-size:12px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
-                <div><b style="color: #06d6a0; font-size: 24px;" id="profile-won">0</b><br><span style="font-size:12px; color:#555; font-weight:bold;">ПОБЕД</span></div>
-                <div><b style="color: #fb8500; font-size: 24px;" id="profile-winrate">0%</b><br><span style="font-size:12px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
+            <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 15px;">
+                <div><b style="color: #4da6ff; font-size: 20px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
+                <div><b style="color: #06d6a0; font-size: 20px;" id="profile-won">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ПОБЕД</span></div>
+                <div><b style="color: #fb8500; font-size: 20px;" id="profile-winrate">0%</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
             </div>
-            <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 20px; font-size: 18px; font-weight:bold; color: #555;">
+            <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 15px; font-size: 16px; font-weight:bold; color: #555;">
                 <div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
                 <div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
                 <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
                 <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
             </div>
-            <div id="avatar-selector" style="display: none; margin-bottom: 20px;">
-                <div style="font-weight:bold; margin-bottom:10px; color:#333;">Сменить аватарку:</div>
-                <div style="display: flex; justify-content: center; gap: 15px;">
+            <div id="avatar-selector" style="display: none; margin-bottom: 15px;">
+                <div style="font-weight:bold; margin-bottom:5px; color:#333;">Сменить аватарку:</div>
+                <div style="display: flex; justify-content: center; gap: 10px;">
                     <img onclick="setAvatar('avatar1')" class="avatar-opt" src="/avatar1.png" onerror="this.src=''">
                     <img onclick="setAvatar('avatar2')" class="avatar-opt" src="/avatar2.png" onerror="this.src=''">
                     <img onclick="setAvatar('avatar3')" class="avatar-opt" src="/avatar3.png" onerror="this.src=''">
@@ -192,33 +211,33 @@
 
     <div id="shop-modal" class="overlay" style="display: none;">
         <div class="modal-box" style="max-width: 400px; width: 90%;">
-            <h2>🛒 Магазин Способностей</h2>
-            <div id="shop-coins" style="color: #ffb703; margin-bottom: 20px; font-size: 24px; font-weight: bold;">Ваши монеты: 0</div>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <h2>🛒 Магазин</h2>
+            <div id="shop-coins" style="color: #ffb703; margin-bottom: 15px; font-size: 20px; font-weight: bold;">Ваши монеты: 0</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                 <button id="btn-shop-prev" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&lt;</button>
                 <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
-                    <h3 id="shop-item-name" style="margin: 0 0 10px 0; font-size: 28px; color: #333; text-transform: uppercase;">Обычный</h3>
+                    <h3 id="shop-item-name" style="margin: 0 0 10px 0; font-size: 24px; color: #333; text-transform: uppercase;">Обычный</h3>
                     <div id="shop-item-preview-border" style="width: 130px; height: 130px; border-radius: 50%; border: 6px solid #4da6ff; background: #f4faff; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; box-shadow: 0 6px 15px rgba(0,0,0,0.15); transition: 0.3s;">
                         <img id="shop-item-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
-                        <span id="shop-item-preview-text" style="font-size: 24px; font-weight: bold; color: white; display: none;">БАЗА</span>
+                        <span id="shop-item-preview-text" style="font-size: 20px; font-weight: bold; color: white; display: none;">БАЗА</span>
                     </div>
-                    <span id="shop-item-boost" style="font-size: 16px; color: #023047; font-style: italic; min-height: 24px; font-weight: bold;">Нет бонусов</span>
-                    <p id="shop-item-price" style="font-size: 22px; font-weight: bold; color: #fb8500; margin: 10px 0;">Бесплатно</p>
-                    <button id="btn-shop-action" class="btn btn-orange" style="width: 90%; padding: 15px; font-size: 18px;">КУПИТЬ</button>
+                    <span id="shop-item-boost" style="font-size: 14px; color: #023047; font-style: italic; min-height: 20px; font-weight: bold;">Нет бонусов</span>
+                    <p id="shop-item-price" style="font-size: 20px; font-weight: bold; color: #fb8500; margin: 10px 0;">Бесплатно</p>
+                    <button id="btn-shop-action" class="btn btn-orange" style="width: 90%; padding: 10px; font-size: 16px;">КУПИТЬ</button>
                 </div>
                 <button id="btn-shop-next" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&gt;</button>
             </div>
-            <div id="shop-error" style="color: #e63946; margin: 10px 0; min-height: 20px; font-weight: bold;"></div>
+            <div id="shop-error" style="color: #e63946; margin: 5px 0; min-height: 20px; font-weight: bold;"></div>
             <button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button>
         </div>
     </div>
 
     <div id="invite-modal" class="overlay" style="display: none; z-index: 2000;">
         <div class="modal-box" style="border-color: #06d6a0; max-width: 400px;">
-            <h2 style="color: #06d6a0; font-size: 36px; margin-bottom: 5px;">⚔️ ВЫЗОВ!</h2>
-            <div style="font-size: 20px; margin-bottom: 25px; color: #555; font-weight: bold;">
-                Игрок <span id="invite-sender-name" style="color: #ffb703; font-size: 24px;">...</span> зовет вас в матч!
-                <div style="font-size: 14px; color: #888; font-weight: normal; margin-top: 5px;">(Матч пройдет без потери ЭЛО)</div>
+            <h2 style="color: #06d6a0; font-size: 28px; margin-bottom: 5px;">⚔️ ВЫЗОВ!</h2>
+            <div style="font-size: 18px; margin-bottom: 20px; color: #555; font-weight: bold;">
+                <span id="invite-sender-name" style="color: #ffb703; font-size: 22px;">...</span> зовет вас в матч!
+                <div style="font-size: 12px; color: #888; font-weight: normal; margin-top: 5px;">(Матч пройдет без потери ЭЛО)</div>
             </div>
             <div style="display: flex; gap: 15px;">
                 <button id="btn-accept-invite" class="btn btn-green" style="flex:1;">Принять</button>
@@ -245,9 +264,9 @@
             <button id="btn-cancel-search" class="btn btn-red" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);">Отменить поиск</button>
             
             <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); border-radius: 25px;">
-                <h2 style="color: #ffb703; font-size: 50px; margin-top: 0; margin-bottom: 20px; text-shadow: 2px 2px 0 #fff;">МАТЧ ОКОНЧЕН!</h2>
-                <div id="end-status" style="color: #333; font-size: 24px; margin-bottom: 30px; font-weight: bold;">Выберите действие:</div>
-                <div style="display: flex; gap: 20px;">
+                <h2 style="color: #ffb703; font-size: 40px; margin-top: 0; margin-bottom: 15px; text-shadow: 2px 2px 0 #fff;">МАТЧ ОКОНЧЕН!</h2>
+                <div id="end-status" style="color: #333; font-size: 20px; margin-bottom: 20px; font-weight: bold;">Выберите действие:</div>
+                <div style="display: flex; gap: 15px;">
                     <button id="btn-new-game" class="btn btn-green">Новая игра</button>
                     <button id="btn-leave-match" class="btn btn-red">В меню</button>
                 </div>
