@@ -41,7 +41,8 @@ const userSchema = new mongoose.Schema({
     regDate: { type: Date, default: Date.now },
     maxRating: { type: Number, default: 1000 },
     minRating: { type: Number, default: 1000 },
-    avatar: { type: String, default: 'avatar1' }
+    avatar: { type: String, default: 'avatar1' },
+    regIp: { type: String, default: 'Скрыт' } // 🔥 Поле для сохранения IP адреса
 });
 const User = mongoose.model('User', userSchema);
 
@@ -277,7 +278,6 @@ function joinPlayerToRoom(socket, user) {
         room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
                 
-                // 🔥 ГЕНЕРАТОР РЕАЛИСТИЧНЫХ STEAM-НИКОВ
                 const generateSteamName = () => {
                     const pros = ['s1mple', 'donk', 'Yatoro', 'm0NESY', 'Collapse', 'sh1ro', 'Dendi', 'Miracle-', 'Nisha', 'ZywOo', 'NiKo', 'b1t', 'ropz', 'Nightfall', 'Puppey', 'Arteezy', 'Topson', 'Jame', 'Ax1Le', 'TORONTOTOKYO'];
                     const prefixes = ['NaVi | ', 'Virtus.pro ', 'Team Spirit ', 'FaZe ', 'Liquid ', 'OG ', 'zxc ', '1000-7 ', 'Shadow_', 'Lil_', 'toxic_'];
@@ -285,25 +285,13 @@ function joinPlayerToRoom(socket, user) {
                     const suffixes = ['_pro', '2010', '228', '1337', '99', '_rus', 'God', 'XD', 'QQ', '_enjoyer'];
 
                     const type = Math.random();
-                    if (type < 0.25) {
-                        return pros[Math.floor(Math.random() * pros.length)];
-                    } else if (type < 0.5) {
-                        const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
-                        const root = roots[Math.floor(Math.random() * roots.length)];
-                        return pref + root;
-                    } else if (type < 0.75) {
-                        const root = roots[Math.floor(Math.random() * roots.length)];
-                        const suf = suffixes[Math.floor(Math.random() * suffixes.length)];
-                        return root + suf;
-                    } else {
-                        const root = roots[Math.floor(Math.random() * roots.length)].toLowerCase();
-                        const suf = ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
-                        return root + suf;
-                    }
+                    if (type < 0.25) return pros[Math.floor(Math.random() * pros.length)];
+                    else if (type < 0.5) return prefixes[Math.floor(Math.random() * prefixes.length)] + roots[Math.floor(Math.random() * roots.length)];
+                    else if (type < 0.75) return roots[Math.floor(Math.random() * roots.length)] + suffixes[Math.floor(Math.random() * suffixes.length)];
+                    else return roots[Math.floor(Math.random() * roots.length)].toLowerCase() + ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
                 };
 
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
-                
                 const fakeName = generateSteamName();
                 const fakeSkin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
                 const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
@@ -332,9 +320,18 @@ io.on('connection', (socket) => {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const existing = await User.findOne({ name: data.name });
             if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
+            
+            // 🔥 ОПРЕДЕЛЯЕМ IP ИГРОКА ПРИ РЕГИСТРАЦИИ
+            let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно";
+            let clientIp = rawIp.split(',')[0].trim();
+            if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)';
+            
             const hashedPassword = await bcrypt.hash(data.password, 10);
-            const newUser = new User({ name: data.name, password: hashedPassword });
+            
+            // 🔥 СОХРАНЯЕМ IP В БАЗУ
+            const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp });
             await newUser.save();
+            
             socket.user = newUser; 
             connectedUsers[newUser.name] = socket.id;
             if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true });
