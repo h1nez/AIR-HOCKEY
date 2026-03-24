@@ -12,7 +12,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 // ==========================================
-// 1. НАСТРОЙКИ БАЗЫ И АДМИНА
+// 1. НАСТРОЙКИ БАЗЫ, АДМИНА И КЛАНОВ
 // ==========================================
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
 const ADMIN_NICKNAME = "davidik12"; // 🔥 ВПИШИ СЮДА СВОЙ ТОЧНЫЙ НИКНЕЙМ!
@@ -43,9 +43,21 @@ const userSchema = new mongoose.Schema({
     maxRating: { type: Number, default: 1000 },
     minRating: { type: Number, default: 1000 },
     avatar: { type: String, default: 'avatar1' },
-    regIp: { type: String, default: 'Скрыт' }
+    regIp: { type: String, default: 'Скрыт' },
+    clan: { type: String, default: null } // 🔥 Добавили привязку к клану
 });
 const User = mongoose.model('User', userSchema);
+
+// 🔥 СХЕМА КЛАНОВ
+const clanSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    maxMembers: { type: Number, default: 30 },
+    leader: { type: String, required: true },
+    deputies: { type: [String], default: [] },
+    members: { type: [String], default: [] },
+    chat: { type: Array, default: [] }
+});
+const Clan = mongoose.model('Clan', clanSchema);
 
 const connectedUsers = {}; 
 
@@ -217,7 +229,7 @@ setInterval(() => {
 }, 20);
 
 // ==========================================
-// 3. АВТОРИЗАЦИЯ И МЕНЮ
+// 3. АВТОРИЗАЦИЯ И СЕТЬ
 // ==========================================
 function tryRejoin(socket, user) {
     for (const id in rooms) {
@@ -286,14 +298,186 @@ function joinPlayerToRoom(socket, user) {
 
 io.on('connection', (socket) => {
     
-    // 🔥 ГЛОБАЛЬНЫЙ ЧАТ
+    // ==========================================
+    // 🔥 СИСТЕМА КЛАНОВ
+    // ==========================================
+    socket.on('getClanData', async (callback) => {
+        if (!socket.user) return callback({ success: false });
+        // Актуализируем инфу юзера
+        const u = await User.findById(socket.user._id);
+        socket.user = u;
+
+        if (!u.clan) return callback({ success: true, clan: null });
+        const clan = await Clan.findOne({ name: u.clan }).lean();
+        if (!clan) {
+            u.clan = null; await u.save();
+            return callback({ success: true, clan: null });
+        }
+        callback({ success: true, clan });
+    });
+
+    socket.on('createClan', async (data, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            if (u.clan) return callback({ success: false, msg: "Вы уже состоите в клане!" });
+            
+            const existingClan = await Clan.findOne({ name: data.name });
+            if (existingClan) return callback({ success: false, msg: "Клан с таким именем уже существует!" });
+
+            const newClan = new Clan({
+                name: data.name,
+                maxMembers: data.maxMembers,
+                leader: u.name,
+                members: [u.name]
+            });
+            await newClan.save();
+            u.clan = newClan.name;
+            await u.save();
+            socket.user = u;
+            callback({ success: true, msg: "Клан успешно создан!" });
+        } catch(e) { callback({ success: false, msg: "Ошибка сервера при создании." }); }
+    });
+
+    socket.on('searchClans', async (callback) => {
+        try {
+            const clans = await Clan.find().select('name leader members maxMembers').limit(20).lean();
+            callback({ success: true, clans });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('joinClan', async (clanName, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            if (u.clan) return callback({ success: false, msg: "Вы уже в клане!" });
+
+            const clan = await Clan.findOne({ name: clanName });
+            if (!clan) return callback({ success: false, msg: "Клан не найден!" });
+            if (clan.members.length >= clan.maxMembers) return callback({ success: false, msg: "Клан полностью заполнен!" });
+
+            clan.members.push(u.name);
+            await clan.save();
+            u.clan = clan.name;
+            await u.save();
+            socket.user = u;
+            callback({ success: true, msg: "Вы успешно вступили в клан!" });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('leaveClan', async (callback) => {
+        if (!socket.user || !socket.user.clan) return callback({ success: false });
+        try {
+            const u = await User.findById(socket.user._id);
+            const clanName = u.clan;
+            const clan = await Clan.findOne({ name: clanName });
+            
+            u.clan = null;
+            await u.save();
+            socket.user = u;
+
+            if (clan) {
+                clan.members = clan.members.filter(m => m !== u.name);
+                clan.deputies = clan.deputies.filter(m => m !== u.name);
+                
+                if (clan.members.length === 0) {
+                    await Clan.deleteOne({ name: clanName });
+                } else if (clan.leader === u.name) {
+                    // Передача лидерства при уходе лидера
+                    if (clan.deputies.length > 0) clan.leader = clan.deputies[0];
+                    else clan.leader = clan.members[0];
+                    await clan.save();
+                } else {
+                    await clan.save();
+                }
+                
+                // Оповещаем остальных онлайн-участников
+                clan.members.forEach(member => {
+                    const sId = connectedUsers[member];
+                    if (sId) io.to(sId).emit('clanUpdated');
+                });
+            }
+            callback({ success: true });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('clanAction', async (data, callback) => {
+        if (!socket.user || !socket.user.clan) return callback({ success: false, msg: "Вы не в клане." });
+        try {
+            const clan = await Clan.findOne({ name: socket.user.clan });
+            if (!clan) return callback({ success: false });
+
+            const isLeader = clan.leader === socket.user.name;
+            const isDeputy = clan.deputies.includes(socket.user.name);
+
+            if (data.action === 'kick') {
+                const targetIsLeader = clan.leader === data.targetName;
+                const targetIsDeputy = clan.deputies.includes(data.targetName);
+
+                if (!isLeader && !isDeputy) return callback({ success: false, msg: "Нет прав." });
+                if (targetIsLeader) return callback({ success: false, msg: "Нельзя кикнуть лидера." });
+                if (isDeputy && targetIsDeputy) return callback({ success: false, msg: "Зам не может кикнуть зама." });
+
+                clan.members = clan.members.filter(m => m !== data.targetName);
+                clan.deputies = clan.deputies.filter(m => m !== data.targetName);
+                await clan.save();
+
+                const targetUser = await User.findOne({ name: data.targetName });
+                if (targetUser) {
+                    targetUser.clan = null;
+                    await targetUser.save();
+                }
+                callback({ success: true });
+            } 
+            else if (data.action === 'promote' || data.action === 'demote') {
+                if (!isLeader) return callback({ success: false, msg: "Только лидер может управлять замами." });
+                
+                if (data.action === 'promote' && !clan.deputies.includes(data.targetName)) {
+                    clan.deputies.push(data.targetName);
+                } else if (data.action === 'demote') {
+                    clan.deputies = clan.deputies.filter(m => m !== data.targetName);
+                }
+                await clan.save();
+                callback({ success: true });
+            }
+            
+            // Оповещаем клан об изменениях
+            clan.members.forEach(member => {
+                const sId = connectedUsers[member];
+                if (sId) io.to(sId).emit('clanUpdated');
+            });
+
+        } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('sendClanChat', async (msg) => {
+        if (!socket.user || !socket.user.clan || !msg || msg.trim() === '') return;
+        try {
+            const clan = await Clan.findOne({ name: socket.user.clan });
+            if (!clan) return;
+
+            const chatMsg = { name: socket.user.name, msg: msg.substring(0, 100), time: Date.now() };
+            clan.chat.push(chatMsg);
+            if (clan.chat.length > 50) clan.chat.shift(); // Храним только 50 последних сообщений
+            await clan.save();
+
+            // Рассылаем всем онлайн-соклановцам
+            clan.members.forEach(member => {
+                const sId = connectedUsers[member];
+                if (sId) io.to(sId).emit('newClanMsg', chatMsg);
+            });
+        } catch(e) {}
+    });
+
+    // ==========================================
+    // ГЛОБАЛЬНЫЙ ЧАТ И ПРОЧЕЕ
+    // ==========================================
     socket.on('globalChat', (msg) => {
         if (!socket.user || !msg || msg.trim() === '') return;
         let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : "";
         io.emit('chatMessage', { name: prefix + socket.user.name, msg: msg.substring(0, 100) });
     });
 
-    // 🔥 ИГРОВЫЕ ЭМОДЗИ
     socket.on('sendEmoji', (emoji) => {
         if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return;
         const room = rooms[socket.roomId];
@@ -301,16 +485,15 @@ io.on('connection', (socket) => {
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
-    // 🔥 АДМИН ПАНЕЛЬ: ПОЛУЧИТЬ ИГРОКОВ
+    // АДМИН ПАНЕЛЬ
     socket.on('adminGetUsers', async (callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false });
         try {
-            const users = await User.find().select('name rating coins regIp').lean();
+            const users = await User.find().select('name rating coins regIp clan').lean();
             callback({ success: true, users });
         } catch(e) { callback({ success: false }); }
     });
 
-    // 🔥 АДМИН ПАНЕЛЬ: ДЕЙСТВИЯ (МОНЕТЫ, ЭЛО, БАН)
     socket.on('adminAction', async (data, callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" });
         try {
@@ -322,6 +505,7 @@ io.on('connection', (socket) => {
             } else if (data.action === 'setElo') {
                 target.rating = Number(data.amount); await target.save();
             } else if (data.action === 'ban') {
+                // Если игрок был в клане, нужно выкинуть его и оттуда, но для простоты просто удаляем аккаунт
                 await User.deleteOne({ name: data.targetName });
                 const tSocketId = connectedUsers[data.targetName];
                 if (tSocketId) {
@@ -446,14 +630,13 @@ io.on('connection', (socket) => {
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME });
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME, clanName: u.clan });
     });
 
-	socket.on('getUserProfile', async (username, callback) => {
+    socket.on('getUserProfile', async (username, callback) => {
         try {
             const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
             if (target) {
-                // 🔥 ПРОВЕРЯЕМ ОНЛАЙН: если игрок есть в connectedUsers, значит он в игре
                 const isOnline = !!connectedUsers[username];
                 callback({ success: true, profile: target, isOnline: isOnline });
             }
@@ -535,7 +718,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getLeaderboard', async (callback) => {
-        try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); }
+        try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating clan -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); }
     });
 
     socket.on('input', (data) => {

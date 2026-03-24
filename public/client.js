@@ -1,7 +1,7 @@
 const socket = io();
 
 // ==========================================
-// 🔥 АССЕТЫ (КАРТИНКИ И ЗВУКИ)
+// 🔥 АССЕТЫ И ЗВУКИ
 // ==========================================
 const catImages = {
     'korzhik': new Image(),
@@ -19,12 +19,9 @@ const sndWall = new Audio('/wall.mp3');
 const sndGoalWin = new Audio('/goal_win.mp3');
 const sndGoalLose = new Audio('/goal_lose.mp3');
 
-// Аудио-контекст для генерации звука эмодзи ("Поньк!")
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 window.addEventListener('click', () => {
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 });
 
 function playPop() {
@@ -55,7 +52,7 @@ function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
 // ==========================================
-// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
+// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
 // ==========================================
 let puckTrail = [];
 let confetti = [];
@@ -313,6 +310,15 @@ window.showProfile = function(username) {
                 statusDot.style.boxShadow = 'none';
                 statusDot.title = 'Не в сети';
             }
+
+            // Показываем клан в профиле
+            const clanLabel = document.getElementById('profile-clan-name');
+            if (p.clan) {
+                clanLabel.innerText = `🛡️ Клан: ${p.clan}`;
+                clanLabel.style.display = 'block';
+            } else {
+                clanLabel.style.display = 'none';
+            }
             
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
@@ -350,9 +356,7 @@ window.setAvatar = function(av) {
     });
 };
 
-document.getElementById('btn-my-profile').onclick = () => {
-    showProfile(nameInput.value);
-};
+document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
 document.getElementById('btn-logout').onclick = () => {
     if (confirm("Вы уверены, что хотите выйти из аккаунта?")) {
@@ -361,6 +365,165 @@ document.getElementById('btn-logout').onclick = () => {
         window.location.reload();
     }
 };
+
+// ==========================================
+// 🔥 СИСТЕМА КЛАНОВ
+// ==========================================
+document.getElementById('btn-clans').onclick = () => {
+    document.getElementById('clans-modal').style.display = 'flex';
+    loadMyClan();
+};
+document.getElementById('btn-close-clans').onclick = () => {
+    document.getElementById('clans-modal').style.display = 'none';
+};
+
+socket.on('clanUpdated', () => {
+    // Если окно клана открыто, обновляем инфу
+    if (document.getElementById('clans-modal').style.display === 'flex') {
+        loadMyClan();
+    }
+});
+
+function loadMyClan() {
+    socket.emit('getClanData', (res) => {
+        if (res.success && res.clan) {
+            document.getElementById('no-clan-block').style.display = 'none';
+            document.getElementById('my-clan-block').style.display = 'block';
+            
+            const clan = res.clan;
+            document.getElementById('clan-modal-title').innerText = `🛡️ Клан: ${clan.name}`;
+            document.getElementById('clan-count').innerText = `(${clan.members.length}/${clan.maxMembers})`;
+            
+            const myName = nameInput.value;
+            const isLeader = clan.leader === myName;
+            const isDeputy = clan.deputies.includes(myName);
+            
+            // Рисуем список участников с кнопками
+            let html = '';
+            clan.members.forEach(member => {
+                let roleIcon = '';
+                let controls = '';
+                
+                const isTargetLeader = clan.leader === member;
+                const isTargetDeputy = clan.deputies.includes(member);
+                
+                if (isTargetLeader) roleIcon = '👑';
+                else if (isTargetDeputy) roleIcon = '⭐';
+                else roleIcon = '👤';
+                
+                if (member !== myName) {
+                    if (isLeader) {
+                        if (isTargetDeputy) controls += `<button class="btn-promo" onclick="clanAction('${member}', 'demote')">⬇ Зам</button>`;
+                        else controls += `<button class="btn-promo" onclick="clanAction('${member}', 'promote')">⬆ Зам</button>`;
+                        controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
+                    } else if (isDeputy && !isTargetLeader && !isTargetDeputy) {
+                        controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
+                    }
+                }
+                
+                html += `
+                <div class="clan-member-row">
+                    <span style="cursor:pointer;" onclick="showProfile('${member}')">${roleIcon} <b>${member}</b></span>
+                    <div class="clan-controls">${controls}</div>
+                </div>`;
+            });
+            
+            document.getElementById('clan-members-list').innerHTML = html;
+            
+            // Загружаем историю чата
+            const chatBox = document.getElementById('clan-chat-msgs');
+            chatBox.innerHTML = clan.chat.map(c => {
+                const color = c.name === myName ? '#4da6ff' : '#8338ec';
+                return `<div style="margin-bottom:4px;"><b style="color:${color}">${c.name}:</b> ${c.msg}</div>`;
+            }).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+        } else {
+            document.getElementById('no-clan-block').style.display = 'block';
+            document.getElementById('my-clan-block').style.display = 'none';
+            document.getElementById('clan-modal-title').innerText = `🛡️ Система Кланов`;
+            loadClansList();
+        }
+    });
+}
+
+function loadClansList() {
+    socket.emit('searchClans', (res) => {
+        if (res.success) {
+            const list = document.getElementById('clan-search-list');
+            if (res.clans.length === 0) {
+                list.innerHTML = "<p style='color:#888; font-size:14px;'>Свободных кланов пока нет.</p>";
+            } else {
+                list.innerHTML = res.clans.map(c => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px; border-bottom: 1px dashed #ccc;">
+                        <div style="font-size:14px;"><b>${c.name}</b> <br><span style="color:#888;font-size:12px;">(${c.members.length}/${c.maxMembers}) Лидер: ${c.leader}</span></div>
+                        <button class="btn btn-green btn-small" onclick="joinClan('${c.name}')">Войти</button>
+                    </div>
+                `).join('');
+            }
+        }
+    });
+}
+
+window.createClan = function() {
+    const name = document.getElementById('new-clan-name').value.trim();
+    const maxMembers = document.getElementById('new-clan-size').value;
+    if (!name) return alert("Введите название клана!");
+    
+    socket.emit('createClan', { name, maxMembers }, (res) => {
+        alert(res.msg);
+        if (res.success) loadMyClan();
+    });
+};
+
+window.joinClan = function(clanName) {
+    socket.emit('joinClan', clanName, (res) => {
+        alert(res.msg);
+        if (res.success) loadMyClan();
+    });
+};
+
+window.leaveClan = function() {
+    if(confirm("Вы уверены, что хотите покинуть клан?")) {
+        socket.emit('leaveClan', (res) => {
+            if (res.success) loadMyClan();
+        });
+    }
+};
+
+window.clanAction = function(targetName, action) {
+    let msg = action === 'kick' ? `Выгнать ${targetName} из клана?` : `Изменить права ${targetName}?`;
+    if (confirm(msg)) {
+        socket.emit('clanAction', { targetName, action }, (res) => {
+            if (res.msg) alert(res.msg);
+            if (res.success) loadMyClan();
+        });
+    }
+};
+
+window.sendClanChat = function() {
+    const input = document.getElementById('clan-chat-input');
+    const msg = input.value.trim();
+    if (msg) {
+        socket.emit('sendClanChat', msg);
+        input.value = '';
+    }
+};
+
+// Прием новых сообщений в чат клана
+socket.on('newClanMsg', (chatMsg) => {
+    // Если окно клана открыто, добавляем сообщение
+    if (document.getElementById('clans-modal').style.display === 'flex') {
+        const chatBox = document.getElementById('clan-chat-msgs');
+        const color = chatMsg.name === nameInput.value ? '#4da6ff' : '#8338ec';
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = '4px';
+        msgDiv.innerHTML = `<b style="color:${color}">${chatMsg.name}:</b> ${chatMsg.msg}`;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+});
+
 
 // ==========================================
 // 🔥 ДРУЗЬЯ И ПРИГЛАШЕНИЯ
@@ -697,7 +860,11 @@ document.getElementById('btn-leaderboard').onclick = () => {
             res.leaderboard.forEach(user => {
                 const li = document.createElement('li');
                 li.style.margin = "8px 0";
-                li.innerHTML = `<b>${user.name}</b> — ЭЛО: ${getLvlHtml(user.rating)} ${user.rating}`;
+                
+                // 🔥 Показываем клан в топе (если есть)
+                const clanBadge = user.clan ? `<span style="color:#8338ec; font-size:14px;">[${user.clan}]</span>` : '';
+                
+                li.innerHTML = `<b>${user.name}</b> ${clanBadge} — ЭЛО: ${getLvlHtml(user.rating)} ${user.rating}`;
                 list.appendChild(li);
             });
             document.getElementById('leaderboard-modal').style.display = 'flex';
