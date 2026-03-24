@@ -14,7 +14,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // ==========================================
 // 1. БАЗА ДАННЫХ MONGODB
 // ==========================================
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:davidik12@aerohockey.5bidt7s.mongodb.net/		';
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -275,13 +275,43 @@ function joinPlayerToRoom(socket, user) {
         room.player1.id = socket.id; room.player1.ip = clientIp; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
 
-        room.botTimer = setTimeout(() => {
+		room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
-                const fakeNames = ['КиберКот', 'Ледокол', 'Мурзик_Про', 'Шайбоед', 'Gamer777', 'ProIgroK', 'NoobMaster', 'SuperCat', 'Alex_2012', 'Nagibator'];
+                
+                // 🔥 ГЕНЕРАТОР РЕАЛИСТИЧНЫХ STEAM-НИКОВ
+                const generateSteamName = () => {
+                    const pros = ['s1mple', 'donk', 'Yatoro', 'm0NESY', 'Collapse', 'sh1ro', 'Dendi', 'Miracle-', 'Nisha', 'ZywOo', 'NiKo', 'b1t', 'ropz', 'Nightfall', 'Puppey', 'Arteezy', 'Topson', 'Jame', 'Ax1Le', 'TORONTOTOKYO'];
+                    const prefixes = ['NaVi | ', 'Virtus.pro ', 'Team Spirit ', 'FaZe ', 'Liquid ', 'OG ', 'zxc ', '1000-7 ', 'Shadow_', 'Lil_', 'toxic_'];
+                    const roots = ['Ghoul', 'Sniper', 'Demon', 'Angel', 'Bebra', 'Monster', 'Tractor', 'Pudge', 'Pivo', 'Gamer', 'Killer', 'Ninja', 'Samurai', 'Hokage', 'DeadInside'];
+                    const suffixes = ['_pro', '2010', '228', '1337', '99', '_rus', 'God', 'XD', 'QQ', '_enjoyer'];
+
+                    const type = Math.random();
+                    if (type < 0.25) {
+                        // 25% шанс на чистого киберспортсмена
+                        return pros[Math.floor(Math.random() * pros.length)];
+                    } else if (type < 0.5) {
+                        // 25% шанс на Клантег + Имя (например: NaVi | Pudge)
+                        const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+                        const root = roots[Math.floor(Math.random() * roots.length)];
+                        return pref + root;
+                    } else if (type < 0.75) {
+                        // 25% шанс на Имя + Цифры/Приписка (например: Demon228)
+                        const root = roots[Math.floor(Math.random() * roots.length)];
+                        const suf = suffixes[Math.floor(Math.random() * suffixes.length)];
+                        return root + suf;
+                    } else {
+                        // 25% шанс на лоу-капс трайхарда (например: ninja_zxc)
+                        const root = roots[Math.floor(Math.random() * roots.length)].toLowerCase();
+                        const suf = ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
+                        return root + suf;
+                    }
+                };
+
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
-                const fakeName = fakeNames[Math.floor(Math.random() * fakeNames.length)] + Math.floor(Math.random()*100);
+                
+                const fakeName = generateSteamName();
                 const fakeSkin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
-                const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 100) - 50);
+                const fakeRating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
 
                 room.player2.id = 'secret_bot';
                 room.player2.ip = 'bot_ip';
@@ -290,15 +320,7 @@ function joinPlayerToRoom(socket, user) {
                 room.player2.rating = fakeRating;
                 room.paused = false;
             }
-        }, 15000);
-
-    } else if (!room.player2.id && room.player2.name === "...") {
-        room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
-        room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
-        room.paused = false; 
-        if (room.botTimer) clearTimeout(room.botTimer); 
-    }
-}
+        }, 15000); // 15 секунд ожидания
 
 io.on('connection', (socket) => {
     
