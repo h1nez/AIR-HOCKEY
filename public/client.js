@@ -138,8 +138,25 @@ function handleAuthResponse(res) {
 // ==========================================
 // 🔥 ГЛОБАЛЬНЫЙ ЧАТ
 // ==========================================
+// ==========================================
+// 🔥 ГЛОБАЛЬНЫЙ ЧАТ
+// ==========================================
+const chatContainer = document.getElementById('global-chat');
+const chatHeader = document.getElementById('chat-header');
+const chatToggleIcon = document.getElementById('chat-toggle-icon');
 const chatInput = document.getElementById('chat-input'); 
 const chatMsgs = document.getElementById('chat-messages');
+
+// Сворачивание и разворачивание чата по клику на заголовок
+chatHeader.onclick = () => {
+    chatContainer.classList.toggle('collapsed');
+    if (chatContainer.classList.contains('collapsed')) {
+        chatToggleIcon.innerText = '▲';
+    } else {
+        chatToggleIcon.innerText = '▼';
+        chatMsgs.scrollTop = chatMsgs.scrollHeight; // Скроллим вниз при открытии
+    }
+};
 
 document.getElementById('btn-send-chat').onclick = sendChat; 
 chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
@@ -151,6 +168,16 @@ function sendChat() {
         chatInput.value = ''; 
     }
 }
+
+socket.on('chatMessage', (data) => {
+    const el = document.createElement('div');
+    const isMe = data.name.includes(nameInput.value);
+    const nameColor = isMe ? '#4da6ff' : '#ffb703';
+    el.innerHTML = `<b style="color: ${nameColor};">${data.name}:</b> <span style="color: #333;">${data.msg}</span>`;
+    chatMsgs.appendChild(el); 
+    // Автоматическая прокрутка к последнему сообщению
+    setTimeout(() => { chatMsgs.scrollTop = chatMsgs.scrollHeight; }, 50);
+});
 
 socket.on('chatMessage', (data) => {
     const el = document.createElement('div');

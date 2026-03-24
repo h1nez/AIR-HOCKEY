@@ -8,7 +8,7 @@
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
         
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-box { background: #fff; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 6px solid #ffb703; text-align: center; width: 90%; max-width: 500px; }
+        .modal-box { background: #fff; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 6px solid #ffb703; text-align: center; width: 90%; max-width: 500px; box-sizing: border-box; }
         
         h1 { color: #ff7000; font-size: 56px; margin-bottom: 20px; text-shadow: 3px 3px 0px #ffe5b4, -2px -2px 0px #fff; text-align: center; line-height: 1.1; }
         h2 { margin-top: 0; color: #fb8500; font-size: 32px; }
@@ -68,48 +68,75 @@
         .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
         .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
 
-        /* 🔥 СТИЛИ ГЛОБАЛЬНОГО ЧАТА (Базовые для ПК) */
+        /* 🔥 СТИЛИ ГЛОБАЛЬНОГО ЧАТА (ПК - пристыкован к низу) */
         #global-chat {
             position: absolute;
-            bottom: 15px;
-            left: 10px; /* Сдвинули левее */
-            width: 280px; /* Сделали чуть уже, чтобы не мешал кнопкам по центру */
-            height: 250px;
+            bottom: 0;          /* Четко в самом низу экрана */
+            left: 20px;
+            width: 320px;
+            height: 300px;
             background: rgba(255,255,255,0.95);
             border: 4px solid #8ecae6;
-            border-radius: 15px;
+            border-bottom: none; /* Убираем рамку снизу для эффекта вкладки */
+            border-radius: 15px 15px 0 0;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.1); /* Тень падает вверх */
             z-index: 50;
+            transition: height 0.3s ease;
+        }
+        #global-chat.collapsed {
+            height: 35px !important; /* Высота свернутого чата */
+        }
+        #global-chat.collapsed #chat-body {
+            display: none !important;
+        }
+        #chat-header {
+            background: #8ecae6; 
+            color: white; 
+            font-weight: bold; 
+            padding: 8px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: pointer; 
+            font-size: 15px;
+            border-radius: 10px 10px 0 0;
         }
 
-        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ВЕРТИКАЛЬНОМ РЕЖИМЕ (ПОРТРЕТ) */
+        /* 🔥 ИСПРАВЛЕНИЯ ДЛЯ ТЕЛЕФОНОВ В ВЕРТИКАЛЬНОМ РЕЖИМЕ (ПОРТРЕТ) */
         @media screen and (max-width: 700px) and (orientation: portrait) {
             #main-menu.overlay {
                 justify-content: flex-start !important;
                 padding-top: 10vh !important;
-                overflow-y: auto !important; /* Включаем прокрутку меню */
-                padding-bottom: 20px !important;
+                overflow-y: auto !important; 
+                padding-bottom: 120px !important; /* ОГРОМНЫЙ отступ снизу, чтобы долистать чат */
             }
             #global-chat {
-                position: relative !important; /* Отвязываем от низа экрана */
+                position: relative !important; 
                 bottom: auto !important;
                 left: auto !important;
-                margin: 20px auto 0 auto !important; /* Ставим по центру под кнопками */
+                margin: 20px auto 0 auto !important; 
                 width: 90% !important;
                 max-width: 400px !important;
-                height: 180px !important;
+                height: 250px !important;
+                border-bottom: 4px solid #8ecae6 !important; /* На телефоне рамка полная */
+                border-radius: 15px !important;
                 flex-shrink: 0;
             }
+            #global-chat.collapsed { height: 42px !important; }
         }
 
-        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ (ЛАНДШАФТ) */
+        /* 🔥 ИСПРАВЛЕНИЯ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ (ЛАНДШАФТ) */
         @media screen and (max-height: 600px) and (orientation: landscape) {
-            .overlay { justify-content: flex-start !important; overflow-y: auto !important; padding-top: 20px !important; padding-bottom: 20px !important; }
-            #global-chat { position: relative !important; bottom: auto !important; left: auto !important; margin: 20px auto !important; width: 90% !important; max-width: 400px !important; height: 140px !important; flex-shrink: 0; }
-            h1 { font-size: 32px !important; margin-top: 10px !important; margin-bottom: 10px !important; line-height: 1.1 !important; }
+            .overlay { justify-content: flex-start !important; overflow-y: auto !important; padding-top: 15px !important; padding-bottom: 100px !important; }
+            #global-chat { 
+                position: relative !important; bottom: auto !important; left: auto !important; 
+                margin: 20px auto !important; width: 90% !important; max-width: 400px !important; 
+                height: 200px !important; border-bottom: 3px solid #8ecae6 !important; border-radius: 15px !important; flex-shrink: 0; 
+            }
+            #global-chat.collapsed { height: 35px !important; }
+            h1 { font-size: 32px !important; margin-top: 5px !important; margin-bottom: 10px !important; line-height: 1.1 !important; }
             h1 span { font-size: 20px !important; }
             #menu-coins { font-size: 20px !important; margin-bottom: 10px !important; }
             #main-menu .btn { padding: 6px 12px !important; font-size: 14px !important; border-radius: 8px !important; }
@@ -159,11 +186,16 @@
         </div>
 
         <div id="global-chat">
-            <div style="background: #8ecae6; color: white; font-weight: bold; padding: 5px; text-align: center; font-size: 14px;">💬 Чат игроков</div>
-            <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; text-align: left; display: flex; flex-direction: column; gap: 5px;"></div>
-            <div style="display: flex; border-top: 2px solid #eee;">
-                <input type="text" id="chat-input" placeholder="Написать..." style="flex: 1; border: none; border-radius: 0; margin: 0; padding: 10px; font-size: 14px; outline: none;">
-                <button id="btn-send-chat" style="border: none; background: #4da6ff; color: white; cursor: pointer; padding: 0 15px; font-weight: bold; font-size: 16px;">➔</button>
+            <div id="chat-header">
+                <span>💬 Чат игроков</span>
+                <span id="chat-toggle-icon">▼</span>
+            </div>
+            <div id="chat-body" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; height: 100%;">
+                <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; text-align: left; display: flex; flex-direction: column; gap: 5px;"></div>
+                <div style="display: flex; border-top: 2px solid #eee;">
+                    <input type="text" id="chat-input" placeholder="Написать..." style="flex: 1; border: none; border-radius: 0 0 0 11px; margin: 0; padding: 10px; font-size: 14px; outline: none;">
+                    <button id="btn-send-chat" style="border: none; background: #4da6ff; color: white; cursor: pointer; padding: 0 15px; font-weight: bold; font-size: 16px;">➔</button>
+                </div>
             </div>
         </div>
     </div>
@@ -191,12 +223,10 @@
     <div id="profile-modal" class="overlay" style="display: none; z-index: 1050;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
-            
             <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px;">
                 <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin: 0; text-transform: uppercase;">Имя</h2>
                 <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
             </div>
-
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
             <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 15px;">
                 <div><b style="color: #4da6ff; font-size: 20px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
