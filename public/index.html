@@ -68,7 +68,44 @@
         .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; }
         .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
 
-        /* МОБИЛЬНЫЙ ГОРИЗОНТАЛЬНЫЙ РЕЖИМ */
+        /* 🔥 СТИЛИ ГЛОБАЛЬНОГО ЧАТА (Базовые для ПК) */
+        #global-chat {
+            position: absolute;
+            bottom: 15px;
+            left: 10px; /* Сдвинули левее */
+            width: 280px; /* Сделали чуть уже, чтобы не мешал кнопкам по центру */
+            height: 250px;
+            background: rgba(255,255,255,0.95);
+            border: 4px solid #8ecae6;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 50;
+        }
+
+        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ВЕРТИКАЛЬНОМ РЕЖИМЕ (ПОРТРЕТ) */
+        @media screen and (max-width: 700px) and (orientation: portrait) {
+            #main-menu.overlay {
+                justify-content: flex-start !important;
+                padding-top: 10vh !important;
+                overflow-y: auto !important; /* Включаем прокрутку меню */
+                padding-bottom: 20px !important;
+            }
+            #global-chat {
+                position: relative !important; /* Отвязываем от низа экрана */
+                bottom: auto !important;
+                left: auto !important;
+                margin: 20px auto 0 auto !important; /* Ставим по центру под кнопками */
+                width: 90% !important;
+                max-width: 400px !important;
+                height: 180px !important;
+                flex-shrink: 0;
+            }
+        }
+
+        /* 🔥 ИСПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНОВ В ГОРИЗОНТАЛЬНОМ РЕЖИМЕ (ЛАНДШАФТ) */
         @media screen and (max-height: 600px) and (orientation: landscape) {
             .overlay { justify-content: flex-start !important; overflow-y: auto !important; padding-top: 20px !important; padding-bottom: 20px !important; }
             #global-chat { position: relative !important; bottom: auto !important; left: auto !important; margin: 20px auto !important; width: 90% !important; max-width: 400px !important; height: 140px !important; flex-shrink: 0; }
@@ -121,7 +158,7 @@
             <button id="btn-play" class="btn btn-green" style="font-size: 36px; padding: 20px 60px;">ИГРАТЬ ONLINE</button>
         </div>
 
-        <div id="global-chat" style="position: absolute; bottom: 20px; left: 20px; width: 300px; height: 250px; background: rgba(255,255,255,0.95); border: 4px solid #8ecae6; border-radius: 15px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+        <div id="global-chat">
             <div style="background: #8ecae6; color: white; font-weight: bold; padding: 5px; text-align: center; font-size: 14px;">💬 Чат игроков</div>
             <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; text-align: left; display: flex; flex-direction: column; gap: 5px;"></div>
             <div style="display: flex; border-top: 2px solid #eee;">
@@ -151,13 +188,15 @@
         </div>
     </div>
 
-    <div id="profile-modal" class="overlay" style="display: none;">
+    <div id="profile-modal" class="overlay" style="display: none; z-index: 1050;">
         <div class="modal-box" style="border-color: #8ecae6; max-width: 450px;">
             <img id="profile-avatar" src="" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid #8ecae6; object-fit: cover; margin-bottom: 10px; background: #f4faff;">
+            
             <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px;">
                 <h2 id="profile-name" style="color: #219ebc; font-size: 40px; margin: 0; text-transform: uppercase;">Имя</h2>
                 <div id="profile-online-status" style="width: 18px; height: 18px; border-radius: 50%; background-color: #ccc; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2);" title="Статус"></div>
             </div>
+
             <div style="font-size: 14px; color: #888; margin-bottom: 15px; font-weight: bold;">В игре с: <span id="profile-regdate">...</span></div>
             <div style="display: flex; justify-content: space-around; background: #f4faff; padding: 10px; border-radius: 15px; margin-bottom: 15px;">
                 <div><b style="color: #4da6ff; font-size: 20px;" id="profile-played">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">МАТЧЕЙ</span></div>
