@@ -5,27 +5,32 @@ const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': 
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 
-// АУДИО ДВИЖОК
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-window.addEventListener('click', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); });
+// ==========================================
+// 🔥 АУДИО ДВИЖОК (КАСТОМНЫЕ ЗВУКИ ИЗ ФАЙЛОВ)
+// ==========================================
+// Загружаем твои файлы (Они должны лежать в папке public)
+const sndHit = new Audio('/hit.mp3');
+const sndWall = new Audio('/wall.mp3');
+const sndGoalWin = new Audio('/goal_win.mp3');
+const sndGoalLose = new Audio('/goal_lose.mp3');
 
-function playTone(freq, type, duration, vol = 0.5) {
-    if(audioCtx.state === 'suspended') return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + duration);
+// Функция проигрывания звука (cloneNode позволяет звукам накладываться друг на друга при быстрых ударах)
+function playSound(audioObj) {
+    if (!audioObj.src || audioObj.src.includes('undefined')) return;
+    const clone = audioObj.cloneNode();
+    clone.volume = 0.5; // Громкость (0.5 = 50%)
+    // Игнорируем системные ошибки браузера, если игрок еще не кликнул по экрану
+    clone.play().catch(() => {}); 
 }
 
-function playHit() { playTone(600, 'sine', 0.1, 0.4); } 
-function playWall() { playTone(200, 'square', 0.1, 0.15); }
-function playGoal() { playTone(400, 'sawtooth', 0.5, 0.5); setTimeout(() => playTone(600, 'sawtooth', 0.6, 0.5), 150); }
+function playHit() { playSound(sndHit); }
+function playWall() { playSound(sndWall); }
+function playGoalWin() { playSound(sndGoalWin); }
+function playGoalLose() { playSound(sndGoalLose); }
 
+// ==========================================
 // ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
+// ==========================================
 let puckTrail = []; 
 let confetti = [];  
 
@@ -40,7 +45,9 @@ function spawnConfetti() {
     }
 }
 
-// ЛОГИКА МЕНЮ
+// ==========================================
+// ЛОГИКА МЕНЮ И АВТОРИЗАЦИИ
+// ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -107,14 +114,14 @@ function updateProfile() {
     });
 }
 
-// ПРОФИЛЬ И ВЫХОД
+// ПРОФИЛЬ
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
-            
             document.getElementById('profile-name').innerText = p.name;
+            
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
@@ -131,7 +138,6 @@ window.showProfile = function(username) {
             const date = new Date(p.regDate);
             document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
 
-            // 🔥 Показываем настройки и кнопку выхода только в СВОЕМ профиле
             if (username === nameInput.value) {
                 document.getElementById('avatar-selector').style.display = 'block';
                 document.getElementById('btn-logout').style.display = 'block';
@@ -139,28 +145,21 @@ window.showProfile = function(username) {
                 document.getElementById('avatar-selector').style.display = 'none';
                 document.getElementById('btn-logout').style.display = 'none';
             }
-
             document.getElementById('profile-modal').style.display = 'flex';
-        } else {
-            alert("Не удалось загрузить профиль");
-        }
+        } else alert("Не удалось загрузить профиль");
     });
 };
-
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
-// 🔥 ЛОГИКА КНОПКИ "ВЫЙТИ ИЗ АККАУНТА"
 document.getElementById('btn-logout').onclick = () => {
     if (confirm("Вы уверены, что хотите выйти из аккаунта?")) {
-        localStorage.removeItem('ah_name');
-        localStorage.removeItem('ah_pass');
-        window.location.reload(); // Мгновенный сброс страницы в состояние гостя
+        localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass');
+        window.location.reload(); 
     }
 };
 
-
-// ДРУЗЬЯ
+// ДРУЗЬЯ И ПРИГЛАШЕНИЯ
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -275,7 +274,6 @@ document.getElementById('btn-in-game-quit').onclick = () => {
     }
 };
 
-// ЭНД СКРИН
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
 socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; });
 
@@ -312,7 +310,9 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
-// --- ИГРОВАЯ ЛОГИКА ---
+// ==========================================
+// 🔥 ИГРОВАЯ ЛОГИКА (ВКЛЮЧАЕТ ЗВУКИ)
+// ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null;
@@ -320,12 +320,22 @@ let hitCooldown = 0; let wallCooldown = 0;
 
 socket.on('role', role => myRole = role);
 
+// Обработка голов и умный выбор звука
 socket.on('goalNotify', data => { 
     document.getElementById('goal-msg').textContent = data.msg; 
     document.getElementById('goal-msg').style.color = data.color; 
     
     if(data.msg) {
-        playGoal(); 
+        // Читаем текст, чтобы понять, наш это гол или чужой
+        const myName = nameInput.value;
+        const msgStr = data.msg;
+        
+        if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) {
+            playGoalWin(); // Ура! Это мы забили или победили!
+        } else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) {
+            playGoalLose(); // Блин, забили нам :(
+        }
+
         canvas.classList.add('shake');
         setTimeout(() => canvas.classList.remove('shake'), 400);
         spawnConfetti();
@@ -473,6 +483,7 @@ function loop() {
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
         
+        // 🔥 ПРОСЛУШКА УДАРОВ ДЛЯ ЗВУКОВ
         if (!serverState.paused && !serverState.gameOver) {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;
