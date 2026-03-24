@@ -5,12 +5,8 @@ const catImages = { 'korzhik': new Image(), 'karamelka': new Image(), 'kompot': 
 catImages.korzhik.src = '/korzhik.png'; catImages.karamelka.src = '/karamelka.png'; 
 catImages.kompot.src = '/kompot.png'; catImages.gonya.src = '/gonya.png';
 
-// ==========================================
-// 🔥 АУДИО ДВИЖОК (ПРОЦЕДУРНЫЕ ЗВУКИ)
-// ==========================================
+// АУДИО ДВИЖОК
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-// Браузеры блокируют звук до первого клика пользователя. Разблокируем при клике:
 window.addEventListener('click', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); });
 
 function playTone(freq, type, duration, vol = 0.5) {
@@ -19,31 +15,19 @@ function playTone(freq, type, duration, vol = 0.5) {
     const gain = audioCtx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    
-    // Плавное затухание звука
     gain.gain.setValueAtTime(vol, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
 }
 
-// Наши звуки
-function playHit() { playTone(600, 'sine', 0.1, 0.4); } // Удар по шайбе
-function playWall() { playTone(200, 'square', 0.1, 0.15); } // Удар о борт
-function playGoal() { 
-    // Аккорд из двух нот для эпичности
-    playTone(400, 'sawtooth', 0.5, 0.5); 
-    setTimeout(() => playTone(600, 'sawtooth', 0.6, 0.5), 150);
-}
+function playHit() { playTone(600, 'sine', 0.1, 0.4); } 
+function playWall() { playTone(200, 'square', 0.1, 0.15); }
+function playGoal() { playTone(400, 'sawtooth', 0.5, 0.5); setTimeout(() => playTone(600, 'sawtooth', 0.6, 0.5), 150); }
 
-// ==========================================
-// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
-// ==========================================
-let puckTrail = []; // Шлейф
-let confetti = [];  // Частицы конфетти
+// ВИЗУАЛЬНЫЕ ЭФФЕКТЫ
+let puckTrail = []; 
+let confetti = [];  
 
 function spawnConfetti() {
     for(let i = 0; i < 100; i++) {
@@ -51,15 +35,12 @@ function spawnConfetti() {
             x: 400, y: 200, 
             vx: (Math.random() - 0.5) * 25, vy: (Math.random() - 0.5) * 25,
             color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-            size: Math.random() * 8 + 4,
-            life: 1
+            size: Math.random() * 8 + 4, life: 1
         });
     }
 }
 
-// ==========================================
 // ЛОГИКА МЕНЮ
-// ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
 const gameWrapper = document.getElementById('game-wrapper');
@@ -126,13 +107,14 @@ function updateProfile() {
     });
 }
 
+// ПРОФИЛЬ И ВЫХОД
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
             const p = res.profile;
             const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
-            document.getElementById('profile-name').innerText = p.name;
             
+            document.getElementById('profile-name').innerText = p.name;
             let av = p.avatar || 'avatar1';
             if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png'; 
@@ -149,15 +131,36 @@ window.showProfile = function(username) {
             const date = new Date(p.regDate);
             document.getElementById('profile-regdate').innerText = date.toLocaleDateString('ru-RU');
 
-            if (username === nameInput.value) document.getElementById('avatar-selector').style.display = 'block';
-            else document.getElementById('avatar-selector').style.display = 'none';
+            // 🔥 Показываем настройки и кнопку выхода только в СВОЕМ профиле
+            if (username === nameInput.value) {
+                document.getElementById('avatar-selector').style.display = 'block';
+                document.getElementById('btn-logout').style.display = 'block';
+            } else {
+                document.getElementById('avatar-selector').style.display = 'none';
+                document.getElementById('btn-logout').style.display = 'none';
+            }
+
             document.getElementById('profile-modal').style.display = 'flex';
-        } else alert("Не удалось загрузить профиль");
+        } else {
+            alert("Не удалось загрузить профиль");
+        }
     });
 };
+
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if(res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); }
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 
+// 🔥 ЛОГИКА КНОПКИ "ВЫЙТИ ИЗ АККАУНТА"
+document.getElementById('btn-logout').onclick = () => {
+    if (confirm("Вы уверены, что хотите выйти из аккаунта?")) {
+        localStorage.removeItem('ah_name');
+        localStorage.removeItem('ah_pass');
+        window.location.reload(); // Мгновенный сброс страницы в состояние гостя
+    }
+};
+
+
+// ДРУЗЬЯ
 window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -234,10 +237,12 @@ socket.on('forceStartGame', () => {
     document.getElementById('btn-in-game-quit').style.display = 'block';
 });
 
+// МАГАЗИН
 window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => { if (res.success) { document.getElementById('shop-error').innerText = ""; updateProfile(); } else { document.getElementById('shop-error').innerText = res.msg; } }); };
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => document.getElementById('shop-modal').style.display = 'none';
 
+// КНОПКИ ИГРЫ
 document.getElementById('btn-play').onclick = () => {
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); 
     document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
@@ -270,36 +275,9 @@ document.getElementById('btn-in-game-quit').onclick = () => {
     }
 };
 
-// ==========================================
-// 🔥 ЛОГИКА ИГРЫ И ОБРАБОТКА ЭФФЕКТОВ
-// ==========================================
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-let serverState = null; let clientState = null; let myRole = null;
-let hitCooldown = 0; let wallCooldown = 0; // Защита от спама звуком
-
-socket.on('role', role => myRole = role);
-
-// Когда забит гол или конец матча
-socket.on('goalNotify', data => { 
-    document.getElementById('goal-msg').textContent = data.msg; 
-    document.getElementById('goal-msg').style.color = data.color; 
-    
-    // Эффекты при голе
-    if(data.msg) {
-        playGoal(); // Звук гола
-        
-        // Тряска экрана
-        canvas.classList.add('shake');
-        setTimeout(() => canvas.classList.remove('shake'), 400);
-
-        // Спавним конфетти
-        spawnConfetti();
-    }
-});
-
+// ЭНД СКРИН
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
-socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; }); // Чистим конфетти на реванше
+socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; });
 
 socket.on('opponentLeft', () => {
     socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; 
@@ -334,6 +312,25 @@ document.getElementById('btn-leaderboard').onclick = () => {
 };
 document.getElementById('btn-close-lb').onclick = () => document.getElementById('leaderboard-modal').style.display = 'none';
 
+// --- ИГРОВАЯ ЛОГИКА ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let serverState = null; let clientState = null; let myRole = null;
+let hitCooldown = 0; let wallCooldown = 0;
+
+socket.on('role', role => myRole = role);
+
+socket.on('goalNotify', data => { 
+    document.getElementById('goal-msg').textContent = data.msg; 
+    document.getElementById('goal-msg').style.color = data.color; 
+    
+    if(data.msg) {
+        playGoal(); 
+        canvas.classList.add('shake');
+        setTimeout(() => canvas.classList.remove('shake'), 400);
+        spawnConfetti();
+    }
+});
 
 socket.on('gameStateUpdate', s => {
     serverState = s;
@@ -433,24 +430,20 @@ function render(s) {
         if (dist < pR + 22) { px = myPlayer.x + (dx/dist)*(pR+22); py = myPlayer.y + (dy/dist)*(pR+22); }
     }
 
-    // 🔥 ДОБАВЛЯЕМ ШЛЕЙФ ОТ ШАЙБЫ
     if(!serverState.paused && !serverState.gameOver) {
         puckTrail.push({x: px, y: py});
-        if(puckTrail.length > 10) puckTrail.shift(); // Длина шлейфа
-    } else {
-        puckTrail = []; // Прячем шлейф на паузе
-    }
+        if(puckTrail.length > 10) puckTrail.shift(); 
+    } else { puckTrail = []; }
 
     ctx.save();
     for(let i=0; i<puckTrail.length; i++) {
         ctx.beginPath();
         ctx.arc(puckTrail[i].x, puckTrail[i].y, 22 * (i/puckTrail.length), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`; // Голубоватый след
+        ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`; 
         ctx.fill();
     }
     ctx.restore();
 
-    // Сама шайба
     ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#333'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#111'; ctx.stroke();
     ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fillStyle = '#666'; ctx.fill();
@@ -458,16 +451,13 @@ function render(s) {
     drawPlayer(s.player1.x, s.player1.y, serverState.player1.skin, '#4da6ff');
     drawPlayer(s.player2.x, s.player2.y, serverState.player2.skin, '#ff4d4d');
 
-    // 🔥 РИСУЕМ КОНФЕТТИ (если они есть)
     if (confetti.length > 0) {
         confetti.forEach((c, index) => {
-            c.x += c.vx; c.y += c.vy; c.vy += 0.8; // Гравитация
-            c.life -= 0.015; // Скорость исчезновения
-            
+            c.x += c.vx; c.y += c.vy; c.vy += 0.8; 
+            c.life -= 0.015; 
             ctx.globalAlpha = Math.max(0, c.life);
             ctx.fillStyle = c.color;
             ctx.fillRect(c.x, c.y, c.size, c.size);
-            
             if (c.life <= 0) confetti.splice(index, 1);
         });
         ctx.globalAlpha = 1.0;
@@ -483,17 +473,14 @@ function loop() {
         clientState[enemy].x += (serverState[enemy].x - clientState[enemy].x) * lerp;
         clientState[enemy].y += (serverState[enemy].y - clientState[enemy].y) * lerp;
         
-        // 🔥 ПРОВЕРКА УДАРОВ (для звуков)
         if (!serverState.paused && !serverState.gameOver) {
             if(hitCooldown > 0) hitCooldown--;
             if(wallCooldown > 0) wallCooldown--;
 
-            // Звук борта
             if ((clientState.puck.y <= 22 + 2 || clientState.puck.y >= 400 - 22 - 2) && wallCooldown === 0) { 
                 playWall(); wallCooldown = 10; 
             }
 
-            // Звук клюшки
             const checkHit = (p) => {
                 let r = serverState[p].skin === 'karamelka' ? 43 : (serverState[p].skin === 'gonya' ? 28 : 35);
                 let dx = clientState.puck.x - clientState[p].x;
