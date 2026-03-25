@@ -8,11 +8,6 @@
     <meta name="description" content="Эпичный онлайн-аэрохоккей! Кланы, Боевой Пропуск и еженедельные турниры.">
     <link rel="icon" type="image/png" href="/favicon.png">
     
-    <meta property="og:title" content="Аэрохоккей: Три Кота 🐾">
-    <meta property="og:description" content="Залетай в турнир! Проверь свои силы против реальных игроков.">
-    <meta property="og:image" content="/kompot.png">
-    <meta property="og:type" content="website">
-
     <style>
         /* --- Базовые стили --- */
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
@@ -24,7 +19,6 @@
         h1 { color: #ff7000; font-size: 52px; margin-bottom: 20px; text-shadow: 3px 3px 0px #ffe5b4; text-align: center; line-height: 1.1; }
         h2 { margin-top: 0; color: #fb8500; font-size: 32px; text-transform: uppercase; }
 
-        /* --- Кнопки и Инпуты --- */
         input, select { width: 90%; padding: 14px; margin: 10px 0; border: 3px solid #8ecae6; border-radius: 18px; font-size: 16px; box-sizing: border-box; outline: none; font-family: inherit; transition: 0.3s; }
         input:focus { border-color: #fb8500; box-shadow: 0 0 10px rgba(251, 133, 0, 0.2); }
 
@@ -38,12 +32,10 @@
         .btn-purple { background: #8338ec; color: white; }
         .btn-small { padding: 8px 15px; font-size: 13px; border-radius: 12px; }
 
-        /* --- Спецэффекты --- */
         @keyframes pulse-btn { 0% { transform: scale(1); } 50% { transform: scale(1.05); filter: brightness(1.1); } 100% { transform: scale(1); } }
         .shake { animation: shake-anim 0.4s; }
         @keyframes shake-anim { 0%, 100% {transform: translate(0,0);} 10%, 30%, 50%, 70%, 90% {transform: translate(-4px,0);} 20%, 40%, 60%, 80% {transform: translate(4px,0);} }
 
-        /* Рамки VS экрана */
         .vs-fire { box-shadow: 0 0 25px #ff4d4d; border: 4px solid #ff4d4d !important; animation: glow-fire 1s infinite alternate; }
         .vs-ice { box-shadow: 0 0 25px #00ffff; border: 4px solid #00ffff !important; animation: glow-ice 1s infinite alternate; }
         .vs-neon { box-shadow: 0 0 25px #ff00ff; border: 4px solid #ff00ff !important; }
@@ -53,17 +45,14 @@
         @keyframes glow-fire { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(20deg) brightness(1.3); } }
         @keyframes glow-matrix { 0% { opacity: 0.8; } 50% { opacity: 1; transform: scale(1.02); } 100% { opacity: 0.8; } }
 
-        /* --- Прогресс-бар БП --- */
         .bp-container { width: 100%; background: #eee; border-radius: 12px; height: 28px; margin: 15px 0; position: relative; border: 2px solid #ddd; overflow: hidden; }
         .bp-fill { height: 100%; background: linear-gradient(90deg, #06d6a0, #4da6ff); transition: width 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .bp-text { position: absolute; top: 0; left: 0; width: 100%; text-align: center; line-height: 28px; font-weight: bold; font-size: 14px; text-shadow: 1px 1px 0 white; }
 
-        /* --- Глобальный чат --- */
         #global-chat { position: fixed; bottom: 0; left: 20px; width: 320px; height: 320px; background: rgba(255,255,255,0.98); border: 4px solid #8ecae6; border-radius: 15px 15px 0 0; display: flex; flex-direction: column; z-index: 2500; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 -5px 20px rgba(0,0,0,0.1); }
         #global-chat.collapsed { height: 40px !important; transform: translateY(0); }
         #chat-header { background: #8ecae6; color: white; padding: 10px 15px; cursor: pointer; display: flex; justify-content: space-between; font-weight: bold; border-radius: 10px 10px 0 0; }
         
-        /* Меню быстрых фраз */
         .qc-menu { display: none; position: absolute; bottom: 60px; left: 0; background: white; border: 3px solid #4da6ff; border-radius: 15px; padding: 10px; flex-direction: column; gap: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 100; }
         .qc-item { padding: 8px 12px; background: #f4faff; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; white-space: nowrap; }
         .qc-item:hover { background: #4da6ff; color: white; }
@@ -98,7 +87,7 @@
         
         <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 650px; margin-bottom: 30px;">
             
-            <button id="btn-tourney" class="btn btn-purple" style="display: none; background: #ef233c; border: 4px solid #fff; animation: pulse-btn 1.5s infinite; width: 100%;">
+            <button id="btn-tourney" class="btn btn-purple" style="display: none; background: #ef233c; border: 4px solid #fff; animation: pulse-btn 1.5s infinite; width: 100%;" onclick="joinTournament()">
                 🏆 УЧАСТВОВАТЬ В ТУРНИРЕ
             </button>
 
@@ -175,16 +164,11 @@
         <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
             <h2 style="color: #d90429;">👑 УПРАВЛЕНИЕ СЕРВЕРОМ</h2>
             
-            <div style="margin-bottom: 20px; padding: 15px; border: 3px dashed #ffb703; border-radius: 20px; background: #fffaf0; text-align: left;">
-                <h3 style="margin: 0 0 10px 0; color: #fb8500; font-size: 20px;">🏆 КОНТРОЛЬ ТУРНИРА</h3>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px;">
-                    <span>Статус: <b id="admin-tourney-state" style="color: #8338ec;">Ожидание</b></span>
-                    <span>Участников: <b id="admin-tourney-players" style="color: #06d6a0;">0</b></span>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn btn-green btn-small" style="flex: 1;" onclick="adminTourney('startReg')">1. ОТКРЫТЬ РЕГУ</button>
-                    <button class="btn btn-blue btn-small" style="flex: 1;" onclick="adminTourney('startMatches')">2. СТАРТ МАТЧЕЙ</button>
-                    <button class="btn btn-red btn-small" onclick="adminTourney('cancel')">ОТМЕНА</button>
+            <div style="margin-bottom: 15px; padding: 10px; border: 2px dashed red; border-radius: 10px; background: #fffaf0;">
+                <h3 style="margin: 0 0 10px 0; color: #d90429;">🏆 Управление Турниром</h3>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-green btn-small" style="flex: 1;" onclick="adminTourney('startReg')">Начать регистрацию на турнир</button>
+                    <button class="btn btn-blue btn-small" style="flex: 1;" onclick="adminTourney('startMatches')">Начать турнир</button>
                 </div>
             </div>
 
