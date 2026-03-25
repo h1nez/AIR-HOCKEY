@@ -477,32 +477,6 @@ async function startNextTournamentRound() {
     }
 }
 
-async function setupTournamentMatch(p1n, p2n) {
-    const s1 = connectedUsers[p1n], s2 = connectedUsers[p2n];
-    if (!s1 && !s2) return; 
-    if (!s1) { tourney.winners.push(p2n); return; } 
-    if (!s2) { tourney.winners.push(p1n); return; }
-    
-    try {
-        const u1 = await User.findOne({name: p1n}).lean();
-        const u2 = await User.findOne({name: p2n}).lean();
-        
-        let roomId = 'room_t_' + Date.now() + Math.floor(Math.random()*1000);
-        rooms[roomId] = {
-            id: roomId, puck: { x: 400, y: 200, vx: 0, vy: 0 },
-            player1: { id: s1, name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating },
-            player2: { id: s2, name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating },
-            paused: false, gameOver: false, isTournament: true
-        };
-        
-        [s1, s2].forEach((s, i) => { 
-            const sock = io.sockets.sockets.get(s); 
-            if(sock){ if(sock.roomId) sock.leave(sock.roomId); sock.join(roomId); sock.roomId = roomId; sock.emit('role', i===0?'p1':'p2'); }
-        });
-        
-        tourney.matchesActive++;
-    } catch(e) {}
-}
 
 io.on('connection', (socket) => {
     
