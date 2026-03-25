@@ -239,10 +239,20 @@ async function finishMatch(room, winRole, isDisconnect = false) {
 
 // 🔥 ЗАПУСК СЛЕДУЮЩЕГО РАУНДА ТУРНИРА
 async function startNextTournamentRound() {
-    tourney.players = [...tourney.winners];
-    tourney.winners = [];
+    // ЕСЛИ есть победители, значит мы переходим к следующему раунду
+    // ЕСЛИ победителей нет, но есть игроки — значит это СТАРТ турнира (Первый раунд)
+    if (tourney.winners.length > 0) {
+        tourney.players = [...tourney.winners];
+        tourney.winners = [];
+    }
+    // Если winners пустой и players пустой — значит турнир реально пуст
+    else if (tourney.players.length === 0) {
+        tourney.state = 'idle';
+        io.emit('tourneyAnnounce', `Турнир завершен без победителя.`);
+        return;
+    }
 
-    // Если остался 1 победитель — выдаем награду за 1 МЕСТО!
+    // Остальной код функции (проверка на 1 игрока, перемешивание и т.д.) остается без изменений...
     if (tourney.players.length === 1) {
         const championName = tourney.players[0];
         tourney.state = 'idle';
