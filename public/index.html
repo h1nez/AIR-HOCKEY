@@ -89,6 +89,9 @@
 
         .vs-gold { box-shadow: 0 0 30px #ffd700; border-color: #ffd700 !important; animation: pulse-gold 1s infinite alternate; }
         @keyframes pulse-gold { 0% { box-shadow: 0 0 20px #ffd700; } 100% { box-shadow: 0 0 40px #fff; } }
+
+        .vs-matrix { box-shadow: 0 0 30px #00ff00; border-color: #00ff00 !important; animation: pulse-matrix 1s infinite alternate; }
+        @keyframes pulse-matrix { 0% { box-shadow: 0 0 20px #00ff00; } 100% { box-shadow: 0 0 40px #aaffaa, 0 0 20px #00ff00 inset; } }
     </style>
 </head>
 <body>
@@ -157,6 +160,15 @@
                 <div style="font-weight: bold; color: #00838f; font-size: 18px; margin-bottom: 5px;">У вас есть VS-Кейсы: <span id="bp-case-count" style="font-size: 24px; color: #e63946;">0</span></div>
                 <div style="font-size: 12px; color: #006064; margin-bottom: 10px;">Внутри случайный эффект аватарки (дается на 0 и 25 уровне БП)!</div>
                 <button onclick="openVsCase()" class="btn btn-purple" style="width: 100%; font-size: 16px;">ОТКРЫТЬ КЕЙС 🎁</button>
+            </div>
+
+            <div id="bp-secret-shop" style="margin-bottom: 15px; padding: 15px; background: #2b2d42; border-radius: 15px; border: 3px solid #ef233c; display: none; color: white;">
+                <div style="font-weight: bold; font-size: 18px; margin-bottom: 5px; color: #edf2f4;">ТЕМНЫЙ РЫНОК БП 🕵️‍♂️</div>
+                <div style="font-size: 12px; color: #8d99ae; margin-bottom: 10px;">Потратьте лишний опыт на эксклюзив! Доступно XP: <span id="bp-secret-xp" style="color: #06d6a0; font-size: 16px; font-weight: bold;">0</span></div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="buyBpItem('sazhik')" class="btn" style="flex: 1; background: #8d99ae; color: white; font-size: 14px; padding: 10px;">🐈‍⬛ Сажик<br><span style="color: #ffb703;">500 XP</span></button>
+                    <button onclick="buyBpItem('matrix')" class="btn" style="flex: 1; background: #8d99ae; color: white; font-size: 14px; padding: 10px;">🟩 Матрица (VS)<br><span style="color: #ffb703;">300 XP</span></button>
+                </div>
             </div>
 
             <div style="text-align: left; background: #fffaf0; padding: 15px; border-radius: 15px; border: 2px solid #ffb703; max-height: 200px; overflow-y: auto; margin-bottom: 15px;">
@@ -269,12 +281,13 @@
                     <div><b style="color: #06d6a0; font-size: 18px;" id="profile-won">0</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ПОБЕД</span></div>
                     <div><b style="color: #fb8500; font-size: 18px;" id="profile-winrate">0%</b><br><span style="font-size:10px; color:#555; font-weight:bold;">ВИНРЕЙТ</span></div>
                 </div>
-				<div style="text-align: left; background: #fffaf0; padding: 10px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 10px; font-size: 14px; font-weight:bold; color: #555;">
-					<div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
-					<div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
-					<div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
-					<div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
-				</div>
+                
+                <div style="text-align: left; background: #fffaf0; padding: 10px; border-radius: 15px; border: 2px dashed #ffb703; margin-bottom: 10px; font-size: 14px; font-weight:bold; color: #555;">
+                    <div style="display: flex; align-items: center;">🏆 Текущее ЭЛО: <span id="profile-mmr" style="color: #fb8500; display:flex; align-items:center;"></span></div>
+                    <div style="margin: 5px 0; display: flex; align-items: center;">📈 Макс. ЭЛО: <span id="profile-max-mmr" style="color: #06d6a0; display:flex; align-items:center;"></span></div>
+                    <div style="display: flex; align-items: center;">📉 Мин. ЭЛО: <span id="profile-min-mmr" style="color: #e63946; display:flex; align-items:center;"></span></div>
+                    <div style="margin-top: 10px;">👕 Скин: <b id="profile-skin" style="color: #219ebc;">Обычный</b></div>
+                </div>
 
                 <div id="profile-edit-section" style="display: none; margin-bottom: 10px; border-top: 2px dashed #ccc; padding-top: 10px;">
                     
@@ -286,6 +299,7 @@
                             <option value="ice" id="vs-opt-ice" disabled>❄️ Ледяное свечение</option>
                             <option value="neon" id="vs-opt-neon" disabled>🟣 Неоновая пульсация</option>
                             <option value="gold" id="vs-opt-gold" disabled>🌟 Золотое сияние</option>
+                            <option value="matrix" id="vs-opt-matrix" disabled>🟩 Матрица (Секретный шоп)</option>
                         </select>
                     </div>
 
