@@ -212,59 +212,6 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
 }
 
-// 🔥 ЗАПУСК СЛЕДУЮЩЕГО РАУНДА ТУРНИРА
-async function startNextTournamentRound() {
-    tourney.players = [...tourney.winners];
-    tourney.winners = [];
-
-    // Если остался 1 победитель — выдаем награды!
-    if (tourney.players.length === 1) {
-        const championName = tourney.players[0];
-        tourney.state = 'idle';
-        io.emit('tourneyAnnounce', `🏆 ТУРНИР ЗАВЕРШЕН! Чемпион Недели: ${championName}!`);
-        try {
-            const u = await User.findOne({ name: championName });
-            if (u) {
-                u.title = "Чемпион Недели 🏆";
-                u.coins += 1000;
-                // Даем уникальные фразы Quick Chat
-                if (!u.quickChats.includes('Я здесь ЧЕМПИОН! 🏆')) u.quickChats.push('Я здесь ЧЕМПИОН! 🏆');
-                if (!u.quickChats.includes('Легкотня! 😎')) u.quickChats.push('Легкотня! 😎');
-                await u.save();
-                const sockId = connectedUsers[championName];
-                if (sockId) io.to(sockId).emit('tourneyMsg', '🎉 ПОЗДРАВЛЯЕМ! Вы выиграли турнир! Вам выдан титул, 1000 монет и новые Быстрые Фразы!');
-            }
-        } catch(e) {}
-        return;
-    }
-
-    if (tourney.players.length === 0) {
-        tourney.state = 'idle';
-        io.emit('tourneyAnnounce', `Турнир завершен без победителя.`);
-        return;
-    }
-
-    // Составляем пары
-    let shuffled = tourney.players.sort(() => 0.5 - Math.random());
-    tourney.matchesActive = 0;
-
-    for (let i = 0; i < shuffled.length; i += 2) {
-        if (i + 1 < shuffled.length) {
-            const p1Name = shuffled[i]; const p2Name = shuffled[i+1];
-            await setupTournamentMatch(p1Name, p2Name);
-        } else {
-            // Игроку не хватило пары, он автоматически проходит в следующий раунд
-            tourney.winners.push(shuffled[i]);
-            const sId = connectedUsers[shuffled[i]];
-            if (sId) io.to(sId).emit('tourneyMsg', `Вам не досталось противника в этом раунде. Вы автоматически проходите дальше!`);
-        }
-    }
-    
-    if (tourney.matchesActive === 0) {
-        // Если матчей нет (например, был 1 авто-проход), сразу стартуем некст раунд
-        startNextTournamentRound();
-    }
-}
 
 async function setupTournamentMatch(p1Name, p2Name) {
     const sId1 = connectedUsers[p1Name]; const sId2 = connectedUsers[p2Name];
