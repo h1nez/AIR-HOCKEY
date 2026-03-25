@@ -177,10 +177,12 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     if (lose.name === "...") return; 
     if (isDisconnect) win.score = 5; 
 
-    if (!room.isFriendly) {
+// Выдаем опыт БП только в онлайн-матчах (не в тренировке и не с друзьями)
+    if (!room.isFriendly && !room.isBotMatch) {
         if (win.id !== 'secret_bot' && win.id !== 'bot') await applyBP(win.name, 50, win.id);
         if (lose.id !== 'secret_bot' && lose.id !== 'bot') await applyBP(lose.name, 20, lose.id);
     }
+
 
     if (room.isBotMatch || room.isFriendly) {
         room.rematch = { player1: false, player2: false };
