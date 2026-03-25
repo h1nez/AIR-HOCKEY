@@ -335,7 +335,10 @@ document.getElementById('btn-leaderboard').onclick = () => {
         }
     });
 };
-document.getElementById('btn-close-lb').onclick = () => { document.getElementById('leaderboard-modal').style.display = 'none'; };
+const tourneyBtn = document.getElementById('btn-tourney');
+if (tourneyBtn) {
+    tourneyBtn.onclick = () => { socket.emit('joinTourney', res => alert(res.msg)); };
+}
 
 // ==========================================
 // 🔥 ИГРОВОЙ ДВИЖОК, ЭКРАН VS И БЫСТРЫЙ ЧАТ

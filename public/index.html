@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Аэрохоккей Три Кота — Играй онлайн!</title> 
-    <meta name="description" content="Эпичный онлайн-аэрохоккей! Прокачивай Боевой Пропуск, вступай в кланы, открывай секретные скины и побеждай друзей.">
+    
+    <title>Аэрохоккей Три Кота — Онлайн Турниры!</title> 
+    <meta name="description" content="Играй в аэрохоккей онлайн! Боевой Пропуск, Кланы, Турниры и эксклюзивные скины Сажика.">
     <link rel="icon" type="image/png" href="/favicon.png">
+    
     <meta property="og:title" content="Аэрохоккей: Три Кота 🐾">
-    <meta property="og:description" content="Залетай ко мне в матч! У нас тут Боевой Пропуск, кланы и онлайн-рубилово.">
+    <meta property="og:description" content="Залетай в турнир! Проверь свои силы против реальных игроков.">
     <meta property="og:image" content="/kompot.png">
     <meta property="og:type" content="website">
+
     <style>
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
@@ -17,190 +20,222 @@
         h1 { color: #ff7000; font-size: 56px; margin-bottom: 20px; text-shadow: 3px 3px 0px #ffe5b4, -2px -2px 0px #fff; text-align: center; line-height: 1.1; }
         h2 { margin-top: 0; color: #fb8500; font-size: 32px; }
         input, select { width: 90%; padding: 12px; margin: 8px 0; border: 3px solid #8ecae6; border-radius: 15px; font-size: 16px; box-sizing: border-box; outline: none; font-family: inherit; }
-        input:focus, select:focus { border-color: #219ebc; }
-        .remember-label { display: block; margin: 10px 0; cursor: pointer; font-size: 16px; color: #555; font-weight: bold;}
         .btn { padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-family: inherit; font-size: 20px; transition: 0.2s; box-shadow: 0 6px 0 rgba(0,0,0,0.2); text-transform: uppercase; }
         .btn:active { transform: translateY(6px); box-shadow: none; }
-        .btn-blue { background: #4da6ff; color: white; } .btn-red { background: #ff4d4d; color: white; } .btn-green { background: #06d6a0; color: white; } .btn-orange { background: #ffb703; color: white; } .btn-purple { background: #8338ec; color: white; }
+        .btn-blue { background: #4da6ff; color: white; }
+        .btn-red { background: #ff4d4d; color: white; }
+        .btn-green { background: #06d6a0; color: white; }
+        .btn-orange { background: #ffb703; color: white; }
+        .btn-purple { background: #8338ec; color: white; }
         .btn-small { padding: 8px 15px; font-size: 14px; box-shadow: 0 3px 0 rgba(0,0,0,0.2); border-radius: 10px; }
-        #auth-error { color: #e63946; margin-top: 15px; font-size: 16px; min-height: 20px; font-weight: bold; }
-        .tabs { display: flex; margin-bottom: 15px; gap: 5px; } .tab-btn { flex: 1; padding: 10px; background: #eee; border: 3px solid #ccc; border-bottom: none; cursor: pointer; font-weight: bold; border-radius: 15px 15px 0 0; font-size: 16px; font-family: inherit; } .tab-btn.active { background: #ffb703; color: white; border-color: #ffb703; }
-        .tab-content { display: none; background: #fff; padding: 15px; border: 4px solid #ffb703; border-radius: 0 0 15px 15px; min-height: 200px; max-height: 300px; overflow-y: auto; text-align: left; } .tab-content.active { display: block; }
-        .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 2px dashed #eee; } .friend-info { font-size: 18px; font-weight: bold; color: #333; } .friend-mmr { font-size: 14px; color: #888; font-weight: normal; display: flex; align-items: center; margin-top: 4px; }
-        .avatar-opt { transition: 0.2s; border: 4px solid transparent; border-radius: 50%; cursor: pointer; width: 65px; height: 65px; object-fit: cover; } .avatar-opt:hover { transform: scale(1.1); border-color: #8ecae6; }
-        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-3px, -4px) rotate(-1deg); } 20% { transform: translate(-5px, 0px) rotate(1deg); } 30% { transform: translate(5px, 4px) rotate(0deg); } 40% { transform: translate(3px, -3px) rotate(1deg); } 50% { transform: translate(-3px, 4px) rotate(-1deg); } 60% { transform: translate(-5px, 3px) rotate(0deg); } 70% { transform: translate(5px, 3px) rotate(-1deg); } 80% { transform: translate(-3px, -3px) rotate(1deg); } 90% { transform: translate(3px, 4px) rotate(0deg); } 100% { transform: translate(1px, -4px) rotate(-1deg); } } .shake { animation: shake 0.4s; }
-        @keyframes pulse-btn { 0% { transform: scale(1); box-shadow: 0 8px 0 rgba(0,0,0,0.2); } 50% { transform: scale(1.05); box-shadow: 0 12px 20px rgba(0,0,0,0.4), 0 8px 0 rgba(0,0,0,0.2); } 100% { transform: scale(1); box-shadow: 0 8px 0 rgba(0,0,0,0.2); } }
-        .lvl-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-weight: 900; font-size: 13px; margin: 0 6px; vertical-align: middle; color: white; text-shadow: 1px 1px 0px rgba(0,0,0,0.5); box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid rgba(0,0,0,0.8); font-family: Arial, sans-serif; }
-        .lvl-1 { background: #eeeeee; color: #333; text-shadow: none; } .lvl-2, .lvl-3 { background: #16e536; } .lvl-4, .lvl-5, .lvl-6 { background: #ffcc00; color: #333; text-shadow: none; } .lvl-7, .lvl-8 { background: #ff9900; } .lvl-9 { background: #ff3300; } .lvl-10 { background: #ff0000; }
-        .game-layout-limit { width: 100%; max-width: min(800px, calc((100vh - 160px) * 2)); box-sizing: border-box; }
-        .emoji-btn { background: white; border: 3px solid #ffb703; border-radius: 50%; font-size: 26px; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.1s; display: flex; align-items: center; justify-content: center; padding: 0; outline: none; position: relative; } .emoji-btn:active { transform: scale(0.9); box-shadow: none; }
-        #global-chat { position: fixed; bottom: 0; left: 20px; width: 320px; height: 300px; background: rgba(255,255,255,0.95); border: 4px solid #8ecae6; border-bottom: none; border-radius: 15px 15px 0 0; display: flex; flex-direction: column; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); z-index: 2500; transition: height 0.3s ease; } #global-chat.collapsed { height: 35px !important; } #global-chat.collapsed #chat-body { display: none !important; } #chat-header { background: #8ecae6; color: white; font-weight: bold; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 15px; border-radius: 10px 10px 0 0; }
-        @media screen and (max-width: 700px) and (orientation: portrait) { #main-menu.overlay { justify-content: flex-start !important; padding-top: 10vh !important; overflow-y: auto !important; padding-bottom: 250px !important; } #global-chat { left: 50% !important; transform: translateX(-50%); width: 95% !important; max-width: 400px !important; height: 220px !important; } #global-chat.collapsed { height: 42px !important; } }
-        @media screen and (max-height: 600px) and (orientation: landscape) { .overlay { justify-content: flex-start !important; overflow-y: auto !important; padding-top: 15px !important; padding-bottom: 120px !important; } #global-chat { left: auto !important; right: 20px !important; width: 280px !important; height: 160px !important; } #global-chat.collapsed { height: 35px !important; } h1 { font-size: 32px !important; margin-top: 5px !important; margin-bottom: 10px !important; } .game-layout-limit { max-width: min(800px, calc((100vh - 80px) * 2)); } .p-name { font-size: 14px !important; } .emoji-btn { width: 28px !important; height: 28px !important; font-size: 14px !important; } }
-        .bp-progress-container { width: 100%; background: #eee; border-radius: 10px; height: 25px; margin: 15px 0; position: relative; border: 2px solid #ccc; overflow: hidden; } .bp-progress-fill { height: 100%; background: linear-gradient(90deg, #06d6a0, #4da6ff); transition: width 0.5s ease-out; width: 0%; } .bp-progress-text { position: absolute; top: 0; left: 0; width: 100%; text-align: center; line-height: 25px; font-weight: bold; color: #333; font-size: 14px; text-shadow: 1px 1px 0 #fff; }
-        .vs-fire { box-shadow: 0 0 30px #ff0000, 0 0 10px #ff9900 inset; border-color: #ff4d4d !important; animation: pulse-fire 1s infinite alternate; } @keyframes pulse-fire { 0% { box-shadow: 0 0 20px #ff0000; } 100% { box-shadow: 0 0 40px #ff9900, 0 0 20px #ff0000 inset; } }
-        .vs-ice { box-shadow: 0 0 30px #00ffff; border-color: #00ffff !important; animation: pulse-ice 1s infinite alternate; } @keyframes pulse-ice { 0% { box-shadow: 0 0 20px #00ffff; } 100% { box-shadow: 0 0 40px #ffffff; } }
-        .vs-neon { box-shadow: 0 0 30px #ff00ff; border-color: #ff00ff !important; animation: pulse-neon 1s infinite alternate; } @keyframes pulse-neon { 0% { box-shadow: 0 0 20px #ff00ff; } 100% { box-shadow: 0 0 40px #ff00ff; } }
-        .vs-gold { box-shadow: 0 0 30px #ffd700; border-color: #ffd700 !important; animation: pulse-gold 1s infinite alternate; } @keyframes pulse-gold { 0% { box-shadow: 0 0 20px #ffd700; } 100% { box-shadow: 0 0 40px #fff; } }
-        .vs-matrix { box-shadow: 0 0 30px #00ff00; border-color: #00ff00 !important; animation: pulse-matrix 1s infinite alternate; } @keyframes pulse-matrix { 0% { box-shadow: 0 0 20px #00ff00; } 100% { box-shadow: 0 0 40px #aaffaa, 0 0 20px #00ff00 inset; } }
         
-        /* 🔥 МЕНЮ БЫСТРЫХ ФРАЗ */
+        /* Анимации */
+        @keyframes pulse-btn { 0% { transform: scale(1); } 50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(239, 35, 60, 0.4); } 100% { transform: scale(1); } }
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% {transform: translate(0,0);} 10%, 30%, 50%, 70%, 90% {transform: translate(-5px,0);} 20%, 40%, 60%, 80% {transform: translate(5px,0);} }
+
+        /* Эффекты аватарок */
+        .vs-fire { box-shadow: 0 0 30px #ff0000; border-color: #ff4d4d !important; animation: pulse-fire 1s infinite alternate; }
+        .vs-ice { box-shadow: 0 0 30px #00ffff; border-color: #00ffff !important; animation: pulse-ice 1s infinite alternate; }
+        .vs-neon { box-shadow: 0 0 30px #ff00ff; border-color: #ff00ff !important; animation: pulse-neon 1s infinite alternate; }
+        .vs-gold { box-shadow: 0 0 30px #ffd700; border-color: #ffd700 !important; animation: pulse-gold 1s infinite alternate; }
+        .vs-matrix { box-shadow: 0 0 30px #00ff00; border-color: #00ff00 !important; animation: pulse-matrix 1s infinite alternate; }
+        @keyframes pulse-fire { from {box-shadow: 0 0 10px #ff0000;} to {box-shadow: 0 0 30px #ff9900;} }
+        @keyframes pulse-matrix { from {box-shadow: 0 0 10px #00ff00;} to {box-shadow: 0 0 40px #aaffaa;} }
+
+        /* Чат */
+        #global-chat { position: fixed; bottom: 0; left: 20px; width: 320px; height: 300px; background: rgba(255,255,255,0.95); border: 4px solid #8ecae6; border-radius: 15px 15px 0 0; display: flex; flex-direction: column; z-index: 2500; transition: 0.3s; }
+        #global-chat.collapsed { height: 35px !important; }
+        #chat-header { background: #8ecae6; color: white; padding: 8px 15px; cursor: pointer; display: flex; justify-content: space-between; font-weight: bold; }
+
+        /* Быстрые фразы */
         .qc-menu { display: none; position: absolute; bottom: 60px; left: 0; background: white; border: 3px solid #ffb703; border-radius: 15px; padding: 10px; flex-direction: column; gap: 5px; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.2); min-width: 150px; }
         .qc-item { padding: 8px; background: #f4faff; border: 2px solid #8ecae6; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 14px; text-align: left; }
-        .qc-item:hover { background: #4da6ff; color: white; border-color: #219ebc; }
+        .qc-item:hover { background: #4da6ff; color: white; }
+
+        /* Прогресс БП */
+        .bp-progress-container { width: 100%; background: #eee; border-radius: 10px; height: 25px; margin: 15px 0; position: relative; border: 2px solid #ccc; overflow: hidden; }
+        .bp-progress-fill { height: 100%; background: linear-gradient(90deg, #06d6a0, #4da6ff); transition: width 0.5s ease-out; }
+        .bp-progress-text { position: absolute; top: 0; left: 0; width: 100%; text-align: center; line-height: 25px; font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="auth-screen" class="overlay">
         <div class="modal-box">
-            <h2>АЭРОХОККЕЙ</h2>
-            <input type="text" id="username" placeholder="Ваш никнейм">
+            <h2>ВХОД В ИГРУ</h2>
+            <input type="text" id="username" placeholder="Твой никнейм">
             <input type="password" id="password" placeholder="Пароль">
-            <label class="remember-label"><input type="checkbox" id="remember" checked> Запомнить меня</label>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <label style="display: block; margin: 10px 0;"><input type="checkbox" id="remember" checked> Запомнить меня</label>
+            <div style="display: flex; gap: 10px;">
                 <button id="btn-login" class="btn btn-blue" style="flex:1;">Войти</button>
                 <button id="btn-register" class="btn btn-red" style="flex:1;">Создать</button>
             </div>
-            <div id="auth-error"></div>
+            <div id="auth-error" style="color: red; margin-top: 10px;"></div>
         </div>
     </div>
 
     <div id="main-menu" class="overlay" style="display: none;">
-        <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6; text-shadow: 2px 2px 0px #fff;">ТРИ КОТА</span></h1>
-        <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 20px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
+        <h1>АЭРОХОККЕЙ<br><span style="font-size: 40px; color: #8ecae6;">ТРИ КОТА</span></h1>
+        <div id="menu-coins" style="font-size: 28px; color: #ffb703; font-weight: bold; margin-bottom: 20px;">💰 Монеты: 0</div>
         
         <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
             <button id="btn-tourney" class="btn btn-purple" style="display: none; animation: pulse-btn 1s infinite; background: #ef233c;">🏆 ТУРНИР!</button>
-
+            
             <button id="btn-my-profile" class="btn btn-blue">👤 Профиль</button>
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-bp" class="btn btn-green">🎁 Battle Pass</button>
             <button id="btn-clans" class="btn btn-purple">🛡️ Кланы</button>
-            <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:14px;">0</span></button>
+            <button id="btn-friends" class="btn btn-blue" style="position: relative;">👥 Друзья <span id="req-badge" style="display:none; position:absolute; top:-10px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 8px; font-size:12px;">0</span></button>
             <button id="btn-leaderboard" class="btn btn-blue">🏆 Топ-10</button>
             <button id="btn-admin" class="btn btn-red" style="display: none; background: #d90429;">👑 Админ</button>
         </div>
         
-        <div style="display: flex; justify-content: center;">
-            <button id="btn-play-menu" class="btn btn-green" style="font-size: 36px; padding: 20px 80px; border-radius: 25px; animation: pulse-btn 2s infinite;">🎮 ИГРАТЬ</button>
-        </div>
+        <button id="btn-play-menu" class="btn btn-green" style="font-size: 36px; padding: 20px 80px; border-radius: 25px; animation: pulse-btn 2s infinite;">🎮 ИГРАТЬ</button>
 
-        <div id="global-chat">
-            <div id="chat-header"><span>💬 Чат игроков</span><span id="chat-toggle-icon">▼</span></div>
-            <div id="chat-body" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; height: 100%;">
-                <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; text-align: left; display: flex; flex-direction: column; gap: 5px;"></div>
-                <div style="display: flex; border-top: 2px solid #eee;">
-                    <input type="text" id="chat-input" placeholder="Написать..." style="flex: 1; border: none; border-radius: 0 0 0 11px; margin: 0; padding: 10px; font-size: 14px; outline: none;">
-                    <button id="btn-send-chat" style="border: none; background: #4da6ff; color: white; cursor: pointer; padding: 0 15px; font-weight: bold; font-size: 16px;">➔</button>
+        <div id="global-chat" class="collapsed">
+            <div id="chat-header"><span>💬 Чат игроков</span><span id="chat-toggle-icon">▲</span></div>
+            <div id="chat-body" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; text-align: left;"></div>
+                <div style="display: flex; border-top: 1px solid #eee;">
+                    <input type="text" id="chat-input" placeholder="Сообщение..." style="flex: 1; border: none; padding: 10px;">
+                    <button id="btn-send-chat" style="background: #4da6ff; color: white; border: none; padding: 0 15px;">➔</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="bp-modal" class="overlay" style="display: none; z-index: 2000;">
-        <div class="modal-box" style="border-color: #06d6a0; max-width: 500px; padding: 20px;">
-            <h2 style="color: #06d6a0; font-size: 32px; margin-bottom: 5px;">🎁 BATTLE PASS</h2>
-            <div style="font-size: 14px; color: #555; margin-bottom: 15px; font-weight: bold;">Играй матчи, чтобы получать награды!</div>
-            
-            <div style="background: #f4faff; padding: 15px; border-radius: 15px; border: 2px dashed #4da6ff; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px;">
-                    <span style="color: #219ebc;">Текущий Уровень: <span id="bp-current-lvl" style="font-size: 24px; color: #fb8500;">0</span> / 30</span>
-                </div>
+        <div class="modal-box" style="border-color: #06d6a0;">
+            <h2 style="color: #06d6a0;">🎁 BATTLE PASS</h2>
+            <div style="background: #f4faff; padding: 15px; border-radius: 15px; margin-bottom: 15px;">
+                <div style="font-weight: bold; font-size: 18px;">Уровень: <span id="bp-current-lvl" style="color: #fb8500;">0</span></div>
                 <div class="bp-progress-container">
-                    <div id="bp-progress-bar" class="bp-progress-fill"></div>
+                    <div id="bp-progress-bar" class="bp-progress-fill" style="width: 0%"></div>
                     <div id="bp-progress-text" class="bp-progress-text">0 / 100 XP</div>
                 </div>
-                <div style="font-size: 14px; color: #888; font-style: italic;">(Победа: +50 XP | Поражение: +20 XP)</div>
             </div>
 
-            <div id="bp-case-section" style="margin-bottom: 15px; padding: 15px; background: #e0f7fa; border-radius: 15px; border: 2px solid #00bcd4; display: none;">
-                <div style="font-weight: bold; color: #00838f; font-size: 18px; margin-bottom: 5px;">У вас есть VS-Кейсы: <span id="bp-case-count" style="font-size: 24px; color: #e63946;">0</span></div>
-                <div style="font-size: 12px; color: #006064; margin-bottom: 10px;">Внутри случайный эффект аватарки (дается на 0 и 25 уровне БП)!</div>
-                <button onclick="openVsCase()" class="btn btn-purple" style="width: 100%; font-size: 16px;">ОТКРЫТЬ КЕЙС 🎁</button>
-            </div>
-
-            <div id="bp-secret-shop" style="margin-bottom: 15px; padding: 15px; background: #2b2d42; border-radius: 15px; border: 3px solid #ef233c; display: none; color: white;">
-                <div style="font-weight: bold; font-size: 18px; margin-bottom: 5px; color: #edf2f4;">ТЕМНЫЙ РЫНОК БП 🕵️‍♂️</div>
-                <div style="font-size: 12px; color: #8d99ae; margin-bottom: 10px;">Потратьте лишний опыт на эксклюзив! Доступно XP: <span id="bp-secret-xp" style="color: #06d6a0; font-size: 16px; font-weight: bold;">0</span></div>
+            <div id="bp-secret-shop" style="display: none; padding: 15px; background: #2b2d42; border-radius: 15px; color: white; margin-bottom: 15px;">
+                <div style="font-weight: bold; margin-bottom: 10px;">🕵️‍♂️ ТЕМНЫЙ РЫНОК (Доступно XP: <span id="bp-secret-xp" style="color:#06d6a0;">0</span>)</div>
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="buyBpItem('sazhik')" class="btn" style="flex: 1; background: #8d99ae; color: white; font-size: 14px; padding: 10px;">🐈‍⬛ Сажик<br><span style="color: #ffb703;">1500 XP</span></button>
-                    <button onclick="buyBpItem('matrix')" class="btn" style="flex: 1; background: #8d99ae; color: white; font-size: 14px; padding: 10px;">🟩 Матрица (VS)<br><span style="color: #ffb703;">800 XP</span></button>
+                    <button onclick="buyBpItem('sazhik')" class="btn btn-small" style="flex:1; background: #8d99ae;">🐈‍⬛ Сажик<br>1500 XP</button>
+                    <button onclick="buyBpItem('matrix')" class="btn btn-small" style="flex:1; background: #8d99ae;">🟩 Матрица<br>800 XP</button>
                 </div>
             </div>
 
-            <button id="btn-close-bp" class="btn btn-blue" style="width: 100%;">Закрыть</button>
-        </div>
-    </div>
-
-    <div id="bp-levelup-modal" class="overlay" style="display: none; z-index: 3500; background: rgba(0,0,0,0.85);">
-        <div style="text-align: center;">
-            <div style="font-size: 80px; animation: pulse-btn 1s infinite;">🎉</div>
-            <h1 style="color: #06d6a0; text-shadow: 2px 2px 0px #fff; font-size: 50px; margin: 10px 0;">НОВЫЙ УРОВЕНЬ БП!</h1>
-            <div id="bp-levelup-number" style="color: #ffb703; font-size: 40px; font-weight: bold; margin-bottom: 20px;">Уровень X</div>
-            <div id="bp-levelup-rewards" style="color: white; font-size: 24px; font-weight: bold; margin-bottom: 30px;">Награда</div>
-            <button class="btn btn-green" onclick="document.getElementById('bp-levelup-modal').style.display='none'; updateProfile();">ЗАБРАТЬ</button>
+            <div style="text-align: left; font-size: 14px; max-height: 150px; overflow-y: auto; background: #fffaf0; padding: 10px; border-radius: 10px; border: 1px dashed #ccc;">
+                <h4 style="margin:0">Награды:</h4>
+                <p>• Ур. 10: Эффект огня 🔥</p>
+                <p>• Ур. 20: Эффект черной дыры 🌌</p>
+                <p>• Ур. 25: Кейс аватарок 🎁</p>
+                <p>• Ур. 30: Эффект льда ❄️ + ТЕМНЫЙ РЫНОК</p>
+            </div>
+            <button id="btn-close-bp" class="btn btn-blue" style="width: 100%; margin-top: 15px;">Закрыть</button>
         </div>
     </div>
 
     <div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
-        <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
-            <h2 style="color: #d90429;">👑 Панель Администратора</h2>
+        <div class="modal-box" style="border-color: #d90429; max-width: 700px;">
+            <h2 style="color: #d90429;">👑 АДМИН-ЦЕНТР</h2>
             
             <div style="margin-bottom: 15px; padding: 15px; border: 3px dashed #ffb703; border-radius: 15px; background: #fffaf0; text-align: left;">
                 <h3 style="margin-top: 0; color: #fb8500;">🏆 Управление Турниром</h3>
-                <div style="margin-bottom: 10px; font-weight: bold; color: #555;">Статус: <span id="admin-tourney-state" style="color: #06d6a0;">Ожидание</span> | Участников: <span id="admin-tourney-players" style="color: #8338ec;">0</span></div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-green btn-small" style="flex:1;" onclick="adminTourney('startReg')">1. Начать Регистрацию</button>
-                    <button class="btn btn-blue btn-small" style="flex:1;" onclick="adminTourney('startMatches')">2. Запустить Матчи!</button>
+                <div style="margin-bottom: 10px;">Статус: <b id="admin-tourney-state">Ожидание</b> | Игроков: <b id="admin-tourney-players">0</b></div>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-green btn-small" style="flex:1" onclick="adminTourney('startReg')">Открыть Регу</button>
+                    <button class="btn btn-blue btn-small" style="flex:1" onclick="adminTourney('startMatches')">СТАРТ МАТЧЕЙ</button>
                     <button class="btn btn-red btn-small" onclick="adminTourney('cancel')">Отмена</button>
                 </div>
             </div>
 
-            <div style="max-height: 300px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <thead><tr style="border-bottom: 2px solid #ccc; text-align: left;"><th style="padding: 5px;">Ник / IP</th><th style="padding: 5px;">ЭЛО</th><th style="padding: 5px;">Монеты</th><th style="padding: 5px;">Действия</th></tr></thead>
+            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee;">
+                <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                    <thead><tr style="background:#eee;"><th>Игрок</th><th>ЭЛО</th><th>Монеты</th><th>Действия</th></tr></thead>
                     <tbody id="admin-users-list"></tbody>
                 </table>
             </div>
-            <button id="btn-close-admin" class="btn btn-blue" style="width: 100%;">Закрыть</button>
+            <button id="btn-close-admin" class="btn btn-blue" style="width: 100%; margin-top: 10px;">Закрыть</button>
         </div>
     </div>
 
-    <div id="play-modal" class="overlay" style="display: none; z-index: 2000;"><div class="modal-box" style="border-color: #06d6a0; max-width: 400px;"><h2 style="color: #06d6a0; font-size: 32px; margin-bottom: 25px;">ВЫБЕРИ РЕЖИМ</h2><div style="display: flex; flex-direction: column; gap: 15px;"><button id="btn-play" class="btn btn-green" style="font-size: 24px; padding: 20px;">🌐 ИГРАТЬ ONLINE</button><button id="btn-play-bot" class="btn btn-blue" style="font-size: 20px; padding: 15px;">🤖 ТРЕНИРОВКА</button><button id="btn-close-play-modal" class="btn btn-red" style="margin-top: 10px;">Отмена</button></div></div></div>
-    <div id="shop-modal" class="overlay" style="display: none;"><div class="modal-box" style="max-width: 400px; width: 90%;"><h2>🛒 Магазин</h2><div id="shop-coins" style="color: #ffb703; margin-bottom: 15px; font-size: 20px; font-weight: bold;">Ваши монеты: 0</div><div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;"><button id="btn-shop-prev" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&lt;</button><div style="display: flex; flex-direction: column; align-items: center; flex: 1;"><h3 id="shop-item-name" style="margin: 0 0 10px 0; font-size: 24px; color: #333; text-transform: uppercase;">Обычный</h3><div id="shop-item-preview-border" style="width: 130px; height: 130px; border-radius: 50%; border: 6px solid #4da6ff; background: #f4faff; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; box-shadow: 0 6px 15px rgba(0,0,0,0.15); transition: 0.3s;"><img id="shop-item-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;"><span id="shop-item-preview-text" style="font-size: 20px; font-weight: bold; color: white; display: none;">БАЗА</span></div><span id="shop-item-boost" style="font-size: 14px; color: #023047; font-style: italic; min-height: 20px; font-weight: bold;">Нет бонусов</span><p id="shop-item-price" style="font-size: 20px; font-weight: bold; color: #fb8500; margin: 10px 0;">Бесплатно</p><button id="btn-shop-action" class="btn btn-orange" style="width: 90%; padding: 10px; font-size: 16px;">КУПИТЬ</button></div><button id="btn-shop-next" class="btn btn-blue" style="padding: 10px 20px; font-size: 24px;">&gt;</button></div><div id="shop-error" style="color: #e63946; margin: 5px 0; min-height: 20px; font-weight: bold;"></div><button id="btn-close-shop" class="btn btn-orange" style="width: 100%;">Закрыть</button></div></div>
-    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0 10px; box-sizing: border-box;">
-        <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
-            <div style="display: flex; flex-direction: column; align-items: flex-start;"><div class="p-name" style="font-size: 24px; font-weight: bold; color: #4da6ff; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;"><span id="n1">Игрок 1</span> <span id="r1" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-left: 5px;"></span></div><div id="s1" class="paw-icon" style="display: flex; gap: 8px; margin-top: 5px;"></div></div>
-            <button id="btn-in-game-quit" class="btn btn-red btn-small" style="display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 5px;">🚪 Выйти</button>
+    <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; width: 100%;">
+        <div class="game-layout-limit" style="display: flex; justify-content: space-between; width: 800px; margin-bottom: 10px;">
+            <div style="text-align: left;">
+                <div style="font-weight: bold; color: #4da6ff; font-size: 20px;"><span id="n1">...</span> <span id="r1"></span></div>
+                <div id="s1" style="display: flex; gap: 5px;"></div>
+            </div>
+            <button id="btn-in-game-quit" class="btn btn-red btn-small">🚪 Выйти</button>
+            <div style="text-align: right;">
+                <div style="font-weight: bold; color: #ff4d4d; font-size: 20px;"><span id="r2"></span> <span id="n2">...</span></div>
+                <div id="s2" style="display: flex; gap: 5px; flex-direction: row-reverse;"></div>
+            </div>
         </div>
 
-        <div id="game-container" class="game-layout-limit" style="position: relative; aspect-ratio: 2/1; overflow: hidden; border-radius: 40px;">
-            <canvas id="gameCanvas" width="800" height="400" style="width: 100%; height: 100%; background-color: #f4faff; border: 12px solid #8ecae6; box-sizing: border-box; box-shadow: 0 15px 35px rgba(0,0,0,0.15); touch-action: none;"></canvas>
-            <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 56px; font-weight: bold; text-shadow: 3px 3px 0px #fff, -3px -3px 0px #fff, 3px -3px 0px #fff, -3px 3px 0px #fff; pointer-events: none; text-align: center; width: 100%; color: #fb8500;"></div>
-            <button id="btn-cancel-search" class="btn btn-red" style="display: none; position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); z-index: 100;">Отменить поиск</button>
-            <div id="vs-screen" class="overlay" style="display: none; position: absolute; background: rgba(0,0,0,0.85); flex-direction: row; justify-content: center; align-items: center; gap: 20px; z-index: 500;">
-                <div id="vs-p1" style="color: white; text-align: center; transform: translateX(-100vw); transition: 0.5s ease-out;"><img id="vs-p1-av" src="/avatar1.png" style="width:100px; height:100px; border-radius:50%; border: 4px solid #4da6ff; object-fit: cover;"><div id="vs-p1-title" style="color: #ffb703; font-size: 14px; font-weight: bold; margin-top: 5px;"></div><div id="vs-p1-name" style="font-size: 24px; font-weight: bold; color: #4da6ff; text-transform: uppercase;"></div><div id="vs-p1-elo" style="font-size: 16px; font-weight: bold;"></div></div>
-                <div id="vs-logo" style="font-size: 60px; font-weight: 900; color: #ffb703; text-shadow: 4px 4px 0px #fff; opacity: 0; transition: 0.5s ease-in; font-style: italic;">VS</div>
-                <div id="vs-p2" style="color: white; text-align: center; transform: translateX(100vw); transition: 0.5s ease-out;"><img id="vs-p2-av" src="/avatar1.png" style="width:100px; height:100px; border-radius:50%; border: 4px solid #ff4d4d; object-fit: cover;"><div id="vs-p2-title" style="color: #ffb703; font-size: 14px; font-weight: bold; margin-top: 5px;"></div><div id="vs-p2-name" style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-transform: uppercase;"></div><div id="vs-p2-elo" style="font-size: 16px; font-weight: bold;"></div></div>
+        <div id="game-container" style="position: relative; width: 800px; height: 400px; border-radius: 30px; overflow: hidden; border: 10px solid #8ecae6;">
+            <canvas id="gameCanvas" width="800" height="400" style="background: white; cursor: none;"></canvas>
+            <div id="goal-msg" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: 900; text-align: center; pointer-events: none; text-shadow: 2px 2px 10px #fff;"></div>
+            <button id="btn-cancel-search" class="btn btn-red" style="display:none; position:absolute; bottom: 20px; left:50%; transform:translateX(-50%);">Отменить поиск</button>
+            
+            <div id="vs-screen" class="overlay" style="display: none; position: absolute; background: rgba(0,0,0,0.9); z-index: 500;">
+                <div id="vs-p1" style="color: white; text-align: center; transition: 0.5s;"><img id="vs-p1-av" src="/avatar1.png" style="width:120px; border-radius:50%; border: 4px solid #4da6ff;"><h3 id="vs-p1-name"></h3><p id="vs-p1-elo"></p></div>
+                <div id="vs-logo" style="font-size: 80px; color: #ffb703; margin: 0 40px; font-style: italic; font-weight: 900;">VS</div>
+                <div id="vs-p2" style="color: white; text-align: center; transition: 0.5s;"><img id="vs-p2-av" src="/avatar1.png" style="width:120px; border-radius:50%; border: 4px solid #ff4d4d;"><h3 id="vs-p2-name"></h3><p id="vs-p2-elo"></p></div>
             </div>
-            <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); z-index: 600;"><h2 style="color: #ffb703; font-size: 40px; margin-top: 0; margin-bottom: 15px; text-shadow: 2px 2px 0 #fff;">МАТЧ ОКОНЧЕН!</h2><div id="end-status" style="color: #333; font-size: 20px; margin-bottom: 20px; font-weight: bold;">Выберите действие:</div><div style="display: flex; gap: 15px;"><button id="btn-new-game" class="btn btn-green">Новая игра</button><button id="btn-leave-match" class="btn btn-red">В меню</button></div></div>
+
+            <div id="end-screen" class="overlay" style="display: none; position: absolute; background: rgba(255,255,255,0.9); z-index: 600;">
+                <h2>МАТЧ ОКОНЧЕН</h2>
+                <div style="display: flex; gap: 10px;"><button id="btn-new-game" class="btn btn-green">Новая игра</button><button id="btn-leave-match" class="btn btn-red">В меню</button></div>
+            </div>
         </div>
 
-        <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
-            <div id="emoji-panel" style="display: flex; gap: 10px; position: relative;">
-                <button class="emoji-btn" onclick="toggleQuickChat()" style="background: #4da6ff; border-color: #219ebc; color: white;">💬</button>
-                <div id="qc-menu" class="qc-menu">
-                    </div>
-                
-                <button class="emoji-btn" onclick="sendEmoji('😹')">😹</button>
-                <button class="emoji-btn" onclick="sendEmoji('😿')">😿</button>
-                <button class="emoji-btn" onclick="sendEmoji('😼')">😼</button>
-                <button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end;"><div id="s2" class="paw-icon" style="display: flex; gap: 8px; margin-bottom: 5px; flex-direction: row-reverse;"></div><div class="p-name" style="font-size: 24px; font-weight: bold; color: #ff4d4d; text-shadow: 1px 1px 0px #fff; display: flex; align-items: center;"><span id="r2" class="p-elo" style="font-size: 16px; color: #555; display: flex; align-items: center; margin-right: 5px;"></span> <span id="n2">Игрок 2</span></div></div>
+        <div class="game-layout-limit" style="display: flex; width: 800px; gap: 10px; margin-top: 10px; position: relative;">
+            <button class="emoji-btn" onclick="toggleQuickChat()" style="background: #4da6ff; color: white;">💬</button>
+            <div id="qc-menu" class="qc-menu"></div>
+            
+            <button class="emoji-btn" onclick="sendEmoji('😹')">😹</button>
+            <button class="emoji-btn" onclick="sendEmoji('😼')">😼</button>
+            <button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button>
         </div>
     </div>
+
+    <div id="clans-modal" class="overlay" style="display: none;"><div class="modal-box"><h2>🛡️ КЛАНЫ</h2><div id="no-clan-block"><button class="btn btn-blue" onclick="loadClansList()">Список кланов</button></div><div id="my-clan-block" style="display:none;"></div><button id="btn-close-clans" class="btn btn-orange" style="width:100%; margin-top:10px;">Закрыть</button></div></div>
+    
+    <div id="profile-modal" class="overlay" style="display: none;">
+        <div class="modal-box">
+            <h2 id="profile-name">ПРОФИЛЬ</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <img id="profile-avatar" src="/avatar1.png" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid #8ecae6;">
+                <div style="text-align: left;">
+                    <div>🏆 ЭЛО: <span id="profile-mmr"></span></div>
+                    <div>👕 Скин: <span id="profile-skin"></span></div>
+                    <div>📉 Мин: <span id="profile-min-mmr"></span> | 📈 Макс: <span id="profile-max-mmr"></span></div>
+                </div>
+            </div>
+            <div id="profile-edit-section" style="display:none;">
+                <select id="vs-effect-selector" onchange="setVsEffect(this.value)">
+                    <option value="none">Без эффекта VS</option>
+                    <option value="fire" id="vs-opt-fire" disabled>🔥 Огонь</option>
+                    <option value="ice" id="vs-opt-ice" disabled>❄️ Лед</option>
+                    <option value="neon" id="vs-opt-neon" disabled>🟣 Неон</option>
+                    <option value="gold" id="vs-opt-gold" disabled>🌟 Золото</option>
+                    <option value="matrix" id="vs-opt-matrix" disabled>🟩 Матрица</option>
+                </select>
+                <select id="effect-selector" onchange="setGoalEffect(this.value)">
+                    <option value="default">Обычное конфетти</option>
+                    <option value="fire" id="opt-fire" disabled>🔥 Эффект огня</option>
+                    <option value="blackhole" id="opt-blackhole" disabled>🌌 Черная дыра</option>
+                    <option value="ice" id="opt-ice" disabled>❄️ Лед</option>
+                </select>
+            </div>
+            <button onclick="document.getElementById('profile-modal').style.display='none'" class="btn btn-blue" style="width:100%;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="play-modal" class="overlay" style="display: none;"><div class="modal-box"><h2>РЕЖИМ ИГРЫ</h2><button id="btn-play" class="btn btn-green" style="width:100%; margin-bottom:10px;">ОНЛАЙН</button><button id="btn-play-bot" class="btn btn-blue" style="width:100%;">ТРЕНИРОВКА</button><button id="btn-close-play-modal" class="btn btn-red" style="width:100%; margin-top:10px;">ОТМЕНА</button></div></div>
+    <div id="shop-modal" class="overlay" style="display: none;"><div class="modal-box"><h2>🛒 МАГАЗИН</h2><div id="shop-coins">💰 0</div><div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:20px 0;"><button id="btn-shop-prev" class="btn btn-blue">&lt;</button><div id="shop-item-preview-border" style="width:100px; height:100px; border:4px solid #ccc; border-radius:50%; display:flex; align-items:center; justify-content:center;"><img id="shop-item-preview" style="width:80%;"></div><button id="btn-shop-next" class="btn btn-blue">&gt;</button></div><h3 id="shop-item-name">Скин</h3><p id="shop-item-price"></p><button id="btn-shop-action" class="btn btn-orange">КУПИТЬ</button><br><br><button id="btn-close-shop" class="btn btn-red" style="width:100%;">ЗАКРЫТЬ</button></div></div>
+    <div id="leaderboard-modal" class="overlay" style="display: none;"><div class="modal-box"><h2>🏆 ТОП ИГРОКОВ</h2><ol id="leaderboard-list" style="text-align:left;"></ol><button onclick="document.getElementById('leaderboard-modal').style.display='none'" class="btn btn-blue" style="width:100%;">ЗАКРЫТЬ</button></div></div>
+    <div id="friends-modal" class="overlay" style="display: none;"><div class="modal-box"><h2>👥 ДРУЗЬЯ</h2><div class="tabs"><button class="tab-btn active" onclick="switchTab('tab-list')">Список</button><button class="tab-btn" onclick="switchTab('tab-search')">Поиск</button></div><div id="tab-list" class="tab-content active"><div id="friends-list"></div></div><div id="tab-search" class="tab-content"><input id="search-input" placeholder="Никнейм..."><button class="btn btn-blue btn-small" onclick="searchFriends()">Искать</button><div id="search-results"></div></div><button id="btn-close-friends" class="btn btn-orange" style="width:100%; margin-top:10px;">Закрыть</button></div></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
