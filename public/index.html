@@ -414,34 +414,37 @@
         </div>
     </div>
 
-    <div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
-        <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
+	<div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
+		<div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
 			<h2 style="color: #d90429;">👑 Панель Администратора</h2>
-
-			<div id="admin-tourney-info" style="margin-bottom: 10px; padding: 10px; background: #f0f4ff; border: 2px solid #8338ec; border-radius: 10px; font-size: 14px; display: none; text-align: left;">
+	
+			<div id="admin-tourney-info" style="margin-bottom: 15px; padding: 10px; background: #f0f4ff; border: 2px solid #8338ec; border-radius: 10px; font-size: 14px; display: none; text-align: left;">
 			</div>
 
-			<div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; ...">
-
-            <div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; border-radius: 10px; background: #fffaf0;">
-                <h3 style="margin: 0 0 10px 0; color: #d90429; font-size: 18px;">🏆 Управление Турниром</h3>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-green btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startReg')">Открыть регистрацию</button>
-                    <button class="btn btn-blue btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startMatches')">Начать турнир</button>
-                </div>
-            </div>
-
-			<div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; ...">
-
-            <div style="max-height: 400px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <thead><tr style="border-bottom: 2px solid #ccc; text-align: left;"><th style="padding: 5px;">Ник / IP</th><th style="padding: 5px;">ЭЛО</th><th style="padding: 5px;">Монеты</th><th style="padding: 5px;">Действия</th></tr></thead>
-                    <tbody id="admin-users-list"></tbody>
-                </table>
-            </div>
-            <button id="btn-close-admin" class="btn btn-blue" style="width: 100%;">Закрыть</button>
-        </div>
-    </div>
+			<div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; border-radius: 10px; background: #fffaf0;">
+				<h3 style="margin: 0 0 10px 0; color: #d90429; font-size: 18px;">🏆 Управление Турниром</h3>
+				<div style="display: flex; gap: 10px;">
+					<button class="btn btn-green btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startReg')">Открыть регистрацию</button>
+					<button class="btn btn-blue btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startMatches')">Начать турнир</button>
+				</div>
+			</div>
+	
+			<div style="max-height: 400px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
+				<table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+					<thead>
+						<tr style="border-bottom: 2px solid #ccc; text-align: left;">
+							<th style="padding: 5px;">Ник / IP</th>
+							<th style="padding: 5px;">ЭЛО</th>
+							<th style="padding: 5px;">Монеты</th>
+							<th style="padding: 5px;">Действия</th>
+						</tr>
+					</thead>
+					<tbody id="admin-users-list"></tbody>
+				</table>
+			</div>
+			<button id="btn-close-admin" class="btn btn-blue" style="width: 100%;">Закрыть</button>
+		</div>
+	</div>
 
     <div id="game-wrapper" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0 10px; box-sizing: border-box;">
         <div class="game-layout-limit panel-margin" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">

@@ -495,15 +495,36 @@ io.on('connection', (socket) => {
     socket.on('globalChat', (msg) => { if (!socket.user || !msg || msg.trim() === '') return; let titleStr = socket.user.title ? `[${socket.user.title}] ` : ""; let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : ""; io.emit('chatMessage', { name: prefix + titleStr + socket.user.name, msg: msg.substring(0, 100) }); });
     socket.on('sendEmoji', (emoji) => { if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return; const room = rooms[socket.roomId]; let role = 'spectator'; if (socket.id === room.player1.id) role = 'p1'; else if (socket.id === room.player2.id) role = 'p2'; io.to(socket.roomId).emit('showEmoji', { role, emoji }); });
 
-    // 🔥 ДОБАВЛЕНА ИНФОРМАЦИЯ О ТУРНИРЕ ДЛЯ АДМИНА
-    socket.on('adminGetUsers', async (callback) => { 
-        if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false }); 
-        try { 
-            const users = await User.find().select('name rating coins regIp clan').lean(); 
-            const enhanced = users.map(u => { const isOnline = !!connectedUsers[u.name]; let inGameRoom = null; if (isOnline) { for (let id in rooms) { if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { inGameRoom = id; break; } } } return { ...u, isOnline, inGameRoom }; }); 
-            callback({ success: true, users: enhanced, tourneyState: tourney.state, tourneyPlayers: tourney.players.length, tourneyPlayersList: tourney.players }); 
-        } catch(e) { callback({ success: false }); } 
-    });
+	socket.on('adminGetUsers', async (callback) => { 
+		if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false }); 
+		try { 
+			const users = await User.find().select('name rating coins regIp clan').lean(); 
+			const enhanced = users.map(u => { 
+				const isOnline = !!connectedUsers[u.name]; 
+				let inGameRoom = null; 
+				if (isOnline) { 
+					for (let id in rooms) { 
+						if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { 
+							inGameRoom = id; 
+							break; 
+						} 
+					} 
+				} 
+				return { ...u, isOnline, inGameRoom }; 
+			}); 
+        
+			// ВНИМАТЕЛЬНО проверь скобки и запятые тут:
+			callback({ 
+				success: true, 
+				users: enhanced, 
+				tourneyState: tourney.state, 
+				tourneyPlayers: tourney.players.length,
+				tourneyPlayersList: tourney.players // Запятая должна быть на строке выше
+			}); 
+		} catch(e) { 
+			callback({ success: false }); 
+		} 
+	});
     
     socket.on('adminAction', async (data, callback) => { if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" }); try { const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" }); if (data.action === 'addBpXp') { await applyBP(data.targetName, Number(data.amount), connectedUsers[data.targetName]); return callback({ success: true, msg: `Успешно выдано ${data.amount} XP!` }); } if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } else if (data.action === 'ban') { await User.deleteOne({ name: data.targetName }); const tSocketId = connectedUsers[data.targetName]; if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); } } callback({ success: true, msg: "Успешно!" }); } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); } });
 
