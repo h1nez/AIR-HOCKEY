@@ -339,6 +339,38 @@ socket.on('bpLevelUp', (data) => {
 });
 
 // ==========================================
+// 🔥 ТУРНИРЫ
+// ==========================================
+socket.on('tourneyAnnounce', (msg) => {
+    alert(msg);
+    const btn = document.getElementById('btn-tourney');
+    if (btn) {
+        if (msg.includes('ОТКРЫТА')) {
+            btn.style.display = 'inline-block';
+        } else if (msg.includes('НАЧАЛСЯ') || msg.includes('отменен') || msg.includes('ЗАВЕРШЕН')) {
+            btn.style.display = 'none';
+        }
+    }
+});
+
+socket.on('tourneyMsg', (msg) => {
+    alert("🏆 ТУРНИР: " + msg);
+});
+
+window.joinTournament = function() {
+    socket.emit('joinTourney', (res) => {
+        alert(res.msg);
+    });
+};
+
+window.adminTourney = function(action) {
+    socket.emit('tourneyAdminAction', action, (res) => {
+        if (res.msg) alert(res.msg);
+        if (res.success && window.loadAdminUsers) loadAdminUsers();
+    });
+};
+
+// ==========================================
 // 🔥 АДМИН-ПАНЕЛЬ
 // ==========================================
 document.getElementById('btn-admin').onclick = () => {
@@ -895,5 +927,37 @@ function loop() {
     }
     requestAnimationFrame(loop);
 }
+
+// ==========================================
+// 🔥 ТУРНИРЫ
+// ==========================================
+socket.on('tourneyAnnounce', (msg) => {
+    alert(msg);
+    const btn = document.getElementById('btn-tourney');
+    if (btn) {
+        if (msg.includes('ОТКРЫТА')) {
+            btn.style.display = 'inline-block';
+        } else if (msg.includes('НАЧАЛСЯ') || msg.includes('отменен') || msg.includes('ЗАВЕРШЕН')) {
+            btn.style.display = 'none';
+        }
+    }
+});
+
+socket.on('tourneyMsg', (msg) => {
+    alert("🏆 ТУРНИР: " + msg);
+});
+
+window.joinTournament = function() {
+    socket.emit('joinTourney', (res) => {
+        alert(res.msg);
+    });
+};
+
+window.adminTourney = function(action) {
+    socket.emit('tourneyAdminAction', action, (res) => {
+        if (res.msg) alert(res.msg);
+        if (res.success && window.loadAdminUsers) loadAdminUsers();
+    });
+};
 
 loop();

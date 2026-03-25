@@ -72,6 +72,13 @@ const Clan = mongoose.model('Clan', clanSchema);
 
 const connectedUsers = {}; 
 
+// 🔥 СИСТЕМА ТУРНИРОВ
+let tourney = {
+    state: 'idle', // 'idle', 'reg', 'playing'
+    players: [], // Ники зарегистрированных
+    winners: [], // Победители текущего раунда
+    matchesActive: 0
+};
 
 // ==========================================
 // 2. ИГРОВАЯ ЛОГИКА И КОМНАТЫ
@@ -80,9 +87,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const WIDTH = 800; const HEIGHT = 400; const PUCK_R = 22;
 const rooms = {}; let roomCounter = 1;
-
-let tourney = { state: 'idle', players: [], winners: [], matchesActive: 0, round: 1 };
-function resetTourney() { tourney = { state: 'idle', players: [], winners: [], matchesActive: 0, round: 1 }; }
 
 function createRoom(isBotMatch = false, isFriendly = false, isTournament = false) {
     const roomId = 'room_' + roomCounter++;
@@ -166,6 +170,27 @@ async function finishMatch(room, winRole, isDisconnect = false) {
             const winnerSocketId = connectedUsers[win.name];
             if (winnerSocketId) io.to(winnerSocketId).emit('tourneyMsg', `Вы прошли дальше! Ждите остальных...`);
         }
+
+        // ВЫДАЧА НАГРАД ЗА 2 И 3 МЕСТО
+        if (lose.id !== 'bot') {
+            if (tourney.players.length === 2) {
+                // Финал -> проигравший занимает 2 место
+                try {
+                    const u2 = await User.findOne({ name: lose.name });
+                    if (u2) { u2.title = "Вице-чемпион 🥈"; await u2.save(); }
+                    const sid = connectedUsers[lose.name];
+                    if (sid) io.to(sid).emit('tourneyMsg', "🥈 2 место! Выдан титул: Вице-чемпион!");
+                } catch(e) {}
+            } else if (tourney.players.length <= 4) {
+                // Полуфинал -> проигравшие занимают 3 место
+                try {
+                    const u3 = await User.findOne({ name: lose.name });
+                    if (u3) { u3.coins += 1000; await u3.save(); }
+                    const sid = connectedUsers[lose.name];
+                    if (sid) io.to(sid).emit('tourneyMsg', "🥉 3 место! Выдано 1000 монет!");
+                } catch(e) {}
+            }
+        }
         
         io.to(room.id).emit('goalNotify', { msg: `ПОБЕДА В ТУРНИРЕ: ${win.name}!`, color: "gold", effectType: win.effect });
         setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 3000);
@@ -212,6 +237,58 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
 }
 
+// 🔥 ЗАПУСК СЛЕДУЮЩЕГО РАУНДА ТУРНИРА
+async function startNextTournamentRound() {
+    tourney.players = [...tourney.winners];
+    tourney.winners = [];
+
+    // Если остался 1 победитель — выдаем награду за 1 МЕСТО!
+    if (tourney.players.length === 1) {
+        const championName = tourney.players[0];
+        tourney.state = 'idle';
+        io.emit('tourneyAnnounce', `🏆 ТУРНИР ЗАВЕРШЕН! Чемпион: ${championName}!`);
+        try {
+            const u = await User.findOne({ name: championName });
+            if (u) {
+                // Выдаем эффект гола "Черная дыра"
+                if (!u.goalEffects.includes('blackhole')) u.goalEffects.push('blackhole');
+                u.currentGoalEffect = 'blackhole';
+                await u.save();
+                
+                const sockId = connectedUsers[championName];
+                if (sockId) io.to(sockId).emit('tourneyMsg', '🎉 1 МЕСТО! Вы выиграли турнир! Открыт эффект гола: Черная дыра 🌌!');
+            }
+        } catch(e) {}
+        return;
+    }
+
+    if (tourney.players.length === 0) {
+        tourney.state = 'idle';
+        io.emit('tourneyAnnounce', `Турнир завершен без победителя.`);
+        return;
+    }
+
+    // Составляем пары
+    let shuffled = tourney.players.sort(() => 0.5 - Math.random());
+    tourney.matchesActive = 0;
+
+    for (let i = 0; i < shuffled.length; i += 2) {
+        if (i + 1 < shuffled.length) {
+            const p1Name = shuffled[i]; const p2Name = shuffled[i+1];
+            await setupTournamentMatch(p1Name, p2Name);
+        } else {
+            // Игроку не хватило пары, он автоматически проходит в следующий раунд
+            tourney.winners.push(shuffled[i]);
+            const sId = connectedUsers[shuffled[i]];
+            if (sId) io.to(sId).emit('tourneyMsg', `Вам не досталось противника в этом раунде. Вы автоматически проходите дальше!`);
+        }
+    }
+    
+    if (tourney.matchesActive === 0) {
+        // Если матчей нет (например, был 1 авто-проход), сразу стартуем некст раунд
+        startNextTournamentRound();
+    }
+}
 
 async function setupTournamentMatch(p1Name, p2Name) {
     const sId1 = connectedUsers[p1Name]; const sId2 = connectedUsers[p2Name];
@@ -238,125 +315,14 @@ async function setupTournamentMatch(p1Name, p2Name) {
 
 
 async function handleGoal(room, winRole) {
-    room.paused = true; 
-    
-    // Возвращаем игроков на стартовые позиции после гола
-    room.player1.x = 80; room.player1.y = 200; 
-    room.player2.x = 720; room.player2.y = 200;
-    
-    const win = winRole === 'player1' ? room.player1 : room.player2; 
-    const lose = winRole === 'player1' ? room.player2 : room.player1;
-    
+    room.paused = true;
+    room.player1.x = 80; room.player1.y = 200; room.player2.x = 720; room.player2.y = 200;
+    const win = winRole === 'player1' ? room.player1 : room.player2;
     win.score++;
-    
-    // === ЕСЛИ КТО-ТО НАБРАЛ 5 ОЧКОВ (КОНЕЦ МАТЧА) ===
-    if (win.score >= 5) {
-        room.gameOver = true;
-        
-        // --- 🏆 ТУРНИРНЫЙ МАТЧ ---
-        if (room.isTournament) {
-            tourney.matchesActive--;
-            
-            const winnerName = win.name !== "..." ? win.name : null;
-            const loserName = lose.name !== "..." ? lose.name : null;
-
-            // Победитель проходит дальше
-            if (winnerName && (!win.id || !win.id.includes('bot'))) {
-                tourney.winners.push(winnerName);
-            }
-
-            // Выдача наград за 2 и 3 место проигравшим
-            if (loserName && (!lose.id || !lose.id.includes('bot'))) {
-                // Если в турнире было 2 человека (это был Финал), проигравший получает 2 место
-                if (tourney.players.length === 2) {
-                    try {
-                        const u2 = await User.findOne({ name: loserName });
-                        if (u2) { 
-                            u2.title = "Вице-чемпион 🥈"; 
-                            await u2.save(); 
-                        }
-                        const sid = connectedUsers[loserName];
-                        if (sid) io.to(sid).emit('tourneyMsg', "🥈 2 место! Выдан титул: Вице-чемпион!");
-                    } catch(e) { console.error("Ошибка выдачи 2 места:", e); }
-                } 
-                // Если было 3 или 4 человека (это был Полуфинал), проигравшие получают 3 место
-                else if (tourney.players.length <= 4) {
-                    try {
-                        const u3 = await User.findOne({ name: loserName });
-                        if (u3) { 
-                            u3.coins += 1000; 
-                            await u3.save(); 
-                        }
-                        const sid = connectedUsers[loserName];
-                        if (sid) io.to(sid).emit('tourneyMsg', "🥉 3 место! Выдано 1000 монет!");
-                    } catch(e) { console.error("Ошибка выдачи 3 места:", e); }
-                }
-            }
-
-            io.to(room.id).emit('goalNotify', { msg: `ТУРНИР: ПОБЕДА ${win.name}!`, color: "gold" });
-            
-            // Запускаем следующий раунд, если матчей больше нет
-            if (tourney.matchesActive <= 0) {
-                setTimeout(startNextTournamentRound, 3000);
-            }
-        } 
-        
-        // --- 🎮 ОБЫЧНЫЙ МАТЧ ---
-        else {
-            // Начисляем опыт Battle Pass
-            await applyBP(win.name, 50); 
-            await applyBP(lose.name, 20);
-            
-            if (win.id && !win.id.includes('bot') && lose.id && !lose.id.includes('bot')) {
-                try {
-                    const u1 = await User.findOne({name: win.name}); 
-                    const u2 = await User.findOne({name: lose.name});
-                    
-                    if (u1 && u2) {
-                        // Расчет ЭЛО
-                        const K = 32; 
-                        const exp = 1 / (1 + Math.pow(10, (u2.rating - u1.rating) / 400));
-                        const diff = Math.round(K * (1 - exp));
-                        
-                        u1.rating += diff; 
-                        u2.rating -= diff; 
-                        u1.coins += 25; // Награда за победу
-                        u2.coins += 5;  // Утешительный приз
-                        
-                        await u1.save(); 
-                        await u2.save();
-                    }
-                } catch(e) { console.error("Ошибка сохранения ЭЛО:", e); }
-            } else if (win.id && !win.id.includes('bot')) {
-                // Если выиграл у бота
-                try {
-                    const u1 = await User.findOne({name: win.name});
-                    if (u1) { u1.coins += 15; await u1.save(); }
-                } catch(e) {}
-            }
-            
-            io.to(room.id).emit('goalNotify', { msg: `ПОБЕДИТЕЛЬ: ${win.name}`, color: "gold" });
-        }
-        
-        // Показываем экран конца матча
-        setTimeout(() => io.to(room.id).emit('showEndScreen'), 2000);
-    } 
-    
-    // === ОБЫЧНЫЙ ГОЛ (ИГРА ПРОДОЛЖАЕТСЯ) ===
+    if (win.score >= 5) { await finishMatch(room, winRole, false); } 
     else {
-        io.to(room.id).emit('goalNotify', { 
-            msg: `ГОЛ: ${win.name}`, 
-            color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d' 
-        });
-        
-        // Сбрасываем шайбу и снимаем паузу через 2 секунды
-        setTimeout(() => { 
-            if (rooms[room.id] && !rooms[room.id].gameOver) { 
-                rooms[room.id].puck = { x: 400, y: 200, vx: 0, vy: 0 }; 
-                rooms[room.id].paused = false; 
-                io.to(room.id).emit('goalNotify', { msg: "", color: "" }); 
-            } 
-        }, 2000);
+        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d', effectType: win.effect });
+        setTimeout(() => reset(room), 2000);
     }
 }
 
@@ -439,44 +405,6 @@ function joinPlayerToRoom(socket, user) {
         room.paused = true; io.to(myRoomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 }); setTimeout(() => { if (rooms[myRoomId] && !rooms[myRoomId].gameOver) rooms[myRoomId].paused = false; }, 3000);
     }
 }
-
-async function startNextTournamentRound() {
-    tourney.players = [...tourney.winners];
-    tourney.winners = [];
-
-    // 🥇 1 МЕСТО: Выдаем эффект гола
-    if (tourney.players.length === 1) {
-        const champ = tourney.players[0];
-        io.emit('tourneyAnnounce', { type: 'end', msg: `🏆 ТУРНИР ОКОНЧЕН! Чемпион: ${champ}!` });
-        try {
-            const u1 = await User.findOne({ name: champ });
-            if (u1) {
-                if (!u1.goalEffects.includes('blackhole')) u1.goalEffects.push('blackhole'); // Даем эффект Черной дыры
-                u1.currentGoalEffect = 'blackhole';
-                await u1.save();
-                const sid = connectedUsers[champ];
-                if (sid) io.to(sid).emit('tourneyMsg', "🥇 1 место! Открыт эффект гола: Черная дыра!");
-            }
-        } catch(e){}
-        resetTourney();
-        return;
-    }
-
-    if (tourney.players.length === 0) { resetTourney(); return; }
-
-    tourney.round++;
-    let shuffled = tourney.players.sort(() => 0.5 - Math.random());
-    tourney.matchesActive = 0;
-
-    for (let i = 0; i < shuffled.length; i += 2) {
-        if (i + 1 < shuffled.length) {
-            setupTournamentMatch(shuffled[i], shuffled[i+1]);
-        } else {
-            tourney.winners.push(shuffled[i]); // Авто-проход, если нечетное количество
-        }
-    }
-}
-
 
 io.on('connection', (socket) => {
     
@@ -592,30 +520,6 @@ io.on('connection', (socket) => {
     socket.on('rejectFriend', async (senderName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
     socket.on('removeFriend', async (friendName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName }); u.friends = u.friends.filter(n => n !== friendName); if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); } await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
     socket.on('getLeaderboard', async (callback) => { try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating clan -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); } });
-
-	socket.on('joinTourney', (cb) => {
-        if (!socket.user) return;
-        if (tourney.state !== 'reg') return cb({ success: false, msg: "Регистрация сейчас закрыта." });
-        if (!tourney.players.includes(socket.user.name)) tourney.players.push(socket.user.name);
-        cb({ success: true, msg: "Вы записаны на турнир! Ожидайте начала." });
-    });
-
-    socket.on('tourneyAdminAction', (act, cb) => {
-        // Убедись, что тут стоит проверка на твой ник!
-        // if (socket.user?.name !== "ТВОЙ_НИК") return; 
-        
-        if (act === 'startReg') { 
-            resetTourney(); 
-            tourney.state = 'reg'; 
-            io.emit('tourneyAnnounce', { type: 'reg', msg: "🏆 РЕГИСТРАЦИЯ НА ТУРНИР ОТКРЫТА!" }); 
-        }
-        if (act === 'startMatches') { 
-            if (tourney.players.length < 2) return cb({success: false, msg: "Слишком мало игроков"});
-            tourney.state = 'playing'; 
-            startNextTournamentRound(); 
-        }
-        cb({ success: true });
-    });
 
     socket.on('input', (data) => {
         if (!socket.roomId || !rooms[socket.roomId]) return; 
