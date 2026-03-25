@@ -297,10 +297,15 @@ function joinPlayerToRoom(socket, user) {
                     else return roots[Math.floor(Math.random() * roots.length)].toLowerCase() + ['_zxc', '_god', '_qwe', '_123', '_pos1'][Math.floor(Math.random() * 5)];
                 };
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
+                const fakeTitles = ['', 'Новичок', 'Подпивас', 'Табуретка', 'ZXC Гуль', 'Гроза льда', 'Киберспортсмен', 'Легенда'];
+                const fakeAvatars = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];
+                
                 room.player2.id = 'secret_bot'; room.player2.ip = 'bot_ip';
-                room.player2.name = generateSteamName(); room.player2.skin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
+                room.player2.name = generateSteamName(); 
+                room.player2.skin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
                 room.player2.rating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
-                room.player2.avatar = "avatar4"; room.player2.title = "Искусственный интеллект";
+                room.player2.avatar = fakeAvatars[Math.floor(Math.random() * fakeAvatars.length)]; 
+                room.player2.title = fakeTitles[Math.floor(Math.random() * fakeTitles.length)];
                 
                 // 🔥 Показываем VS Экран
                 room.paused = true;
