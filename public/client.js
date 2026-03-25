@@ -917,9 +917,19 @@ function render(s) {
 function loop() {
     if (serverState && clientState) {
         const lerp = 0.4;
-        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp; clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
-        clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp; clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
-        clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp; clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
+		// Шайбу сглаживаем всегда
+        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp; 
+        clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
+        
+        // Чужую клюшку сглаживаем всегда. СВОЮ клюшку сглаживаем ТОЛЬКО когда игра на паузе (например, возврат в центр после гола)
+        if (myRole !== 'p1' || serverState.paused) {
+            clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp; 
+            clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
+        }
+        if (myRole !== 'p2' || serverState.paused) {
+            clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp; 
+            clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
+        }
         
         if (!serverState.paused && !serverState.gameOver) {
             if (hitCooldown > 0) hitCooldown--; if (wallCooldown > 0) wallCooldown--;
