@@ -1,7 +1,7 @@
 const socket = io();
 
 // ==========================================
-// 🔥 ДАННЫЕ МАГАЗИНА (Должны быть сверху!)
+// 🔥 ДАННЫЕ МАГАЗИНА
 // ==========================================
 let userInventory = ['default'];
 let userCurrentSkin = 'default';
@@ -9,10 +9,10 @@ let shopIndex = 0;
 
 const shopItems = [
     { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
-    { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 50, color: '#fb8500' },
-    { id: 'karamelka', name: 'Карамелька', boost: 'Супер-скорость', price: 50, color: '#e63946' },
-    { id: 'kompot', name: 'Компот', boost: 'Большая клюшка', price: 50, color: '#06d6a0' },
-    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 75, color: '#8338ec' }
+    { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 250, color: '#fb8500' },
+    { id: 'karamelka', name: 'Карамелька', boost: 'Супер-скорость', price: 250, color: '#e63946' },
+    { id: 'kompot', name: 'Компот', boost: 'Большая клюшка', price: 500, color: '#06d6a0' },
+    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 500, color: '#8338ec' }
 ];
 
 // ==========================================
@@ -67,7 +67,7 @@ function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
 // ==========================================
-// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И УРОВНИ
+// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (КОНФЕТТИ И БП)
 // ==========================================
 let puckTrail = [];
 let confetti = [];
@@ -87,19 +87,44 @@ function getLvlHtml(elo) {
     return `<span class="lvl-badge ${cls}">${lvl}</span>`;
 }
 
-function spawnConfetti() {
-    for (let i = 0; i < 100; i++) {
-        confetti.push({
-            x: 400, y: 200,
-            vx: (Math.random() - 0.5) * 25, vy: (Math.random() - 0.5) * 25,
-            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-            size: Math.random() * 8 + 4, life: 1
-        });
+function spawnConfetti(type = 'default') {
+    confetti = []; 
+    for (let i = 0; i < 150; i++) {
+        let color, vx, vy, size;
+        
+        if (type === 'fire') {
+            color = `hsl(${Math.random() * 40 + 10}, 100%, 50%)`;
+            vx = (Math.random() - 0.5) * 20;
+            vy = (Math.random() * -20) - 5;
+            size = Math.random() * 12 + 5;
+        } else if (type === 'blackhole') {
+            color = `hsl(${Math.random() * 60 + 260}, 100%, 60%)`;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 300 + 100;
+            const px = 400 + Math.cos(angle) * dist;
+            const py = 200 + Math.sin(angle) * dist;
+            vx = 0; vy = 0;
+            size = Math.random() * 6 + 3;
+            confetti.push({ x: px, y: py, vx, vy, color, size, life: 1.5, type });
+            continue;
+        } else if (type === 'ice') {
+            color = `hsl(${Math.random() * 40 + 180}, 100%, 80%)`;
+            vx = (Math.random() - 0.5) * 40;
+            vy = (Math.random() - 0.5) * 40;
+            size = Math.random() * 8 + 4;
+        } else {
+            color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            vx = (Math.random() - 0.5) * 25;
+            vy = (Math.random() - 0.5) * 25;
+            size = Math.random() * 8 + 4;
+        }
+        
+        confetti.push({ x: 400, y: 200, vx, vy, color, size, life: 1, type });
     }
 }
 
 // ==========================================
-// 🔥 АВТОРИЗАЦИЯ И МЕНЮ
+// 🔥 АВТОРИЗАЦИЯ
 // ==========================================
 const authScreen = document.getElementById('auth-screen');
 const mainMenu = document.getElementById('main-menu');
@@ -118,17 +143,26 @@ if (savedName && savedPass) {
     authError.innerText = "Автоматический вход...";
     authError.style.color = "#4da6ff";
     
-    const doAutoLogin = () => { socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse); };
-    if (socket.connected) { doAutoLogin(); } else { socket.on('connect', doAutoLogin); }
+    const doAutoLogin = () => {
+        socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
+    };
+    
+    if (socket.connected) {
+        doAutoLogin();
+    } else {
+        socket.on('connect', doAutoLogin);
+    }
 }
 
 document.getElementById('btn-login').onclick = () => {
-    authError.innerText = "Подключение..."; authError.style.color = "#e63946";
+    authError.innerText = "Подключение...";
+    authError.style.color = "#e63946";
     socket.emit('login', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
 document.getElementById('btn-register').onclick = () => {
-    authError.innerText = "Создание..."; authError.style.color = "#e63946";
+    authError.innerText = "Создание...";
+    authError.style.color = "#e63946";
     socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
@@ -136,7 +170,8 @@ function handleAuthResponse(res) {
     if (res.success) {
         authScreen.style.display = 'none';
         if (res.rejoining) {
-            mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
+            mainMenu.style.display = 'none';
+            gameWrapper.style.display = 'flex';
             document.getElementById('btn-cancel-search').style.display = 'none';
         } else {
             mainMenu.style.display = 'flex';
@@ -145,9 +180,11 @@ function handleAuthResponse(res) {
         updateProfile();
         
         if (rememberCb.checked) {
-            localStorage.setItem('ah_name', nameInput.value); localStorage.setItem('ah_pass', passInput.value);
+            localStorage.setItem('ah_name', nameInput.value);
+            localStorage.setItem('ah_pass', passInput.value);
         } else {
-            localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass');
+            localStorage.removeItem('ah_name');
+            localStorage.removeItem('ah_pass');
         }
     } else {
         authScreen.style.display = 'flex';
@@ -175,7 +212,9 @@ chatHeader.onclick = () => {
 };
 
 document.getElementById('btn-send-chat').onclick = sendChat;
-chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChat();
+});
 
 function sendChat() {
     const msg = chatInput.value.trim();
@@ -189,13 +228,17 @@ socket.on('chatMessage', (data) => {
     const el = document.createElement('div');
     const isMe = data.name.includes(nameInput.value);
     const nameColor = isMe ? '#4da6ff' : '#ffb703';
+    
     el.innerHTML = `<b style="color: ${nameColor};">${data.name}:</b> <span style="color: #333;">${data.msg}</span>`;
     chatMsgs.appendChild(el);
-    setTimeout(() => { chatMsgs.scrollTop = chatMsgs.scrollHeight; }, 50);
+    
+    setTimeout(() => {
+        chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    }, 50);
 });
 
 // ==========================================
-// 🔥 ПРОФИЛЬ, АДМИНКА, ПОДАРКИ
+// 🔥 ПРОФИЛЬ И БОЕВОЙ ПРОПУСК
 // ==========================================
 function updateProfile() {
     socket.emit('getProfile', (data) => {
@@ -204,19 +247,89 @@ function updateProfile() {
             document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
             
             const reqBadge = document.getElementById('req-badge');
-            if (data.reqCount > 0) { reqBadge.style.display = 'block'; reqBadge.innerText = data.reqCount; } 
-            else { reqBadge.style.display = 'none'; }
+            if (data.reqCount > 0) {
+                reqBadge.style.display = 'block';
+                reqBadge.innerText = data.reqCount;
+            } else {
+                reqBadge.style.display = 'none';
+            }
             
-            userInventory = data.inventory; userCurrentSkin = data.skin; renderShopItem();
-            if (data.title) { document.getElementById('title-selector').value = data.title; }
-            if (data.isAdmin) { document.getElementById('btn-admin').style.display = 'inline-block'; } 
-            else { document.getElementById('btn-admin').style.display = 'none'; }
+            userInventory = data.inventory;
+            userCurrentSkin = data.skin;
+            renderShopItem();
+            
+            if (data.title) {
+                document.getElementById('title-selector').value = data.title;
+            }
+
+            // БОЕВОЙ ПРОПУСК И КЕЙСЫ
+            document.getElementById('bp-current-lvl').innerText = data.bpLevel;
+            document.getElementById('bp-progress-bar').style.width = `${Math.min(100, data.bpXP)}%`;
+            document.getElementById('bp-progress-text').innerText = `${data.bpXP} / 100 XP`;
+            
+            if (data.vsCases > 0) {
+                document.getElementById('bp-case-section').style.display = 'block';
+                document.getElementById('bp-case-count').innerText = data.vsCases;
+            } else {
+                document.getElementById('bp-case-section').style.display = 'none';
+            }
+
+            // ЭФФЕКТЫ В ПРОФИЛЕ
+            const effects = data.goalEffects || ['default'];
+            document.getElementById('opt-fire').disabled = !effects.includes('fire');
+            document.getElementById('opt-blackhole').disabled = !effects.includes('blackhole');
+            document.getElementById('opt-ice').disabled = !effects.includes('ice');
+            if (data.currentGoalEffect) document.getElementById('effect-selector').value = data.currentGoalEffect;
+
+            const vsEffects = data.vsEffects || ['none'];
+            document.getElementById('vs-opt-fire').disabled = !vsEffects.includes('fire');
+            document.getElementById('vs-opt-ice').disabled = !vsEffects.includes('ice');
+            document.getElementById('vs-opt-neon').disabled = !vsEffects.includes('neon');
+            document.getElementById('vs-opt-gold').disabled = !vsEffects.includes('gold');
+            if (data.currentVsEffect) document.getElementById('vs-effect-selector').value = data.currentVsEffect;
+
+            if (data.isAdmin) {
+                document.getElementById('btn-admin').style.display = 'inline-block';
+            } else {
+                document.getElementById('btn-admin').style.display = 'none';
+            }
         }
     });
 }
 
-document.getElementById('btn-admin').onclick = () => { loadAdminUsers(); document.getElementById('admin-modal').style.display = 'flex'; };
-document.getElementById('btn-close-admin').onclick = () => { document.getElementById('admin-modal').style.display = 'none'; };
+document.getElementById('btn-bp').onclick = () => {
+    updateProfile();
+    document.getElementById('bp-modal').style.display = 'flex';
+};
+
+document.getElementById('btn-close-bp').onclick = () => {
+    document.getElementById('bp-modal').style.display = 'none';
+};
+
+window.openVsCase = function() {
+    socket.emit('openVsCase', (res) => {
+        alert(res.msg);
+        updateProfile();
+    });
+};
+
+socket.on('bpLevelUp', (data) => {
+    document.getElementById('bp-levelup-number').innerText = `Уровень ${data.level}`;
+    document.getElementById('bp-levelup-rewards').innerHTML = data.rewards.join('<br>');
+    document.getElementById('bp-levelup-modal').style.display = 'flex';
+});
+
+// ==========================================
+// 🔥 АДМИН-ПАНЕЛЬ
+// ==========================================
+document.getElementById('btn-admin').onclick = () => {
+    loadAdminUsers();
+    document.getElementById('admin-modal').style.display = 'flex';
+};
+
+document.getElementById('btn-close-admin').onclick = () => {
+    document.getElementById('admin-modal').style.display = 'none';
+};
 
 window.loadAdminUsers = function() {
     socket.emit('adminGetUsers', (res) => {
@@ -225,8 +338,6 @@ window.loadAdminUsers = function() {
         list.innerHTML = res.users.map(u => {
             const onlineDot = u.isOnline ? '<span style="color: #06d6a0;" title="В сети">🟢</span>' : '<span style="color: #ccc;" title="Оффлайн">⚪</span>';
             const rowBg = u.isOnline ? 'background: #f4fff8;' : '';
-            
-            // 🔥 Кнопка "Смотреть" появляется, если игрок сейчас в комнате
             let spectateBtn = u.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
 
             return `
@@ -239,49 +350,90 @@ window.loadAdminUsers = function() {
                 <td style="padding: 5px; font-weight: bold; color: #06d6a0;">${u.coins}</td>
                 <td style="padding: 5px; display:flex; gap:5px; flex-wrap: wrap;">
                     ${spectateBtn}
-                    <button class="btn btn-green btn-small" onclick="adminAction('${u.name}', 'addCoins')">💰</button>
-                    <button class="btn btn-orange btn-small" onclick="adminAction('${u.name}', 'setElo')">🏆</button>
-                    <button class="btn btn-red btn-small" onclick="adminAction('${u.name}', 'ban')">БАН</button>
+                    <button class="btn btn-purple btn-small" onclick="adminAction('${u.name}', 'addBpXp')" title="Выдать XP">⭐</button>
+                    <button class="btn btn-green btn-small" onclick="adminAction('${u.name}', 'addCoins')" title="Выдать монеты">💰</button>
+                    <button class="btn btn-orange btn-small" onclick="adminAction('${u.name}', 'setElo')" title="Изменить ЭЛО">🏆</button>
+                    <button class="btn btn-red btn-small" onclick="adminAction('${u.name}', 'ban')" title="Бан">БАН</button>
                 </td>
             </tr>`;
         }).join('');
     });
 };
 
-// 🔥 Функция, чтобы Админ мог скрытно зайти на стрим
 window.adminSpectate = function(roomId) {
-    document.getElementById('admin-modal').style.display = 'none'; // Закрываем админку
-    spectateRoom(roomId); // Вызываем уже готовую функцию зрителя
+    document.getElementById('admin-modal').style.display = 'none';
+    spectateRoom(roomId);
 };
+
 window.adminAction = function(targetName, action) {
     let amount = 0;
-    if (action === 'addCoins') { amount = prompt(`Сколько монет дать ${targetName}?`); if (amount === null || isNaN(amount) || amount === "") return; } 
-    else if (action === 'setElo') { amount = prompt(`Новое ЭЛО для ${targetName}:`); if (amount === null || isNaN(amount) || amount === "") return; } 
-    else if (action === 'ban') { if (!confirm(`Вы точно хотите удалить аккаунт ${targetName} НАВСЕГДА?`)) return; }
+    if (action === 'addCoins') {
+        amount = prompt(`Сколько монет дать ${targetName}? (введи число, можно с минусом)`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'setElo') {
+        amount = prompt(`Установить новое ЭЛО для ${targetName}:`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'addBpXp') {
+        amount = prompt(`Сколько XP БП выдать ${targetName}? (100 XP = 1 уровень)`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'ban') {
+        if (!confirm(`💀 ВНИМАНИЕ! Вы точно хотите удалить аккаунт ${targetName} НАВСЕГДА? Игрока выкинет из игры прямо сейчас.`)) return;
+    }
 
     socket.emit('adminAction', { targetName, action, amount }, (res) => {
-        alert(res.msg); if (res.success) loadAdminUsers();
+        alert(res.msg);
+        if (res.success) loadAdminUsers();
     });
 };
 
+// ==========================================
+// 🔥 ПРОФИЛЬ: ФУНКЦИИ И ПОДАРКИ
+// ==========================================
 window.showProfile = function(username) {
     socket.emit('getUserProfile', username, (res) => {
         if (res.success) {
             const p = res.profile;
-            const skinNames = { 'default': 'Обычный', 'korzhik': 'Коржик', 'karamelka': 'Карамелька', 'kompot': 'Компот', 'gonya': 'Гоня' };
+            const skinNames = {
+                'default': 'Обычный',
+                'korzhik': 'Коржик',
+                'karamelka': 'Карамелька',
+                'kompot': 'Компот',
+                'gonya': 'Гоня'
+            };
             
             document.getElementById('profile-name').innerText = p.name;
+            
             const statusDot = document.getElementById('profile-online-status');
-            if (res.isOnline) { statusDot.style.backgroundColor = '#06d6a0'; statusDot.style.boxShadow = '0 0 8px #06d6a0'; statusDot.title = 'В сети'; } 
-            else { statusDot.style.backgroundColor = '#ccc'; statusDot.style.boxShadow = 'none'; statusDot.title = 'Не в сети'; }
+            if (res.isOnline) {
+                statusDot.style.backgroundColor = '#06d6a0';
+                statusDot.style.boxShadow = '0 0 8px #06d6a0';
+                statusDot.title = 'В сети';
+            } else {
+                statusDot.style.backgroundColor = '#ccc';
+                statusDot.style.boxShadow = 'none';
+                statusDot.title = 'Не в сети';
+            }
 
             const titleLabel = document.getElementById('profile-title-display');
-            if (p.title) { titleLabel.innerText = `[${p.title}]`; titleLabel.style.display = 'block'; } else { titleLabel.style.display = 'none'; }
+            if (p.title) {
+                titleLabel.innerText = `[${p.title}]`;
+                titleLabel.style.display = 'block';
+            } else {
+                titleLabel.style.display = 'none';
+            }
+
             const clanLabel = document.getElementById('profile-clan-name');
-            if (p.clan) { clanLabel.innerText = `🛡️ Клан: ${p.clan}`; clanLabel.style.display = 'block'; } else { clanLabel.style.display = 'none'; }
+            if (p.clan) {
+                clanLabel.innerText = `🛡️ Клан: ${p.clan}`;
+                clanLabel.style.display = 'block';
+            } else {
+                clanLabel.style.display = 'none';
+            }
             
-            let av = p.avatar || 'avatar1'; if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
+            let av = p.avatar || 'avatar1';
+            if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
             document.getElementById('profile-avatar').src = '/' + av + '.png';
+            
             document.getElementById('profile-mmr').innerHTML = `${getLvlHtml(p.rating)} ${p.rating}`;
             document.getElementById('profile-max-mmr').innerHTML = `${getLvlHtml(p.maxRating || 1000)} ${p.maxRating || 1000}`;
             document.getElementById('profile-min-mmr').innerHTML = `${getLvlHtml(p.minRating || 1000)} ${p.minRating || 1000}`;
@@ -294,6 +446,7 @@ window.showProfile = function(username) {
             document.getElementById('profile-regdate').innerText = new Date(p.regDate).toLocaleDateString('ru-RU');
 
             const giftBtn = document.getElementById('btn-gift');
+
             if (username === nameInput.value) {
                 document.getElementById('profile-edit-section').style.display = 'block';
                 document.getElementById('btn-logout').style.display = 'block';
@@ -301,21 +454,31 @@ window.showProfile = function(username) {
             } else {
                 document.getElementById('profile-edit-section').style.display = 'none';
                 document.getElementById('btn-logout').style.display = 'none';
+                
                 giftBtn.style.display = 'block';
                 giftBtn.onclick = () => {
                     const amount = prompt(`Сколько монет вы хотите подарить игроку ${p.name}?`);
                     if (amount && !isNaN(amount) && amount > 0) {
-                        socket.emit('sendGift', { targetName: p.name, amount: amount }, (giftRes) => { alert(giftRes.msg); if (giftRes.success) updateProfile(); });
+                        socket.emit('sendGift', { targetName: p.name, amount: amount }, (giftRes) => {
+                            alert(giftRes.msg);
+                            if (giftRes.success) updateProfile();
+                        });
                     }
                 };
             }
+            
             document.getElementById('profile-modal').style.display = 'flex';
-        } else { alert("Не удалось загрузить профиль"); }
+        } else {
+            alert("Не удалось загрузить профиль");
+        }
     });
 };
 
 window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if (res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); };
 window.setMyTitle = function(title) { socket.emit('setTitle', title, () => updateProfile()); };
+window.setGoalEffect = function(effect) { socket.emit('setGoalEffect', effect, (res) => { if (!res.success) alert(res.msg); updateProfile(); }); };
+window.setVsEffect = function(effect) { socket.emit('setVsEffect', effect, (res) => { if (!res.success) alert(res.msg); updateProfile(); }); };
+
 document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
 document.getElementById('btn-logout').onclick = () => { if (confirm("Выйти из аккаунта?")) { localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass'); window.location.reload(); } };
 
@@ -329,38 +492,59 @@ socket.on('clanUpdated', () => { if (document.getElementById('clans-modal').styl
 function loadMyClan() {
     socket.emit('getClanData', (res) => {
         if (res.success && res.clan) {
-            document.getElementById('no-clan-block').style.display = 'none'; document.getElementById('my-clan-block').style.display = 'block';
-            const clan = res.clan; const privStr = clan.isPrivate ? ' (Закрытый 🔒)' : '';
+            document.getElementById('no-clan-block').style.display = 'none';
+            document.getElementById('my-clan-block').style.display = 'block';
+            
+            const clan = res.clan;
+            const privStr = clan.isPrivate ? ' (Закрытый 🔒)' : '';
             document.getElementById('clan-modal-title').innerText = `🛡️ Клан: ${clan.name}${privStr}`;
             document.getElementById('clan-count').innerText = `(${clan.members.length}/${clan.maxMembers})`;
             
-            const myName = nameInput.value; const isLeader = clan.leader === myName; const isDeputy = clan.deputies.includes(myName);
-            if (isLeader || isDeputy) { document.getElementById('clan-invite-block').style.display = 'block'; } else { document.getElementById('clan-invite-block').style.display = 'none'; }
+            const myName = nameInput.value;
+            const isLeader = clan.leader === myName;
+            const isDeputy = clan.deputies.includes(myName);
+            
+            if (isLeader || isDeputy) {
+                document.getElementById('clan-invite-block').style.display = 'block';
+            } else {
+                document.getElementById('clan-invite-block').style.display = 'none';
+            }
             
             let html = '';
             clan.members.forEach(member => {
                 let roleIcon = ''; let controls = '';
                 const isTargetLeader = clan.leader === member; const isTargetDeputy = clan.deputies.includes(member);
+                
                 if (isTargetLeader) roleIcon = '👑'; else if (isTargetDeputy) roleIcon = '⭐'; else roleIcon = '👤';
+                
                 if (member !== myName) {
                     if (isLeader) {
-                        if (isTargetDeputy) controls += `<button class="btn-promo" onclick="clanAction('${member}', 'demote')">⬇ Зам</button>`;
-                        else controls += `<button class="btn-promo" onclick="clanAction('${member}', 'promote')">⬆ Зам</button>`;
+                        if (isTargetDeputy) { controls += `<button class="btn-promo" onclick="clanAction('${member}', 'demote')">⬇ Зам</button>`; } 
+                        else { controls += `<button class="btn-promo" onclick="clanAction('${member}', 'promote')">⬆ Зам</button>`; }
                         controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
                     } else if (isDeputy && !isTargetLeader && !isTargetDeputy) {
                         controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
                     }
                 }
-                html += `<div class="clan-member-row"><span style="cursor:pointer;" onclick="showProfile('${member}')">${roleIcon} <b>${member}</b></span><div class="clan-controls">${controls}</div></div>`;
+                
+                html += `
+                <div class="clan-member-row">
+                    <span style="cursor:pointer;" onclick="showProfile('${member}')">${roleIcon} <b>${member}</b></span>
+                    <div class="clan-controls">${controls}</div>
+                </div>`;
             });
-            document.getElementById('clan-members-list').innerHTML = html;
             
+            document.getElementById('clan-members-list').innerHTML = html;
             const chatBox = document.getElementById('clan-chat-msgs');
-            chatBox.innerHTML = clan.chat.map(c => { const color = c.name.includes(myName) ? '#4da6ff' : '#8338ec'; return `<div style="margin-bottom:4px;"><b style="color:${color}">${c.name}:</b> ${c.msg}</div>`; }).join('');
+            chatBox.innerHTML = clan.chat.map(c => {
+                const color = c.name.includes(myName) ? '#4da6ff' : '#8338ec';
+                return `<div style="margin-bottom:4px;"><b style="color:${color}">${c.name}:</b> ${c.msg}</div>`;
+            }).join('');
             chatBox.scrollTop = chatBox.scrollHeight;
 
         } else {
-            document.getElementById('no-clan-block').style.display = 'block'; document.getElementById('my-clan-block').style.display = 'none';
+            document.getElementById('no-clan-block').style.display = 'block';
+            document.getElementById('my-clan-block').style.display = 'none';
             document.getElementById('clan-modal-title').innerText = `🛡️ Система Кланов`;
             
             const invList = document.getElementById('clan-invites-list');
@@ -368,10 +552,14 @@ function loadMyClan() {
                 invList.innerHTML = `<h4 style="margin: 0 0 5px 0; color: #8338ec;">📩 Ваши приглашения:</h4>` + res.invites.map(inv => `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 10px; background:#f4faff; border:2px solid #8ecae6; border-radius:10px; margin-bottom:5px;">
                         <b style="font-size: 16px;">${inv}</b>
-                        <div style="display:flex; gap: 5px;"><button class="btn btn-green btn-small" onclick="acceptClanInvite('${inv}')">✔ Вступить</button><button class="btn btn-red btn-small" onclick="rejectClanInvite('${inv}')">✖</button></div>
+                        <div style="display:flex; gap: 5px;">
+                            <button class="btn btn-green btn-small" onclick="acceptClanInvite('${inv}')">✔ Вступить</button>
+                            <button class="btn btn-red btn-small" onclick="rejectClanInvite('${inv}')">✖</button>
+                        </div>
                     </div>
                 `).join('');
             } else { invList.innerHTML = ''; }
+            
             loadClansList();
         }
     });
@@ -381,11 +569,16 @@ function loadClansList() {
     socket.emit('searchClans', (res) => {
         if (res.success) {
             const list = document.getElementById('clan-search-list');
-            if (res.clans.length === 0) list.innerHTML = "<p style='color:#888; font-size:14px;'>Свободных кланов пока нет.</p>";
-            else {
+            if (res.clans.length === 0) {
+                list.innerHTML = "<p style='color:#888; font-size:14px;'>Свободных кланов пока нет.</p>";
+            } else {
                 list.innerHTML = res.clans.map(c => {
                     let btnHtml = c.isPrivate ? `<span style="color:#e63946; font-size: 12px; font-weight:bold;">🔒 Закрытый</span>` : `<button class="btn btn-green btn-small" onclick="joinClan('${c.name}')">Войти</button>`;
-                    return `<div style="display:flex; justify-content:space-between; align-items:center; padding: 5px; border-bottom: 1px dashed #ccc;"><div style="font-size:14px;"><b>${c.name}</b> <br><span style="color:#888;font-size:12px;">(${c.members.length}/${c.maxMembers}) Лидер: ${c.leader}</span></div>${btnHtml}</div>`;
+                    return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px; border-bottom: 1px dashed #ccc;">
+                        <div style="font-size:14px;"><b>${c.name}</b> <br><span style="color:#888;font-size:12px;">(${c.members.length}/${c.maxMembers}) Лидер: ${c.leader}</span></div>
+                        ${btnHtml}
+                    </div>`;
                 }).join('');
             }
         }
@@ -415,19 +608,24 @@ socket.on('newClanMsg', (chatMsg) => {
 let currentClanInviter = "";
 socket.on('incomingClanInvite', (clanName) => {
     currentClanInviter = clanName; document.getElementById('clan-invite-name').innerText = clanName; document.getElementById('clan-invite-modal').style.display = 'flex';
-    if (document.getElementById('clans-modal').style.display === 'flex') loadMyClan();
+    if (document.getElementById('clans-modal').style.display === 'flex') { loadMyClan(); }
 });
+
 document.getElementById('btn-accept-clan-invite').onclick = () => { acceptClanInvite(currentClanInviter); document.getElementById('clan-invite-modal').style.display = 'none'; };
 document.getElementById('btn-decline-clan-invite').onclick = () => { rejectClanInvite(currentClanInviter); document.getElementById('clan-invite-modal').style.display = 'none'; };
 window.acceptClanInvite = function(clanName) { socket.emit('acceptClanInvite', clanName, (res) => { alert(res.msg); if (res.success) loadMyClan(); }); };
 window.rejectClanInvite = function(clanName) { socket.emit('rejectClanInvite', clanName, (res) => { loadMyClan(); }); };
 
+
 // ==========================================
 // 🔥 ДРУЗЬЯ И ЗРИТЕЛИ
 // ==========================================
 window.switchTab = function(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active');
-    if (tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active'); if (tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active'); if (tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if (tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    if (tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    if (tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
 };
 
 document.getElementById('btn-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'flex'; loadFriendsData(); };
@@ -440,41 +638,68 @@ function loadFriendsData() {
         if (res.friends.length === 0) { list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>"; } 
         else {
             list.innerHTML = res.friends.map(f => {
-                let actionBtn = f.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="spectateRoom('${f.inGameRoom}')">👀 Смотреть</button>` : `<button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>`;
-                return `<div class="friend-item"><div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div><div style="display:flex; gap:5px;">${actionBtn}<button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button><button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button></div></div>`;
+                let actionBtn = f.inGameRoom 
+                    ? `<button class="btn btn-purple btn-small" onclick="spectateRoom('${f.inGameRoom}')">👀 Смотреть</button>`
+                    : `<button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>`;
+                return `
+                <div class="friend-item">
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div>
+                    <div style="display:flex; gap:5px;">${actionBtn}<button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button><button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button></div>
+                </div>`;
             }).join('');
         }
-        const reqList = document.getElementById('requests-list'); document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
-        if (res.requests.length === 0) reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>";
-        else reqList.innerHTML = res.requests.map(r => `<div class="friend-item"><div class="friend-info">${r}</div><div><button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button><button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button></div></div>`).join('');
+        const reqList = document.getElementById('requests-list');
+        document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
+        if (res.requests.length === 0) { reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>"; } 
+        else { reqList.innerHTML = res.requests.map(r => `<div class="friend-item"><div class="friend-info">${r}</div><div><button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button><button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button></div></div>`).join(''); }
     });
 }
 
-window.searchFriends = function() { const q = document.getElementById('search-input').value; socket.emit('searchUser', q, (res) => { const resBox = document.getElementById('search-results'); if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; } resBox.innerHTML = res.users.map(u => `<div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div><div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button><button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>`).join(''); }); };
-window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); }; window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); }; window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); }; window.removeFriend = function(name) { if (confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); }; window.inviteFriendToMatch = function(name) { socket.emit('inviteFriend', name, (res) => { alert(res.msg); }); };
+window.searchFriends = function() {
+    const q = document.getElementById('search-input').value;
+    socket.emit('searchUser', q, (res) => {
+        const resBox = document.getElementById('search-results');
+        if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
+        resBox.innerHTML = res.users.map(u => `<div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div><div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button><button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>`).join('');
+    });
+};
+
+window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); };
+window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
+window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
+window.removeFriend = function(name) { if (confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
+window.inviteFriendToMatch = function(name) { socket.emit('inviteFriend', name, (res) => { alert(res.msg); }); };
 
 window.spectateRoom = function(roomId) {
     document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
     mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
-    document.getElementById('goal-msg').textContent = "Подключение к трансляции..."; document.getElementById('goal-msg').style.color = "#8338ec";
+    document.getElementById('goal-msg').textContent = "Трансляция..."; document.getElementById('goal-msg').style.color = "#8338ec";
     document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block';
     socket.emit('spectate', roomId);
 };
 
 let currentInviter = "";
-socket.on('incomingInvite', (senderName) => { currentInviter = senderName; document.getElementById('invite-sender-name').innerText = senderName; document.getElementById('invite-modal').style.display = 'flex'; });
-document.getElementById('btn-accept-invite').onclick = () => { socket.emit('acceptInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; }; document.getElementById('btn-decline-invite').onclick = () => { socket.emit('declineInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; }; socket.on('inviteDeclined', (name) => { alert(`Игрок ${name} отклонил приглашение.`); });
+socket.on('incomingInvite', (senderName) => {
+    currentInviter = senderName; document.getElementById('invite-sender-name').innerText = senderName; document.getElementById('invite-modal').style.display = 'flex';
+});
+
+document.getElementById('btn-accept-invite').onclick = () => { socket.emit('acceptInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
+document.getElementById('btn-decline-invite').onclick = () => { socket.emit('declineInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
+socket.on('inviteDeclined', (name) => { alert(`Игрок ${name} отклонил приглашение.`); });
 socket.on('forceStartGame', () => { document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none'); mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; document.getElementById('goal-msg').textContent = ""; document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block'; });
 
 // ==========================================
-// 🔥 МАГАЗИН СКИНОВ И РЕЖИМЫ ИГРЫ
+// 🔥 МАГАЗИН СКИНОВ И ИГРА
 // ==========================================
 function renderShopItem() {
     const item = shopItems[shopIndex];
     document.getElementById('shop-item-name').innerText = item.name; document.getElementById('shop-item-boost').innerText = item.boost;
     const border = document.getElementById('shop-item-preview-border'); const img = document.getElementById('shop-item-preview'); const text = document.getElementById('shop-item-preview-text');
     border.style.borderColor = item.color;
-    if (item.id === 'default') { img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color; } else { img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff'; }
+    
+    if (item.id === 'default') { img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color; } 
+    else { img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff'; }
+    
     const actionBtn = document.getElementById('btn-shop-action'); const priceText = document.getElementById('shop-item-price');
     if (userCurrentSkin === item.id) { priceText.innerText = "Надето"; priceText.style.color = "#219ebc"; actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true; } 
     else if (userInventory.includes(item.id)) { priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0"; actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false; actionBtn.onclick = () => window.buySkin(item.id); } 
@@ -489,33 +714,19 @@ document.getElementById('btn-close-shop').onclick = () => { document.getElementB
 
 document.getElementById('btn-play-menu').onclick = () => { document.getElementById('play-modal').style.display = 'flex'; };
 document.getElementById('btn-close-play-modal').onclick = () => { document.getElementById('play-modal').style.display = 'none'; };
-
-document.getElementById('btn-play').onclick = () => {
-    document.getElementById('play-modal').style.display = 'none'; mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play');
-    document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500";
-    document.getElementById('btn-cancel-search').style.display = 'block'; document.getElementById('btn-in-game-quit').style.display = 'none';
-};
-
-document.getElementById('btn-play-bot').onclick = () => {
-    document.getElementById('play-modal').style.display = 'none'; mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('playBot');
-    document.getElementById('goal-msg').textContent = ""; document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block';
-};
-
+document.getElementById('btn-play').onclick = () => { document.getElementById('play-modal').style.display = 'none'; mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500"; document.getElementById('btn-cancel-search').style.display = 'block'; document.getElementById('btn-in-game-quit').style.display = 'none'; };
+document.getElementById('btn-play-bot').onclick = () => { document.getElementById('play-modal').style.display = 'none'; mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('playBot'); document.getElementById('goal-msg').textContent = ""; document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block'; };
 document.getElementById('btn-cancel-search').onclick = () => { socket.emit('cancelPlay'); gameWrapper.style.display = 'none'; mainMenu.style.display = 'flex'; updateProfile(); document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('goal-msg').textContent = ""; };
 
 document.getElementById('btn-in-game-quit').onclick = () => {
     if (!serverState) return;
-    if (myRole === 'spectator') {
-        socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = [];
-        document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); return;
-    }
+    if (myRole === 'spectator') { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); return; }
+    
     const isBot = serverState.isBotMatch; const isFriendly = serverState.isFriendly;
     let msg = "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снято ЭЛО!";
     if (isBot) msg = "Вы уверены, что хотите прервать тренировку?"; if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
-    if (confirm(msg)) {
-        socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = [];
-        document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile();
-    }
+    
+    if (confirm(msg)) { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); }
 };
 
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
@@ -556,16 +767,20 @@ socket.on('showEmoji', (data) => {
     activeEmojis.push({ text: data.emoji, x: startX + (Math.random() * 40 - 20), y: startY + (Math.random() * 40 - 20), life: 1.0 });
 });
 
-// 🔥 ЛОГИКА VS ЭКРАНА
+// 🔥 ЛОГИКА VS ЭКРАНА С ЭФФЕКТАМИ АВАТАРОК
 socket.on('showVsScreen', (data) => {
     const p1 = data.p1; const p2 = data.p2;
     
-    document.getElementById('vs-p1-av').src = `/${p1.avatar || 'avatar1'}.png`;
+    const p1av = document.getElementById('vs-p1-av');
+    p1av.src = `/${p1.avatar || 'avatar1'}.png`;
+    p1av.className = p1.vsEffect !== 'none' ? `vs-${p1.vsEffect}` : '';
     document.getElementById('vs-p1-title').innerText = p1.title ? `[${p1.title}]` : '';
     document.getElementById('vs-p1-name').innerText = p1.name;
     document.getElementById('vs-p1-elo').innerHTML = `ЭЛО: ${getLvlHtml(Math.round(p1.rating))} ${Math.round(p1.rating)}`;
 
-    document.getElementById('vs-p2-av').src = `/${p2.avatar || 'avatar1'}.png`;
+    const p2av = document.getElementById('vs-p2-av');
+    p2av.src = `/${p2.avatar || 'avatar1'}.png`;
+    p2av.className = p2.vsEffect !== 'none' ? `vs-${p2.vsEffect}` : '';
     document.getElementById('vs-p2-title').innerText = p2.title ? `[${p2.title}]` : '';
     document.getElementById('vs-p2-name').innerText = p2.name;
     document.getElementById('vs-p2-elo').innerHTML = `ЭЛО: ${getLvlHtml(Math.round(p2.rating))} ${Math.round(p2.rating)}`;
@@ -573,18 +788,8 @@ socket.on('showVsScreen', (data) => {
     const vsScreen = document.getElementById('vs-screen');
     vsScreen.style.display = 'flex';
     
-    setTimeout(() => {
-        document.getElementById('vs-p1').style.transform = 'translateX(0)';
-        document.getElementById('vs-p2').style.transform = 'translateX(0)';
-        document.getElementById('vs-logo').style.opacity = '1';
-    }, 100);
-
-    setTimeout(() => {
-        document.getElementById('vs-p1').style.transform = 'translateX(-100vw)';
-        document.getElementById('vs-p2').style.transform = 'translateX(100vw)';
-        document.getElementById('vs-logo').style.opacity = '0';
-        setTimeout(() => { vsScreen.style.display = 'none'; }, 500);
-    }, 3000);
+    setTimeout(() => { document.getElementById('vs-p1').style.transform = 'translateX(0)'; document.getElementById('vs-p2').style.transform = 'translateX(0)'; document.getElementById('vs-logo').style.opacity = '1'; }, 100);
+    setTimeout(() => { document.getElementById('vs-p1').style.transform = 'translateX(-100vw)'; document.getElementById('vs-p2').style.transform = 'translateX(100vw)'; document.getElementById('vs-logo').style.opacity = '0'; setTimeout(() => { vsScreen.style.display = 'none'; p1av.className = ''; p2av.className = ''; }, 500); }, 3000);
 });
 
 socket.on('goalNotify', data => {
@@ -593,62 +798,42 @@ socket.on('goalNotify', data => {
         const myName = nameInput.value; const msgStr = data.msg;
         if (msgStr.includes(myName) || msgStr.includes('ПОБЕДА НАД БОТОМ') || msgStr.includes('ДРУГ СБЕЖАЛ')) { playGoalWin(); } 
         else if (msgStr.includes('ГОЛ:') || msgStr.includes('ЧЕМПИОН:') || msgStr.includes('БОТ ПОБЕДИЛ') || msgStr.includes('ТЕХ. ПОБЕДА:')) { playGoalLose(); }
-        canvas.classList.add('shake'); setTimeout(() => canvas.classList.remove('shake'), 400); spawnConfetti();
+        canvas.classList.add('shake'); setTimeout(() => canvas.classList.remove('shake'), 400);
+        spawnConfetti(data.effectType || 'default');
     }
 });
 
 socket.on('gameStateUpdate', s => {
     serverState = s; if (!clientState) clientState = JSON.parse(JSON.stringify(s));
-    
     const renderPaws = (score, color) => {
         const pawSVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8.35,3C9.53,2.83 10.78,4.12 11.14,5.9C11.5,7.67 10.85,9.25 9.67,9.43C8.5,9.61 7.24,8.32 6.87,6.54C6.5,4.77 7.17,3.19 8.35,3 M15.5,3C16.69,3.19 17.35,4.77 17,6.54C16.62,8.32 15.37,9.61 14.19,9.43C13,9.25 12.35,7.67 12.71,5.9C13.08,4.12 14.33,2.83 15.5,3 M5.1,7.61C6.22,7.31 7.6,8.39 8.16,10.03C8.73,11.67 8.27,13.25 7.15,13.56C6.03,13.86 4.65,12.78 4.09,11.14C3.52,9.5 3.97,7.92 5.1,7.61 M18.77,7.61C19.9,7.92 20.35,9.5 19.78,11.14C19.22,12.78 17.84,13.86 16.71,13.56C15.59,13.25 15.14,11.67 15.71,10.03C16.27,8.39 17.65,7.31 18.77,7.61 M11.93,11.5C13.72,11.5 15.7,12.22 16.71,13.38C17.75,14.57 18.06,16.5 17.5,17.96C16.92,19.5 15.36,21 12,21C8.64,21 7.08,19.5 6.5,17.96C5.94,16.5 6.25,14.57 7.29,13.38C8.3,12.22 10.14,11.5 11.93,11.5Z" /></svg>`;
         let html = '';
-        for (let i = 0; i < 5; i++) {
-            if (i < score) html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`;
-            else html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`;
-        }
+        for (let i = 0; i < 5; i++) { if (i < score) html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`; else html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`; }
         return html;
     };
     
-    document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff');
-    document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
-    document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`;
-    document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
-    document.getElementById('n1').textContent = s.player1.name;
-    document.getElementById('n2').textContent = s.player2.name;
+    document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
+    document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`; document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
+    document.getElementById('n1').textContent = s.player1.name; document.getElementById('n2').textContent = s.player2.name;
     
     if (s.timeLeft !== null && s.timeLeft !== undefined && !s.gameOver) {
-        document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`;
-        document.getElementById('goal-msg').style.color = "#ffb703";
+        document.getElementById('goal-msg').textContent = `Ждем друга: ${s.timeLeft}с`; document.getElementById('goal-msg').style.color = "#ffb703";
     } else if (s.player1.id && s.player2.id && !s.gameOver && myRole !== 'spectator') {
-        document.getElementById('btn-cancel-search').style.display = 'none';
-        document.getElementById('btn-in-game-quit').style.display = 'block';
-        if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) {
-            document.getElementById('goal-msg').textContent = "";
-        }
+        document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block';
+        if (document.getElementById('goal-msg').textContent.includes("Ищем") || document.getElementById('goal-msg').textContent.includes("Ждем")) { document.getElementById('goal-msg').textContent = ""; }
     }
-    
-    if (s.paused) {
-        clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y;
-        clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y;
-    }
+    if (s.paused) { clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y; clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y; }
 });
 
 function sendInput(clientX, clientY) {
     if (!myRole || myRole === 'spectator' || !clientState || !serverState || serverState.paused || serverState.gameOver) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
-    
+    const rect = canvas.getBoundingClientRect(); const x = (clientX - rect.left) * (canvas.width / rect.width); const y = (clientY - rect.top) * (canvas.height / rect.height);
     const me = myRole === 'p1' ? 'player1' : 'player2';
-    // 🔥 БАФЫ: Компот теперь большой, а Карамелька обычная
+    
     let pR = serverState[me].skin === 'kompot' ? 43 : (serverState[me].skin === 'gonya' ? 28 : 35);
+    let minX = myRole === 'p1' ? pR : 400 + pR; let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
     
-    let minX = myRole === 'p1' ? pR : 400 + pR;
-    let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
-    
-    clientState[me].x = Math.min(maxX, Math.max(minX, x));
-    clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
+    clientState[me].x = Math.min(maxX, Math.max(minX, x)); clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
     socket.emit('input', { x, y });
 }
 
@@ -657,19 +842,13 @@ canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touc
 canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
 function drawPlayer(x, y, skinName, color) {
-    // 🔥 БАФЫ
     let r = skinName === 'kompot' ? 43 : (skinName === 'gonya' ? 28 : 35);
-    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.lineWidth = 5; ctx.strokeStyle = color; ctx.stroke();
     } else {
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        if (skinName === 'korzhik') ctx.fillText("КОРЖ", x, y);
-        else if (skinName === 'karamelka') ctx.fillText("КАРА", x, y);
-        else if (skinName === 'kompot') ctx.fillText("КОМП", x, y);
-        else if (skinName === 'gonya') ctx.fillText("ГОНЯ", x, y);
-        else { ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
+        if (skinName === 'korzhik') ctx.fillText("КОРЖ", x, y); else if (skinName === 'karamelka') ctx.fillText("КАРА", x, y); else if (skinName === 'kompot') ctx.fillText("КОМП", x, y); else if (skinName === 'gonya') ctx.fillText("ГОНЯ", x, y); else { ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
     }
 }
 
@@ -711,8 +890,23 @@ function render(s) {
     drawPlayer(s.player1.x, s.player1.y, serverState.player1.skin, '#4da6ff');
     drawPlayer(s.player2.x, s.player2.y, serverState.player2.skin, '#ff4d4d');
 
+    // 🔥 ФИЗИКА ЭФФЕКТОВ БОЕВОГО ПРОПУСКА
     if (confetti.length > 0) {
-        confetti.forEach((c, index) => { c.x += c.vx; c.y += c.vy; c.vy += 0.8; c.life -= 0.015; ctx.globalAlpha = Math.max(0, c.life); ctx.fillStyle = c.color; ctx.fillRect(c.x, c.y, c.size, c.size); if (c.life <= 0) confetti.splice(index, 1); }); ctx.globalAlpha = 1.0;
+        confetti.forEach((c, index) => {
+            if (c.type === 'blackhole') {
+                c.vx -= (c.x - 400) * 0.05; c.vy -= (c.y - 200) * 0.05;
+                c.x += c.vx * 0.1; c.y += c.vy * 0.1; c.life -= 0.02;
+            } else if (c.type === 'fire') {
+                c.x += c.vx; c.y += c.vy; c.vy -= 0.5; c.life -= 0.02;
+            } else {
+                c.x += c.vx; c.y += c.vy; c.vy += 0.8; c.life -= 0.015;
+            }
+            ctx.globalAlpha = Math.max(0, c.life);
+            ctx.fillStyle = c.color;
+            ctx.fillRect(c.x, c.y, c.size, c.size);
+            if (c.life <= 0) confetti.splice(index, 1);
+        });
+        ctx.globalAlpha = 1.0;
     }
     
     if (activeEmojis.length > 0) {

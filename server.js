@@ -46,7 +46,16 @@ const userSchema = new mongoose.Schema({
     regIp: { type: String, default: 'Скрыт' },
     clan: { type: String, default: null },
     clanInvites: { type: [String], default: [] },
-    title: { type: String, default: '' }
+    title: { type: String, default: '' },
+    // 🔥 БОЕВОЙ ПРОПУСК И ЭФФЕКТЫ
+    bpLevel: { type: Number, default: 0 },
+    bpXP: { type: Number, default: 0 },
+    goalEffects: { type: [String], default: ['default'] },
+    currentGoalEffect: { type: String, default: 'default' },
+    // 🔥 VS-КЕЙСЫ
+    vsCases: { type: Number, default: 1 }, // 1 кейс дается сразу на 0 лвле!
+    vsEffects: { type: [String], default: ['none'] },
+    currentVsEffect: { type: String, default: 'none' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -75,9 +84,8 @@ function createRoom(isBotMatch = false, isFriendly = false) {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
         id: roomId, puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
-        // 🔥 Добавили avatar и title в профиль игрока в комнате
-        player1: { id: null, ip: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "" },
-        player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "" },
+        player1: { id: null, ip: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "", effect: "default", vsEffect: "none" },
+        player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "", effect: "default", vsEffect: "none" },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
         disconnectTimeout: null, reconnectDeadline: null, timeLeft: null,
         botTimer: null, isBotMatch: isBotMatch, isFriendly: isFriendly 
@@ -115,6 +123,51 @@ function resolveCollision(puck, player) {
     }
 }
 
+// 🔥 ЛОГИКА БОЕВОГО ПРОПУСКА (ОБНОВЛЕНА ДЛЯ АДМИНА И КЕЙСОВ)
+async function applyBP(userName, xpAdded, socketId) {
+    if (userName === "..." || userName.includes("Бот Вася")) return;
+    try {
+        const userDoc = await User.findOne({ name: userName });
+        if (!userDoc) return;
+
+        userDoc.bpXP += xpAdded;
+        let leveledUp = false;
+        let rewards = [];
+
+        while (userDoc.bpXP >= 100 && userDoc.bpLevel < 30) {
+            userDoc.bpXP -= 100;
+            userDoc.bpLevel++;
+            leveledUp = true;
+            
+            if (userDoc.bpLevel === 10) { 
+                if (!userDoc.goalEffects.includes('fire')) userDoc.goalEffects.push('fire'); 
+                rewards.push('Эффект Гола: Огонь 🔥'); 
+            }
+            else if (userDoc.bpLevel === 20) { 
+                if (!userDoc.goalEffects.includes('blackhole')) userDoc.goalEffects.push('blackhole'); 
+                rewards.push('Эффект Гола: Черная дыра 🌌'); 
+            }
+            else if (userDoc.bpLevel === 25) { 
+                userDoc.vsCases = (userDoc.vsCases || 0) + 1;
+                rewards.push('Кейс Аватарок (VS) 🎁'); 
+            }
+            else if (userDoc.bpLevel === 30) { 
+                if (!userDoc.goalEffects.includes('ice')) userDoc.goalEffects.push('ice'); 
+                rewards.push('Эффект Гола: Лед ❄️'); 
+            }
+            else { 
+                userDoc.coins += 50; 
+                rewards.push('50 Монет 💰'); 
+            }
+        }
+        await userDoc.save();
+        
+        if (leveledUp && socketId) {
+            io.to(socketId).emit('bpLevelUp', { level: userDoc.bpLevel, rewards });
+        }
+    } catch(e) { console.error("BP Error", e); }
+}
+
 async function finishMatch(room, winRole, isDisconnect = false) {
     room.paused = true; room.gameOver = true;
     if (room.botTimer) clearTimeout(room.botTimer);
@@ -124,6 +177,11 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     if (lose.name === "...") return; 
     if (isDisconnect) win.score = 5; 
 
+    if (!room.isFriendly) {
+        if (win.id !== 'secret_bot' && win.id !== 'bot') await applyBP(win.name, 50, win.id);
+        if (lose.id !== 'secret_bot' && lose.id !== 'bot') await applyBP(lose.name, 20, lose.id);
+    }
+
     if (room.isBotMatch || room.isFriendly) {
         room.rematch = { player1: false, player2: false };
         let msg = "";
@@ -132,7 +190,7 @@ async function finishMatch(room, winRole, isDisconnect = false) {
         } else {
             msg = isDisconnect ? "ДРУГ СБЕЖАЛ С ПОЛЯ БОЯ!" : `ПОБЕДИЛ: ${win.name}! 🎉`;
         }
-        io.to(room.id).emit('goalNotify', { msg: msg, color: "gold" });
+        io.to(room.id).emit('goalNotify', { msg: msg, color: "gold", effectType: win.effect });
         setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
         return;
     }
@@ -162,8 +220,8 @@ async function finishMatch(room, winRole, isDisconnect = false) {
     } catch (err) {}
     
     room.rematch = { player1: false, player2: false };
-    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold" }); } 
-    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold" }); }
+    if (isDisconnect) { io.to(room.id).emit('goalNotify', { msg: `ТЕХ. ПОБЕДА: ${win.name} (+${diff})`, color: "gold", effectType: win.effect }); } 
+    else { io.to(room.id).emit('goalNotify', { msg: `ЧЕМПИОН: ${win.name} (+${diff})`, color: "gold", effectType: win.effect }); }
     setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 2000);
 }
 
@@ -174,7 +232,7 @@ async function handleGoal(room, winRole) {
     win.score++;
     if (win.score >= 5) { await finishMatch(room, winRole, false); } 
     else {
-        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d' });
+        io.to(room.id).emit('goalNotify', { msg: `ГОЛ: ${win.name}`, color: winRole === 'player1' ? '#4da6ff' : '#ff4d4d', effectType: win.effect });
         setTimeout(() => reset(room), 2000);
     }
 }
@@ -190,9 +248,7 @@ function reset(room) {
 
 function getRoomIdByUserName(name) {
     for (let id in rooms) {
-        if (!rooms[id].gameOver && (rooms[id].player1.name === name || rooms[id].player2.name === name)) {
-            return id;
-        }
+        if (!rooms[id].gameOver && (rooms[id].player1.name === name || rooms[id].player2.name === name)) return id;
     }
     return null;
 }
@@ -281,14 +337,16 @@ function joinPlayerToRoom(socket, user) {
         room.player1.id = socket.id; room.player1.ip = clientIp; room.player1.name = user.name; 
         room.player1.rating = user.rating; room.player1.skin = user.skin; 
         room.player1.avatar = user.avatar; room.player1.title = user.title;
+        room.player1.effect = user.currentGoalEffect || 'default';
+        room.player1.vsEffect = user.currentVsEffect || 'none'; // 🔥 Добавляем VS-эффект
         socket.emit('role', 'p1');
 
         room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
                 const generateSteamName = () => {
-                    const pros = ['s1mple', 'donk', 'Yatoro', 'm0NESY', 'Collapse', 'sh1ro', 'Dendi', 'Miracle-', 'Nisha', 'ZywOo', 'NiKo', 'b1t', 'ropz', 'Nightfall', 'Puppey', 'Arteezy', 'Topson', 'Jame', 'Ax1Le', 'TORONTOTOKYO'];
+                    const pros = ['s1mple', 'donk', 'Yatoro', 'm0NESY', 'Collapse', 'sh1ro', 'Dendi', 'Miracle-', 'Nisha', 'ZywOo', 'NiKo', 'b1t', 'ropz', 'Nightfall'];
                     const prefixes = ['NaVi | ', 'Virtus.pro ', 'Team Spirit ', 'FaZe ', 'Liquid ', 'OG ', 'zxc ', '1000-7 ', 'Shadow_', 'Lil_', 'toxic_'];
-                    const roots = ['Ghoul', 'Sniper', 'Demon', 'Angel', 'Bebra', 'Monster', 'Tractor', 'Pudge', 'Pivo', 'Gamer', 'Killer', 'Ninja', 'Samurai', 'Hokage', 'DeadInside'];
+                    const roots = ['Ghoul', 'Sniper', 'Demon', 'Angel', 'Bebra', 'Monster', 'Tractor', 'Pudge', 'Pivo', 'Gamer', 'Killer', 'Ninja', 'Samurai', 'Hokage'];
                     const suffixes = ['_pro', '2010', '228', '1337', '99', '_rus', 'God', 'XD', 'QQ', '_enjoyer'];
                     const type = Math.random();
                     if (type < 0.25) return pros[Math.floor(Math.random() * pros.length)];
@@ -299,6 +357,7 @@ function joinPlayerToRoom(socket, user) {
                 const fakeSkins = ['default', 'korzhik', 'karamelka', 'kompot', 'gonya'];
                 const fakeTitles = ['', 'Новичок', 'Подпивас', 'Табуретка', 'ZXC Гуль', 'Гроза льда', 'Киберспортсмен', 'Легенда'];
                 const fakeAvatars = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];
+                const fakeVsEffects = ['none', 'none', 'fire', 'ice', 'neon', 'gold'];
                 
                 room.player2.id = 'secret_bot'; room.player2.ip = 'bot_ip';
                 room.player2.name = generateSteamName(); 
@@ -306,8 +365,9 @@ function joinPlayerToRoom(socket, user) {
                 room.player2.rating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
                 room.player2.avatar = fakeAvatars[Math.floor(Math.random() * fakeAvatars.length)]; 
                 room.player2.title = fakeTitles[Math.floor(Math.random() * fakeTitles.length)];
+                room.player2.effect = 'default';
+                room.player2.vsEffect = fakeVsEffects[Math.floor(Math.random() * fakeVsEffects.length)];
                 
-                // 🔥 Показываем VS Экран
                 room.paused = true;
                 io.to(myRoomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
                 setTimeout(() => { if (rooms[myRoomId] && !rooms[myRoomId].gameOver) rooms[myRoomId].paused = false; }, 3000);
@@ -317,10 +377,11 @@ function joinPlayerToRoom(socket, user) {
         room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
         room.player2.rating = user.rating; room.player2.skin = user.skin;
         room.player2.avatar = user.avatar; room.player2.title = user.title;
+        room.player2.effect = user.currentGoalEffect || 'default';
+        room.player2.vsEffect = user.currentVsEffect || 'none';
         socket.emit('role', 'p2');
         if (room.botTimer) clearTimeout(room.botTimer); 
         
-        // 🔥 Показываем VS Экран
         room.paused = true;
         io.to(myRoomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
         setTimeout(() => { if (rooms[myRoomId] && !rooms[myRoomId].gameOver) rooms[myRoomId].paused = false; }, 3000);
@@ -331,10 +392,7 @@ io.on('connection', (socket) => {
     
     socket.on('spectate', (roomId) => {
         if (!socket.user || !rooms[roomId]) return;
-        socket.join(roomId);
-        socket.roomId = roomId;
-        socket.emit('role', 'spectator');
-        socket.emit('forceStartGame');
+        socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'spectator'); socket.emit('forceStartGame');
     });
 
     socket.on('sendGift', async (data, callback) => {
@@ -342,9 +400,7 @@ io.on('connection', (socket) => {
         try {
             const u = await User.findById(socket.user._id);
             if (u.coins < data.amount) return callback({ success: false, msg: "Недостаточно монет!" });
-            
-            const target = await User.findOne({ name: data.targetName });
-            if (!target) return callback({ success: false, msg: "Игрок не найден!" });
+            const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" });
             if (u.name === target.name) return callback({ success: false, msg: "Нельзя дарить самому себе :)" });
 
             u.coins -= Number(data.amount); target.coins += Number(data.amount);
@@ -355,10 +411,52 @@ io.on('connection', (socket) => {
 
     socket.on('setTitle', async (title, callback) => {
         if (!socket.user) return;
+        try { const u = await User.findById(socket.user._id); u.title = title; await u.save(); socket.user = u; callback({ success: true }); } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('setGoalEffect', async (effect, callback) => {
+        if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id); u.title = title; await u.save(); socket.user = u; callback({ success: true });
+            const u = await User.findById(socket.user._id);
+            if (u.goalEffects.includes(effect)) { u.currentGoalEffect = effect; await u.save(); socket.user = u; callback({ success: true }); } 
+            else callback({ success: false, msg: "Этот эффект не открыт!" });
         } catch(e) { callback({ success: false }); }
     });
+
+    // 🔥 УСТАНОВКА И ОТКРЫТИЕ VS ЭФФЕКТОВ
+    socket.on('setVsEffect', async (effect, callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            if (u.vsEffects.includes(effect) || effect === 'none') { u.currentVsEffect = effect; await u.save(); socket.user = u; callback({ success: true }); } 
+            else callback({ success: false, msg: "Этот эффект не открыт!" });
+        } catch(e) { callback({ success: false }); }
+    });
+
+    socket.on('openVsCase', async (callback) => {
+        if (!socket.user) return;
+        try {
+            const u = await User.findById(socket.user._id);
+            if (u.vsCases <= 0) return callback({ success: false, msg: "У вас нет кейсов!" });
+            
+            u.vsCases -= 1;
+            const possibleEffects = ['fire', 'ice', 'neon', 'gold'];
+            const unowned = possibleEffects.filter(e => !u.vsEffects.includes(e));
+            
+            if (unowned.length === 0) {
+                u.coins += 500; await u.save(); socket.user = u;
+                return callback({ success: true, msg: "У вас уже есть все эффекты! Вы получили 500 монет в качестве компенсации.", effect: null });
+            }
+            
+            const wonEffect = unowned[Math.floor(Math.random() * unowned.length)];
+            u.vsEffects.push(wonEffect);
+            await u.save(); socket.user = u;
+            
+            const names = { 'fire': 'Огонь 🔥', 'ice': 'Лед ❄️', 'neon': 'Неон 🟣', 'gold': 'Золото 🌟' };
+            callback({ success: true, msg: `Вы открыли кейс и получили эффект: ${names[wonEffect]}!`, effect: wonEffect });
+        } catch(e) { callback({ success: false }); }
+    });
+
 
     socket.on('getClanData', async (callback) => {
         if (!socket.user) return callback({ success: false });
@@ -372,46 +470,35 @@ io.on('connection', (socket) => {
     socket.on('createClan', async (data, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            if (u.clan) return callback({ success: false, msg: "Вы уже состоите в клане!" });
-            const existingClan = await Clan.findOne({ name: data.name });
-            if (existingClan) return callback({ success: false, msg: "Клан с таким именем уже существует!" });
-
+            const u = await User.findById(socket.user._id); if (u.clan) return callback({ success: false, msg: "Вы уже состоите в клане!" });
+            const existingClan = await Clan.findOne({ name: data.name }); if (existingClan) return callback({ success: false, msg: "Клан с таким именем уже существует!" });
             const newClan = new Clan({ name: data.name, maxMembers: data.maxMembers, isPrivate: data.isPrivate, leader: u.name, members: [u.name] });
             await newClan.save(); u.clan = newClan.name; await u.save(); socket.user = u;
             callback({ success: true, msg: "Клан успешно создан!" });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера при создании." }); }
     });
 
-    socket.on('searchClans', async (callback) => {
-        try { const clans = await Clan.find().select('name leader members maxMembers isPrivate').limit(20).lean(); callback({ success: true, clans }); } catch(e) { callback({ success: false }); }
-    });
+    socket.on('searchClans', async (callback) => { try { const clans = await Clan.find().select('name leader members maxMembers isPrivate').limit(20).lean(); callback({ success: true, clans }); } catch(e) { callback({ success: false }); } });
 
     socket.on('joinClan', async (clanName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            if (u.clan) return callback({ success: false, msg: "Вы уже в клане!" });
-            const clan = await Clan.findOne({ name: clanName });
-            if (!clan) return callback({ success: false, msg: "Клан не найден!" });
+            const u = await User.findById(socket.user._id); if (u.clan) return callback({ success: false, msg: "Вы уже в клане!" });
+            const clan = await Clan.findOne({ name: clanName }); if (!clan) return callback({ success: false, msg: "Клан не найден!" });
             if (clan.isPrivate) return callback({ success: false, msg: "Это закрытый клан! Вход только по приглашению." });
             if (clan.members.length >= clan.maxMembers) return callback({ success: false, msg: "Клан полностью заполнен!" });
-            clan.members.push(u.name); await clan.save(); u.clan = clan.name; await u.save(); socket.user = u;
-            callback({ success: true, msg: "Вы успешно вступили в клан!" });
+            clan.members.push(u.name); await clan.save(); u.clan = clan.name; await u.save(); socket.user = u; callback({ success: true, msg: "Вы успешно вступили в клан!" });
         } catch(e) { callback({ success: false }); }
     });
 
     socket.on('inviteToClan', async (targetName, callback) => {
         if (!socket.user || !socket.user.clan) return callback({ success: false, msg: "Вы не в клане." });
         try {
-            const clan = await Clan.findOne({ name: socket.user.clan });
-            if (!clan) return callback({ success: false, msg: "Клан не найден." });
+            const clan = await Clan.findOne({ name: socket.user.clan }); if (!clan) return callback({ success: false, msg: "Клан не найден." });
             if (clan.leader !== socket.user.name && !clan.deputies.includes(socket.user.name)) return callback({ success: false, msg: "Только лидер или зам может приглашать!" });
             if (clan.members.length >= clan.maxMembers) return callback({ success: false, msg: "В клане больше нет мест!" });
-            const target = await User.findOne({ name: targetName });
-            if (!target) return callback({ success: false, msg: "Игрок не найден." });
-            if (target.clan) return callback({ success: false, msg: "Игрок уже состоит в клане." });
-            if (target.clanInvites.includes(clan.name)) return callback({ success: false, msg: "Приглашение уже было отправлено." });
+            const target = await User.findOne({ name: targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден." });
+            if (target.clan) return callback({ success: false, msg: "Игрок уже состоит в клане." }); if (target.clanInvites.includes(clan.name)) return callback({ success: false, msg: "Приглашение уже было отправлено." });
             target.clanInvites.push(clan.name); await target.save();
             const targetSocketId = connectedUsers[targetName]; if (targetSocketId) { io.to(targetSocketId).emit('incomingClanInvite', clan.name); }
             callback({ success: true, msg: "Приглашение отправлено!" });
@@ -421,8 +508,7 @@ io.on('connection', (socket) => {
     socket.on('acceptClanInvite', async (clanName, callback) => {
         if (!socket.user) return;
         try {
-            const u = await User.findById(socket.user._id);
-            if (u.clan) return callback({ success: false, msg: "Вы уже в клане." });
+            const u = await User.findById(socket.user._id); if (u.clan) return callback({ success: false, msg: "Вы уже в клане." });
             if (!u.clanInvites.includes(clanName)) return callback({ success: false, msg: "Приглашение не найдено." });
             const clan = await Clan.findOne({ name: clanName }); u.clanInvites = u.clanInvites.filter(c => c !== clanName);
             if (!clan) { await u.save(); return callback({ success: false, msg: "Клан больше не существует." }); }
@@ -433,10 +519,7 @@ io.on('connection', (socket) => {
         } catch(e) { callback({ success: false }); }
     });
 
-    socket.on('rejectClanInvite', async (clanName, callback) => {
-        if (!socket.user) return;
-        try { const u = await User.findById(socket.user._id); u.clanInvites = u.clanInvites.filter(c => c !== clanName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); }
-    });
+    socket.on('rejectClanInvite', async (clanName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); u.clanInvites = u.clanInvites.filter(c => c !== clanName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
 
     socket.on('leaveClan', async (callback) => {
         if (!socket.user || !socket.user.clan) return callback({ success: false });
@@ -458,9 +541,7 @@ io.on('connection', (socket) => {
             const isLeader = clan.leader === socket.user.name; const isDeputy = clan.deputies.includes(socket.user.name);
             if (data.action === 'kick') {
                 const targetIsLeader = clan.leader === data.targetName; const targetIsDeputy = clan.deputies.includes(data.targetName);
-                if (!isLeader && !isDeputy) return callback({ success: false, msg: "Нет прав." });
-                if (targetIsLeader) return callback({ success: false, msg: "Нельзя кикнуть лидера." });
-                if (isDeputy && targetIsDeputy) return callback({ success: false, msg: "Зам не может кикнуть зама." });
+                if (!isLeader && !isDeputy) return callback({ success: false, msg: "Нет прав." }); if (targetIsLeader) return callback({ success: false, msg: "Нельзя кикнуть лидера." }); if (isDeputy && targetIsDeputy) return callback({ success: false, msg: "Зам не может кикнуть зама." });
                 clan.members = clan.members.filter(m => m !== data.targetName); clan.deputies = clan.deputies.filter(m => m !== data.targetName); await clan.save();
                 const targetUser = await User.findOne({ name: data.targetName }); if (targetUser) { targetUser.clan = null; await targetUser.save(); } callback({ success: true });
             } 
@@ -495,29 +576,15 @@ io.on('connection', (socket) => {
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
-
-// 🔥 ДОБАВЛЕНА ПРОВЕРКА ОНЛАЙНА И МАТЧЕЙ В АДМИНКЕ
     socket.on('adminGetUsers', async (callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false });
         try { 
             const users = await User.find().select('name rating coins regIp clan').lean(); 
-            
             const enhanced = users.map(u => {
-                const isOnline = !!connectedUsers[u.name];
-                let inGameRoom = null;
-                
-                // Если игрок онлайн, проверяем, не в матче ли он
-                if (isOnline) {
-                    for (let id in rooms) {
-                        if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) {
-                            inGameRoom = id;
-                            break;
-                        }
-                    }
-                }
+                const isOnline = !!connectedUsers[u.name]; let inGameRoom = null;
+                if (isOnline) { for (let id in rooms) { if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { inGameRoom = id; break; } } }
                 return { ...u, isOnline, inGameRoom };
             });
-            
             callback({ success: true, users: enhanced }); 
         } catch(e) { callback({ success: false }); }
     });
@@ -526,6 +593,13 @@ io.on('connection', (socket) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" });
         try {
             const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" });
+            
+            // 🔥 АДМИН ВЫДАЕТ ОПЫТ БП
+            if (data.action === 'addBpXp') {
+                await applyBP(data.targetName, Number(data.amount), connectedUsers[data.targetName]);
+                return callback({ success: true, msg: `Успешно выдано ${data.amount} XP!` });
+            }
+            
             if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } 
             else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } 
             else if (data.action === 'ban') {
@@ -542,7 +616,10 @@ io.on('connection', (socket) => {
             if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" });
             const existing = await User.findOne({ name: data.name }); if (existing) return callback({ success: false, msg: "Это имя уже занято!" });
             let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно"; let clientIp = rawIp.split(',')[0].trim(); if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)';
-            const hashedPassword = await bcrypt.hash(data.password, 10); const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp }); await newUser.save();
+            const hashedPassword = await bcrypt.hash(data.password, 10); 
+            const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp, vsCases: 1 }); // Даем кейс за регу!
+            await newUser.save();
+            
             socket.user = newUser; connectedUsers[newUser.name] = socket.id;
             if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true }); else callback({ success: true, rejoining: false });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
@@ -563,14 +640,10 @@ io.on('connection', (socket) => {
     socket.on('playBot', () => {
         if (!socket.user || socket.roomId) return;
         const roomId = createRoom(true, false); const room = rooms[roomId];
-        room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0, avatar: socket.user.avatar, title: socket.user.title };
-        room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0, avatar: "avatar4", title: "Искусственный интеллект" };
+        room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0, avatar: socket.user.avatar, title: socket.user.title, effect: socket.user.currentGoalEffect || 'default', vsEffect: socket.user.currentVsEffect || 'none' };
+        room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0, avatar: "avatar4", title: "Искусственный интеллект", effect: "default", vsEffect: "none" };
         socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
-        
-        // 🔥 VS ЭКРАН (Бот)
-        room.paused = true;
-        io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
-        setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
+        room.paused = true; io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 }); setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
     });
 
     socket.on('rematch', () => {
@@ -580,18 +653,14 @@ io.on('connection', (socket) => {
         if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) room.rematch.player2 = true; 
         if (room.rematch.player1 && room.rematch.player2) { 
             room.player1.score = 0; room.player2.score = 0; room.gameOver = false; reset(room); io.to(room.id).emit('hideEndScreen'); 
-            // 🔥 VS ЭКРАН (Реванш)
-            room.paused = true;
-            io.to(room.id).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
-            setTimeout(() => { if (rooms[room.id] && !rooms[room.id].gameOver) rooms[room.id].paused = false; }, 3000);
+            room.paused = true; io.to(room.id).emit('showVsScreen', { p1: room.player1, p2: room.player2 }); setTimeout(() => { if (rooms[room.id] && !rooms[room.id].gameOver) rooms[room.id].paused = false; }, 3000); 
         }
     });
 
     socket.on('leaveMatch', () => {
         if (!socket.roomId || !rooms[socket.roomId]) return;
         const room = rooms[socket.roomId]; if (room.botTimer) clearTimeout(room.botTimer); 
-        const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id);
-        if (!isPlayer) { socket.leave(socket.roomId); socket.roomId = null; return; }
+        const isPlayer = (socket.id === room.player1.id || socket.id === room.player2.id); if (!isPlayer) { socket.leave(socket.roomId); socket.roomId = null; return; }
         const role = room.player1.id === socket.id ? 'player1' : 'player2'; const winRole = role === 'player1' ? 'player2' : 'player1';
         if (room.player2.name !== "..." && !room.gameOver) { finishMatch(room, winRole, true); } else { socket.to(room.id).emit('opponentLeft'); }
         if (room.player1.id === socket.id) { room.player1.id = null; room.player1.ip = null; } if (room.player2.id === socket.id) { room.player2.id = null; room.player2.ip = null; }
@@ -618,20 +687,15 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         const senderSocketId = connectedUsers[senderName]; if (!senderSocketId) return;
         const senderSocket = io.sockets.sockets.get(senderSocketId); if (!senderSocket || senderSocket.roomId || socket.roomId) return;
-
         const roomId = createRoom(false, true); const room = rooms[roomId];
         const u1 = await User.findOne({ name: senderSocket.user.name }).lean(); const u2 = await User.findOne({ name: socket.user.name }).lean();
-
-        room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0, avatar: u1.avatar, title: u1.title };
-        room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0, avatar: u2.avatar, title: u2.title };
-
+        
+        room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0, avatar: u1.avatar, title: u1.title, effect: u1.currentGoalEffect || 'default', vsEffect: u1.currentVsEffect || 'none' };
+        room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0, avatar: u2.avatar, title: u2.title, effect: u2.currentGoalEffect || 'default', vsEffect: u2.currentVsEffect || 'none' };
+        
         senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
         socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p2'); socket.emit('forceStartGame'); 
-        
-        // 🔥 VS ЭКРАН (Приглашение)
-        room.paused = true;
-        io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
-        setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
+        room.paused = true; io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 }); setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
     });
 
     socket.on('declineInvite', (senderName) => { const senderSocketId = connectedUsers[senderName]; if (senderSocketId) io.to(senderSocketId).emit('inviteDeclined', socket.user.name); });
@@ -639,82 +703,26 @@ io.on('connection', (socket) => {
     socket.on('getProfile', async (callback) => {
         if (!socket.user) return;
         const u = await User.findById(socket.user._id); socket.user = u; 
-        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME, clanName: u.clan, title: u.title });
+        callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory, reqCount: u.requests.length, isAdmin: u.name === ADMIN_NICKNAME, clanName: u.clan, title: u.title, bpLevel: u.bpLevel, bpXP: u.bpXP, goalEffects: u.goalEffects, currentGoalEffect: u.currentGoalEffect, vsCases: u.vsCases, vsEffects: u.vsEffects, currentVsEffect: u.currentVsEffect });
     });
 
     socket.on('getUserProfile', async (username, callback) => {
-        try {
-            const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean();
-            if (target) { const isOnline = !!connectedUsers[username]; callback({ success: true, profile: target, isOnline: isOnline }); }
-            else callback({ success: false, msg: "Игрок не найден" });
-        } catch(e) { callback({ success: false }); }
+        try { const target = await User.findOne({ name: username }).select('-password -inventory -requests -friends').lean(); if (target) { const isOnline = !!connectedUsers[username]; callback({ success: true, profile: target, isOnline: isOnline }); } else callback({ success: false, msg: "Игрок не найден" }); } catch(e) { callback({ success: false }); }
     });
 
-    socket.on('setAvatar', async (avatar, callback) => {
-        if (!socket.user) return;
-        try { const u = await User.findById(socket.user._id); u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true }); } catch(e) { callback({ success: false }); }
-    });
-
-    socket.on('buySkin', async (skinName, callback) => {
-        if (!socket.user) return;
-        const prices = { korzhik: 50, karamelka: 50, kompot: 50, gonya: 75, default: 0 };
-        const u = await User.findById(socket.user._id);
-        if (u.inventory.includes(skinName)) { u.skin = skinName; await u.save(); socket.user = u; return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory }); }
-        if (u.coins >= prices[skinName]) { u.coins -= prices[skinName]; u.inventory.push(skinName); u.skin = skinName; await u.save(); socket.user = u; return callback({ success: true, coins: u.coins, skin: u.skin, inventory: u.inventory }); } 
-        else { return callback({ success: false, msg: "Не хватает монет!" }); }
-    });
+    socket.on('setAvatar', async (avatar, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); u.avatar = avatar; await u.save(); socket.user = u; callback({ success: true }); } catch(e) { callback({ success: false }); } });
 
     socket.on('getFriendsData', async (callback) => {
         if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id);
-            const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin').lean();
-            const friendsWithStatus = friendsProfiles.map(f => { const inGameRoom = getRoomIdByUserName(f.name); return { ...f, inGameRoom: inGameRoom }; });
-            callback({ success: true, friends: friendsWithStatus, requests: u.requests });
-        } catch(e) { callback({ success: false }); }
+        try { const u = await User.findById(socket.user._id); const friendsProfiles = await User.find({ name: { $in: u.friends } }).select('name rating skin').lean(); const friendsWithStatus = friendsProfiles.map(f => { const inGameRoom = getRoomIdByUserName(f.name); return { ...f, inGameRoom: inGameRoom }; }); callback({ success: true, friends: friendsWithStatus, requests: u.requests }); } catch(e) { callback({ success: false }); }
     });
 
-    socket.on('searchUser', async (query, callback) => {
-        if (!socket.user || !query) return;
-        try { const users = await User.find({ $and: [{ name: new RegExp(query, 'i') }, { name: { $ne: socket.user.name } }] }).limit(5).select('name rating').lean(); callback({ success: true, users }); } catch(e) { callback({ success: false }); }
-    });
-
-    socket.on('sendFriendRequest', async (targetName, callback) => {
-        if (!socket.user) return;
-        try {
-            const target = await User.findOne({ name: targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден" });
-            if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" });
-            if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" });
-            target.requests.push(socket.user.name); await target.save(); callback({ success: true, msg: "Запрос отправлен!" });
-        } catch(e) { callback({ success: false, msg: "Ошибка" }); }
-    });
-
-    socket.on('acceptFriend', async (senderName, callback) => {
-        if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id); const sender = await User.findOne({ name: senderName }); u.requests = u.requests.filter(n => n !== senderName);
-            if (sender && !u.friends.includes(senderName)) { u.friends.push(senderName); if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); } }
-            await u.save(); callback({ success: true });
-        } catch(e) { callback({ success: false }); }
-    });
-
-    socket.on('rejectFriend', async (senderName, callback) => {
-        if (!socket.user) return;
-        try { const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); }
-    });
-
-    socket.on('removeFriend', async (friendName, callback) => {
-        if (!socket.user) return;
-        try {
-            const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName }); u.friends = u.friends.filter(n => n !== friendName);
-            if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); }
-            await u.save(); callback({ success: true });
-        } catch(e) { callback({ success: false }); }
-    });
-
-    socket.on('getLeaderboard', async (callback) => {
-        try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating clan -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); }
-    });
+    socket.on('searchUser', async (query, callback) => { if (!socket.user || !query) return; try { const users = await User.find({ $and: [{ name: new RegExp(query, 'i') }, { name: { $ne: socket.user.name } }] }).limit(5).select('name rating').lean(); callback({ success: true, users }); } catch(e) { callback({ success: false }); } });
+    socket.on('sendFriendRequest', async (targetName, callback) => { if (!socket.user) return; try { const target = await User.findOne({ name: targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден" }); if (target.friends.includes(socket.user.name)) return callback({ success: false, msg: "Уже в друзьях" }); if (target.requests.includes(socket.user.name)) return callback({ success: false, msg: "Запрос уже отправлен" }); target.requests.push(socket.user.name); await target.save(); callback({ success: true, msg: "Запрос отправлен!" }); } catch(e) { callback({ success: false, msg: "Ошибка" }); } });
+    socket.on('acceptFriend', async (senderName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); const sender = await User.findOne({ name: senderName }); u.requests = u.requests.filter(n => n !== senderName); if (sender && !u.friends.includes(senderName)) { u.friends.push(senderName); if (!sender.friends.includes(u.name)) { sender.friends.push(u.name); await sender.save(); } } await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
+    socket.on('rejectFriend', async (senderName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); u.requests = u.requests.filter(n => n !== senderName); await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
+    socket.on('removeFriend', async (friendName, callback) => { if (!socket.user) return; try { const u = await User.findById(socket.user._id); const friend = await User.findOne({ name: friendName }); u.friends = u.friends.filter(n => n !== friendName); if (friend) { friend.friends = friend.friends.filter(n => n !== u.name); await friend.save(); } await u.save(); callback({ success: true }); } catch(e) { callback({ success: false }); } });
+    socket.on('getLeaderboard', async (callback) => { try { const topUsers = await User.find().sort({ rating: -1 }).limit(10).select('name rating clan -_id').lean(); callback({ success: true, leaderboard: topUsers }); } catch(e) { callback({ success: false }); } });
 
     socket.on('input', (data) => {
         if (!socket.roomId || !rooms[socket.roomId]) return; 
