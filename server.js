@@ -75,8 +75,9 @@ function createRoom(isBotMatch = false, isFriendly = false) {
     const roomId = 'room_' + roomCounter++;
     rooms[roomId] = {
         id: roomId, puck: { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0 },
-        player1: { id: null, ip: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
-        player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0 },
+        // 🔥 Добавили avatar и title в профиль игрока в комнате
+        player1: { id: null, ip: null, name: "...", skin: "default", x: 80, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "" },
+        player2: { id: null, ip: null, name: "...", skin: "default", x: 720, y: 200, score: 0, rating: 1000, speedX: 0, speedY: 0, avatar: "avatar1", title: "" },
         paused: true, gameOver: false, rematch: { player1: false, player2: false },
         disconnectTimeout: null, reconnectDeadline: null, timeLeft: null,
         botTimer: null, isBotMatch: isBotMatch, isFriendly: isFriendly 
@@ -86,13 +87,11 @@ function createRoom(isBotMatch = false, isFriendly = false) {
 
 function resolveCollision(puck, player) {
     let pR = 35; let res = 1.6; let pMaxSpeed = 28; 
-    
-    // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ
-    if (player.skin === 'kompot') pR = 43; // Теперь Компот большой
+    if (player.skin === 'kompot') pR = 43; 
     if (player.skin === 'gonya') pR = 28; 
     if (player.skin === 'korzhik') res = 1.9; 
     if (player.skin === 'gonya') res = 2.2; 
-    if (player.skin === 'karamelka') pMaxSpeed = 35; // Теперь Карамелька быстрая
+    if (player.skin === 'karamelka') pMaxSpeed = 35; 
 
     const dx = puck.x - player.x; const dy = puck.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy); const minDist = PUCK_R + pR;
@@ -280,7 +279,9 @@ function joinPlayerToRoom(socket, user) {
 
     if (!room.player1.id && room.player1.name === "...") {
         room.player1.id = socket.id; room.player1.ip = clientIp; room.player1.name = user.name; 
-        room.player1.rating = user.rating; room.player1.skin = user.skin; socket.emit('role', 'p1');
+        room.player1.rating = user.rating; room.player1.skin = user.skin; 
+        room.player1.avatar = user.avatar; room.player1.title = user.title;
+        socket.emit('role', 'p1');
 
         room.botTimer = setTimeout(() => {
             if (room.player1.id && room.player2.name === "...") {
@@ -299,13 +300,25 @@ function joinPlayerToRoom(socket, user) {
                 room.player2.id = 'secret_bot'; room.player2.ip = 'bot_ip';
                 room.player2.name = generateSteamName(); room.player2.skin = fakeSkins[Math.floor(Math.random() * fakeSkins.length)];
                 room.player2.rating = Math.max(0, room.player1.rating + Math.floor(Math.random() * 60) - 30);
-                room.paused = false;
+                room.player2.avatar = "avatar4"; room.player2.title = "Искусственный интеллект";
+                
+                // 🔥 Показываем VS Экран
+                room.paused = true;
+                io.to(myRoomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
+                setTimeout(() => { if (rooms[myRoomId] && !rooms[myRoomId].gameOver) rooms[myRoomId].paused = false; }, 3000);
             }
         }, 15000);
     } else if (!room.player2.id && room.player2.name === "...") {
         room.player2.id = socket.id; room.player2.ip = clientIp; room.player2.name = user.name; 
-        room.player2.rating = user.rating; room.player2.skin = user.skin; socket.emit('role', 'p2');
-        room.paused = false; if (room.botTimer) clearTimeout(room.botTimer); 
+        room.player2.rating = user.rating; room.player2.skin = user.skin;
+        room.player2.avatar = user.avatar; room.player2.title = user.title;
+        socket.emit('role', 'p2');
+        if (room.botTimer) clearTimeout(room.botTimer); 
+        
+        // 🔥 Показываем VS Экран
+        room.paused = true;
+        io.to(myRoomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
+        setTimeout(() => { if (rooms[myRoomId] && !rooms[myRoomId].gameOver) rooms[myRoomId].paused = false; }, 3000);
     }
 }
 
@@ -477,16 +490,27 @@ io.on('connection', (socket) => {
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
+    // 🔥 ДОБАВЛЕНА ПРОВЕРКА ОНЛАЙНА В АДМИНКЕ
     socket.on('adminGetUsers', async (callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false });
-        try { const users = await User.find().select('name rating coins regIp clan').lean(); callback({ success: true, users }); } catch(e) { callback({ success: false }); }
+        try { 
+            const users = await User.find().select('name rating coins regIp clan').lean(); 
+            const enhanced = users.map(u => ({ ...u, isOnline: !!connectedUsers[u.name] }));
+            callback({ success: true, users: enhanced }); 
+        } catch(e) { callback({ success: false }); }
     });
 
     socket.on('adminAction', async (data, callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" });
         try {
             const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" });
-            if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } else if (data.action === 'ban') { await User.deleteOne({ name: data.targetName }); const tSocketId = connectedUsers[data.targetName]; if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); } }
+            if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } 
+            else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } 
+            else if (data.action === 'ban') {
+                await User.deleteOne({ name: data.targetName });
+                const tSocketId = connectedUsers[data.targetName];
+                if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); }
+            }
             callback({ success: true, msg: "Успешно!" });
         } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); }
     });
@@ -517,9 +541,14 @@ io.on('connection', (socket) => {
     socket.on('playBot', () => {
         if (!socket.user || socket.roomId) return;
         const roomId = createRoom(true, false); const room = rooms[roomId];
-        room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0 };
-        room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0 };
-        room.paused = false; socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
+        room.player1 = { id: socket.id, ip: "local", name: socket.user.name, skin: socket.user.skin, x: 80, y: 200, score: 0, rating: socket.user.rating, speedX: 0, speedY: 0, avatar: socket.user.avatar, title: socket.user.title };
+        room.player2 = { id: 'bot', ip: "bot", name: "Бот Вася 🤖", skin: "default", x: 720, y: 200, score: 0, rating: "---", speedX: 0, speedY: 0, avatar: "avatar4", title: "Искусственный интеллект" };
+        socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p1');
+        
+        // 🔥 VS ЭКРАН (Бот)
+        room.paused = true;
+        io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
+        setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
     });
 
     socket.on('rematch', () => {
@@ -527,7 +556,13 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId];
         if (socket.id === room.player1.id) room.rematch.player1 = true; if (socket.id === room.player2.id) room.rematch.player2 = true;
         if ((room.isBotMatch || room.player2.id === 'secret_bot') && room.rematch.player1) room.rematch.player2 = true; 
-        if (room.rematch.player1 && room.rematch.player2) { room.player1.score = 0; room.player2.score = 0; room.gameOver = false; reset(room); io.to(room.id).emit('hideEndScreen'); }
+        if (room.rematch.player1 && room.rematch.player2) { 
+            room.player1.score = 0; room.player2.score = 0; room.gameOver = false; reset(room); io.to(room.id).emit('hideEndScreen'); 
+            // 🔥 VS ЭКРАН (Реванш)
+            room.paused = true;
+            io.to(room.id).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
+            setTimeout(() => { if (rooms[room.id] && !rooms[room.id].gameOver) rooms[room.id].paused = false; }, 3000);
+        }
     });
 
     socket.on('leaveMatch', () => {
@@ -561,12 +596,20 @@ io.on('connection', (socket) => {
         if (!socket.user) return;
         const senderSocketId = connectedUsers[senderName]; if (!senderSocketId) return;
         const senderSocket = io.sockets.sockets.get(senderSocketId); if (!senderSocket || senderSocket.roomId || socket.roomId) return;
+
         const roomId = createRoom(false, true); const room = rooms[roomId];
         const u1 = await User.findOne({ name: senderSocket.user.name }).lean(); const u2 = await User.findOne({ name: socket.user.name }).lean();
-        room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0 };
-        room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0 };
-        room.paused = false; senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
+
+        room.player1 = { id: senderSocket.id, ip: "friend1", name: u1.name, skin: u1.skin, x: 80, y: 200, score: 0, rating: u1.rating, speedX: 0, speedY: 0, avatar: u1.avatar, title: u1.title };
+        room.player2 = { id: socket.id, ip: "friend2", name: u2.name, skin: u2.skin, x: 720, y: 200, score: 0, rating: u2.rating, speedX: 0, speedY: 0, avatar: u2.avatar, title: u2.title };
+
+        senderSocket.join(roomId); senderSocket.roomId = roomId; senderSocket.emit('role', 'p1'); senderSocket.emit('forceStartGame'); 
         socket.join(roomId); socket.roomId = roomId; socket.emit('role', 'p2'); socket.emit('forceStartGame'); 
+        
+        // 🔥 VS ЭКРАН (Приглашение)
+        room.paused = true;
+        io.to(roomId).emit('showVsScreen', { p1: room.player1, p2: room.player2 });
+        setTimeout(() => { if (rooms[roomId] && !rooms[roomId].gameOver) rooms[roomId].paused = false; }, 3000);
     });
 
     socket.on('declineInvite', (senderName) => { const senderSocketId = connectedUsers[senderName]; if (senderSocketId) io.to(senderSocketId).emit('inviteDeclined', socket.user.name); });
@@ -656,10 +699,7 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomId]; const p = socket.id === room.player1.id ? room.player1 : (socket.id === room.player2.id ? room.player2 : null);
         if (p && !room.paused && !room.gameOver) {
             const oldX = p.x; const oldY = p.y;
-            
-            // 🔥 БАФЫ ПОМЕНЯЛИ МЕСТАМИ
             let pR = p.skin === 'kompot' ? 43 : (p.skin === 'gonya' ? 28 : 35);
-            
             let minX = p === room.player1 ? pR : 400 + pR; let maxX = p === room.player1 ? 400 - pR : 800 - pR;
             p.x = Math.min(maxX, Math.max(minX, data.x)); p.y = Math.min(400 - pR, Math.max(pR, data.y)); p.speedX = p.x - oldX; p.speedY = p.y - oldY;
         }
