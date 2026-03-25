@@ -1,20 +1,18 @@
 const socket = io();
 
 // ==========================================
-// 🔥 ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И МАГАЗИН
+// 🔥 ДАННЫЕ МАГАЗИНА
 // ==========================================
 let userInventory = ['default'];
 let userCurrentSkin = 'default';
 let shopIndex = 0;
-let myQuickChats = []; // Сохраняем фразы игрока
 
 const shopItems = [
     { id: 'default', name: 'Обычный', boost: 'Нет бонусов', price: 0, color: '#4da6ff' },
     { id: 'korzhik', name: 'Коржик', boost: 'Сильный удар', price: 250, color: '#fb8500' },
     { id: 'karamelka', name: 'Карамелька', boost: 'Супер-скорость', price: 250, color: '#e63946' },
     { id: 'kompot', name: 'Компот', boost: 'Большая клюшка', price: 500, color: '#06d6a0' },
-    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 500, color: '#8338ec' },
-    { id: 'sazhik', name: 'Сажик 🐈‍⬛', boost: 'Эндгейм Мастер!', price: 999999, color: '#2b2d42' } // Только из БП!
+    { id: 'gonya', name: 'Гоня 👽', boost: 'Меткий и бешеный!', price: 500, color: '#8338ec' }
 ];
 
 // ==========================================
@@ -24,14 +22,12 @@ const catImages = {
     'korzhik': new Image(),
     'karamelka': new Image(),
     'kompot': new Image(),
-    'gonya': new Image(),
-    'sazhik': new Image()
+    'gonya': new Image()
 };
 catImages.korzhik.src = '/korzhik.png';
 catImages.karamelka.src = '/karamelka.png';
 catImages.kompot.src = '/kompot.png';
 catImages.gonya.src = '/gonya.png';
-catImages.sazhik.src = '/sazhik.png';
 
 const sndHit = new Audio('/hit.mp3');
 const sndWall = new Audio('/wall.mp3');
@@ -71,12 +67,11 @@ function playGoalWin() { playSound(sndGoalWin); }
 function playGoalLose() { playSound(sndGoalLose); }
 
 // ==========================================
-// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (КОНФЕТТИ И ЭМОДЗИ)
+// 🔥 ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (КОНФЕТТИ И БП)
 // ==========================================
 let puckTrail = [];
 let confetti = [];
 let activeEmojis = [];
-let activeQuickChats = [];
 
 function getLvlHtml(elo) {
     let lvl = 1, cls = 'lvl-1';
@@ -93,10 +88,10 @@ function getLvlHtml(elo) {
 }
 
 function spawnConfetti(type = 'default') {
-    confetti = [];
+    confetti = []; 
     for (let i = 0; i < 150; i++) {
         let color, vx, vy, size;
-
+        
         if (type === 'fire') {
             color = `hsl(${Math.random() * 40 + 10}, 100%, 50%)`;
             vx = (Math.random() - 0.5) * 20;
@@ -123,7 +118,7 @@ function spawnConfetti(type = 'default') {
             vy = (Math.random() - 0.5) * 25;
             size = Math.random() * 8 + 4;
         }
-
+        
         confetti.push({ x: 400, y: 200, vx, vy, color, size, life: 1, type });
     }
 }
@@ -147,11 +142,11 @@ if (savedName && savedPass) {
     passInput.value = savedPass;
     authError.innerText = "Автоматический вход...";
     authError.style.color = "#4da6ff";
-
+    
     const doAutoLogin = () => {
         socket.emit('login', { name: savedName, password: savedPass }, handleAuthResponse);
     };
-
+    
     if (socket.connected) {
         doAutoLogin();
     } else {
@@ -181,9 +176,9 @@ function handleAuthResponse(res) {
         } else {
             mainMenu.style.display = 'flex';
         }
-
+        
         updateProfile();
-
+        
         if (rememberCb.checked) {
             localStorage.setItem('ah_name', nameInput.value);
             localStorage.setItem('ah_pass', passInput.value);
@@ -233,53 +228,482 @@ socket.on('chatMessage', (data) => {
     const el = document.createElement('div');
     const isMe = data.name.includes(nameInput.value);
     const nameColor = isMe ? '#4da6ff' : '#ffb703';
-
+    
     el.innerHTML = `<b style="color: ${nameColor};">${data.name}:</b> <span style="color: #333;">${data.msg}</span>`;
     chatMsgs.appendChild(el);
-
+    
     setTimeout(() => {
         chatMsgs.scrollTop = chatMsgs.scrollHeight;
     }, 50);
 });
 
 // ==========================================
-// 🔥 МАГАЗИН СКИНОВ
+// 🔥 ПРОФИЛЬ И БОЕВОЙ ПРОПУСК
+// ==========================================
+function updateProfile() {
+    socket.emit('getProfile', (data) => {
+        if (data.success) {
+            document.getElementById('menu-coins').innerText = `💰 Монеты: ${data.coins}`;
+            document.getElementById('shop-coins').innerText = `Ваши монеты: ${data.coins}`;
+            
+            const reqBadge = document.getElementById('req-badge');
+            if (data.reqCount > 0) {
+                reqBadge.style.display = 'block';
+                reqBadge.innerText = data.reqCount;
+            } else {
+                reqBadge.style.display = 'none';
+            }
+            
+            userInventory = data.inventory;
+            userCurrentSkin = data.skin;
+            renderShopItem();
+            
+            if (data.title) {
+                document.getElementById('title-selector').value = data.title;
+            }
+
+            // БОЕВОЙ ПРОПУСК И КЕЙСЫ
+            document.getElementById('bp-current-lvl').innerText = data.bpLevel;
+            document.getElementById('bp-progress-bar').style.width = `${Math.min(100, data.bpXP)}%`;
+            document.getElementById('bp-progress-text').innerText = `${data.bpXP} / 100 XP`;
+            
+            if (data.vsCases > 0) {
+                document.getElementById('bp-case-section').style.display = 'block';
+                document.getElementById('bp-case-count').innerText = data.vsCases;
+            } else {
+                document.getElementById('bp-case-section').style.display = 'none';
+            }
+
+            // ЭФФЕКТЫ В ПРОФИЛЕ
+            const effects = data.goalEffects || ['default'];
+            document.getElementById('opt-fire').disabled = !effects.includes('fire');
+            document.getElementById('opt-blackhole').disabled = !effects.includes('blackhole');
+            document.getElementById('opt-ice').disabled = !effects.includes('ice');
+            if (data.currentGoalEffect) document.getElementById('effect-selector').value = data.currentGoalEffect;
+
+            const vsEffects = data.vsEffects || ['none'];
+            document.getElementById('vs-opt-fire').disabled = !vsEffects.includes('fire');
+            document.getElementById('vs-opt-ice').disabled = !vsEffects.includes('ice');
+            document.getElementById('vs-opt-neon').disabled = !vsEffects.includes('neon');
+            document.getElementById('vs-opt-gold').disabled = !vsEffects.includes('gold');
+            if (data.currentVsEffect) document.getElementById('vs-effect-selector').value = data.currentVsEffect;
+
+            if (data.isAdmin) {
+                document.getElementById('btn-admin').style.display = 'inline-block';
+            } else {
+                document.getElementById('btn-admin').style.display = 'none';
+            }
+        }
+    });
+}
+
+document.getElementById('btn-bp').onclick = () => {
+    updateProfile();
+    document.getElementById('bp-modal').style.display = 'flex';
+};
+
+document.getElementById('btn-close-bp').onclick = () => {
+    document.getElementById('bp-modal').style.display = 'none';
+};
+
+window.openVsCase = function() {
+    socket.emit('openVsCase', (res) => {
+        alert(res.msg);
+        updateProfile();
+    });
+};
+
+socket.on('bpLevelUp', (data) => {
+    document.getElementById('bp-levelup-number').innerText = `Уровень ${data.level}`;
+    document.getElementById('bp-levelup-rewards').innerHTML = data.rewards.join('<br>');
+    document.getElementById('bp-levelup-modal').style.display = 'flex';
+});
+
+// ==========================================
+// 🔥 АДМИН-ПАНЕЛЬ
+// ==========================================
+document.getElementById('btn-admin').onclick = () => {
+    loadAdminUsers();
+    document.getElementById('admin-modal').style.display = 'flex';
+};
+
+document.getElementById('btn-close-admin').onclick = () => {
+    document.getElementById('admin-modal').style.display = 'none';
+};
+
+window.loadAdminUsers = function() {
+    socket.emit('adminGetUsers', (res) => {
+        if (!res.success) return;
+        const list = document.getElementById('admin-users-list');
+        list.innerHTML = res.users.map(u => {
+            const onlineDot = u.isOnline ? '<span style="color: #06d6a0;" title="В сети">🟢</span>' : '<span style="color: #ccc;" title="Оффлайн">⚪</span>';
+            const rowBg = u.isOnline ? 'background: #f4fff8;' : '';
+            let spectateBtn = u.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
+
+            return `
+            <tr style="border-bottom: 1px solid #eee; ${rowBg}">
+                <td style="padding: 5px;">
+                    ${onlineDot} <b>${u.name}</b><br>
+                    <span style="font-size:10px;color:#888;">IP: ${u.regIp || 'Скрыт'}</span>
+                </td>
+                <td style="padding: 5px; font-weight: bold; color: #fb8500;">${u.rating}</td>
+                <td style="padding: 5px; font-weight: bold; color: #06d6a0;">${u.coins}</td>
+                <td style="padding: 5px; display:flex; gap:5px; flex-wrap: wrap;">
+                    ${spectateBtn}
+                    <button class="btn btn-purple btn-small" onclick="adminAction('${u.name}', 'addBpXp')" title="Выдать XP">⭐</button>
+                    <button class="btn btn-green btn-small" onclick="adminAction('${u.name}', 'addCoins')" title="Выдать монеты">💰</button>
+                    <button class="btn btn-orange btn-small" onclick="adminAction('${u.name}', 'setElo')" title="Изменить ЭЛО">🏆</button>
+                    <button class="btn btn-red btn-small" onclick="adminAction('${u.name}', 'ban')" title="Бан">БАН</button>
+                </td>
+            </tr>`;
+        }).join('');
+    });
+};
+
+window.adminSpectate = function(roomId) {
+    document.getElementById('admin-modal').style.display = 'none';
+    spectateRoom(roomId);
+};
+
+window.adminAction = function(targetName, action) {
+    let amount = 0;
+    if (action === 'addCoins') {
+        amount = prompt(`Сколько монет дать ${targetName}? (введи число, можно с минусом)`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'setElo') {
+        amount = prompt(`Установить новое ЭЛО для ${targetName}:`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'addBpXp') {
+        amount = prompt(`Сколько XP БП выдать ${targetName}? (100 XP = 1 уровень)`);
+        if (amount === null || isNaN(amount) || amount === "") return;
+    } else if (action === 'ban') {
+        if (!confirm(`💀 ВНИМАНИЕ! Вы точно хотите удалить аккаунт ${targetName} НАВСЕГДА? Игрока выкинет из игры прямо сейчас.`)) return;
+    }
+
+    socket.emit('adminAction', { targetName, action, amount }, (res) => {
+        alert(res.msg);
+        if (res.success) loadAdminUsers();
+    });
+};
+
+// ==========================================
+// 🔥 ПРОФИЛЬ: ФУНКЦИИ И ПОДАРКИ
+// ==========================================
+window.showProfile = function(username) {
+    socket.emit('getUserProfile', username, (res) => {
+        if (res.success) {
+            const p = res.profile;
+            const skinNames = {
+                'default': 'Обычный',
+                'korzhik': 'Коржик',
+                'karamelka': 'Карамелька',
+                'kompot': 'Компот',
+                'gonya': 'Гоня'
+            };
+            
+            document.getElementById('profile-name').innerText = p.name;
+            
+            const statusDot = document.getElementById('profile-online-status');
+            if (res.isOnline) {
+                statusDot.style.backgroundColor = '#06d6a0';
+                statusDot.style.boxShadow = '0 0 8px #06d6a0';
+                statusDot.title = 'В сети';
+            } else {
+                statusDot.style.backgroundColor = '#ccc';
+                statusDot.style.boxShadow = 'none';
+                statusDot.title = 'Не в сети';
+            }
+
+            const titleLabel = document.getElementById('profile-title-display');
+            if (p.title) {
+                titleLabel.innerText = `[${p.title}]`;
+                titleLabel.style.display = 'block';
+            } else {
+                titleLabel.style.display = 'none';
+            }
+
+            const clanLabel = document.getElementById('profile-clan-name');
+            if (p.clan) {
+                clanLabel.innerText = `🛡️ Клан: ${p.clan}`;
+                clanLabel.style.display = 'block';
+            } else {
+                clanLabel.style.display = 'none';
+            }
+            
+            let av = p.avatar || 'avatar1';
+            if (['🐱', '🐶', '🦊', '🐻'].includes(av)) av = 'avatar1';
+            document.getElementById('profile-avatar').src = '/' + av + '.png';
+            
+            document.getElementById('profile-mmr').innerHTML = `${getLvlHtml(p.rating)} ${p.rating}`;
+            document.getElementById('profile-max-mmr').innerHTML = `${getLvlHtml(p.maxRating || 1000)} ${p.maxRating || 1000}`;
+            document.getElementById('profile-min-mmr').innerHTML = `${getLvlHtml(p.minRating || 1000)} ${p.minRating || 1000}`;
+            document.getElementById('profile-skin').innerText = skinNames[p.skin] || 'Обычный';
+            document.getElementById('profile-played').innerText = p.gamesPlayed || 0;
+            document.getElementById('profile-won').innerText = p.gamesWon || 0;
+            
+            let winrate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
+            document.getElementById('profile-winrate').innerText = winrate + '%';
+            document.getElementById('profile-regdate').innerText = new Date(p.regDate).toLocaleDateString('ru-RU');
+
+            const giftBtn = document.getElementById('btn-gift');
+
+            if (username === nameInput.value) {
+                document.getElementById('profile-edit-section').style.display = 'block';
+                document.getElementById('btn-logout').style.display = 'block';
+                giftBtn.style.display = 'none';
+            } else {
+                document.getElementById('profile-edit-section').style.display = 'none';
+                document.getElementById('btn-logout').style.display = 'none';
+                
+                giftBtn.style.display = 'block';
+                giftBtn.onclick = () => {
+                    const amount = prompt(`Сколько монет вы хотите подарить игроку ${p.name}?`);
+                    if (amount && !isNaN(amount) && amount > 0) {
+                        socket.emit('sendGift', { targetName: p.name, amount: amount }, (giftRes) => {
+                            alert(giftRes.msg);
+                            if (giftRes.success) updateProfile();
+                        });
+                    }
+                };
+            }
+            
+            document.getElementById('profile-modal').style.display = 'flex';
+        } else {
+            alert("Не удалось загрузить профиль");
+        }
+    });
+};
+
+window.setAvatar = function(av) { socket.emit('setAvatar', av, (res) => { if (res.success) document.getElementById('profile-avatar').src = '/' + av + '.png'; }); };
+window.setMyTitle = function(title) { socket.emit('setTitle', title, () => updateProfile()); };
+window.setGoalEffect = function(effect) { socket.emit('setGoalEffect', effect, (res) => { if (!res.success) alert(res.msg); updateProfile(); }); };
+window.setVsEffect = function(effect) { socket.emit('setVsEffect', effect, (res) => { if (!res.success) alert(res.msg); updateProfile(); }); };
+
+document.getElementById('btn-my-profile').onclick = () => { showProfile(nameInput.value); };
+document.getElementById('btn-logout').onclick = () => { if (confirm("Выйти из аккаунта?")) { localStorage.removeItem('ah_name'); localStorage.removeItem('ah_pass'); window.location.reload(); } };
+
+// ==========================================
+// 🔥 СИСТЕМА КЛАНОВ
+// ==========================================
+document.getElementById('btn-clans').onclick = () => { document.getElementById('clans-modal').style.display = 'flex'; loadMyClan(); };
+document.getElementById('btn-close-clans').onclick = () => { document.getElementById('clans-modal').style.display = 'none'; };
+socket.on('clanUpdated', () => { if (document.getElementById('clans-modal').style.display === 'flex') loadMyClan(); });
+
+function loadMyClan() {
+    socket.emit('getClanData', (res) => {
+        if (res.success && res.clan) {
+            document.getElementById('no-clan-block').style.display = 'none';
+            document.getElementById('my-clan-block').style.display = 'block';
+            
+            const clan = res.clan;
+            const privStr = clan.isPrivate ? ' (Закрытый 🔒)' : '';
+            document.getElementById('clan-modal-title').innerText = `🛡️ Клан: ${clan.name}${privStr}`;
+            document.getElementById('clan-count').innerText = `(${clan.members.length}/${clan.maxMembers})`;
+            
+            const myName = nameInput.value;
+            const isLeader = clan.leader === myName;
+            const isDeputy = clan.deputies.includes(myName);
+            
+            if (isLeader || isDeputy) {
+                document.getElementById('clan-invite-block').style.display = 'block';
+            } else {
+                document.getElementById('clan-invite-block').style.display = 'none';
+            }
+            
+            let html = '';
+            clan.members.forEach(member => {
+                let roleIcon = ''; let controls = '';
+                const isTargetLeader = clan.leader === member; const isTargetDeputy = clan.deputies.includes(member);
+                
+                if (isTargetLeader) roleIcon = '👑'; else if (isTargetDeputy) roleIcon = '⭐'; else roleIcon = '👤';
+                
+                if (member !== myName) {
+                    if (isLeader) {
+                        if (isTargetDeputy) { controls += `<button class="btn-promo" onclick="clanAction('${member}', 'demote')">⬇ Зам</button>`; } 
+                        else { controls += `<button class="btn-promo" onclick="clanAction('${member}', 'promote')">⬆ Зам</button>`; }
+                        controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
+                    } else if (isDeputy && !isTargetLeader && !isTargetDeputy) {
+                        controls += `<button class="btn-kick" onclick="clanAction('${member}', 'kick')">Кик</button>`;
+                    }
+                }
+                
+                html += `
+                <div class="clan-member-row">
+                    <span style="cursor:pointer;" onclick="showProfile('${member}')">${roleIcon} <b>${member}</b></span>
+                    <div class="clan-controls">${controls}</div>
+                </div>`;
+            });
+            
+            document.getElementById('clan-members-list').innerHTML = html;
+            const chatBox = document.getElementById('clan-chat-msgs');
+            chatBox.innerHTML = clan.chat.map(c => {
+                const color = c.name.includes(myName) ? '#4da6ff' : '#8338ec';
+                return `<div style="margin-bottom:4px;"><b style="color:${color}">${c.name}:</b> ${c.msg}</div>`;
+            }).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+        } else {
+            document.getElementById('no-clan-block').style.display = 'block';
+            document.getElementById('my-clan-block').style.display = 'none';
+            document.getElementById('clan-modal-title').innerText = `🛡️ Система Кланов`;
+            
+            const invList = document.getElementById('clan-invites-list');
+            if (res.invites && res.invites.length > 0) {
+                invList.innerHTML = `<h4 style="margin: 0 0 5px 0; color: #8338ec;">📩 Ваши приглашения:</h4>` + res.invites.map(inv => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 10px; background:#f4faff; border:2px solid #8ecae6; border-radius:10px; margin-bottom:5px;">
+                        <b style="font-size: 16px;">${inv}</b>
+                        <div style="display:flex; gap: 5px;">
+                            <button class="btn btn-green btn-small" onclick="acceptClanInvite('${inv}')">✔ Вступить</button>
+                            <button class="btn btn-red btn-small" onclick="rejectClanInvite('${inv}')">✖</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else { invList.innerHTML = ''; }
+            
+            loadClansList();
+        }
+    });
+}
+
+function loadClansList() {
+    socket.emit('searchClans', (res) => {
+        if (res.success) {
+            const list = document.getElementById('clan-search-list');
+            if (res.clans.length === 0) {
+                list.innerHTML = "<p style='color:#888; font-size:14px;'>Свободных кланов пока нет.</p>";
+            } else {
+                list.innerHTML = res.clans.map(c => {
+                    let btnHtml = c.isPrivate ? `<span style="color:#e63946; font-size: 12px; font-weight:bold;">🔒 Закрытый</span>` : `<button class="btn btn-green btn-small" onclick="joinClan('${c.name}')">Войти</button>`;
+                    return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px; border-bottom: 1px dashed #ccc;">
+                        <div style="font-size:14px;"><b>${c.name}</b> <br><span style="color:#888;font-size:12px;">(${c.members.length}/${c.maxMembers}) Лидер: ${c.leader}</span></div>
+                        ${btnHtml}
+                    </div>`;
+                }).join('');
+            }
+        }
+    });
+}
+
+window.createClan = function() {
+    const name = document.getElementById('new-clan-name').value.trim(); const maxMembers = document.getElementById('new-clan-size').value; const isPrivate = document.getElementById('new-clan-private').checked;
+    if (!name) return alert("Введите название клана!");
+    socket.emit('createClan', { name, maxMembers, isPrivate }, (res) => { alert(res.msg); if (res.success) loadMyClan(); });
+};
+
+window.joinClan = function(clanName) { socket.emit('joinClan', clanName, (res) => { alert(res.msg); if (res.success) loadMyClan(); }); };
+window.inviteToClan = function() { const targetName = document.getElementById('clan-invite-input').value.trim(); if (!targetName) return; socket.emit('inviteToClan', targetName, (res) => { alert(res.msg); if (res.success) document.getElementById('clan-invite-input').value = ''; }); };
+window.leaveClan = function() { if(confirm("Вы уверены, что хотите покинуть клан?")) { socket.emit('leaveClan', (res) => { if (res.success) loadMyClan(); }); } };
+window.clanAction = function(targetName, action) { let msg = action === 'kick' ? `Выгнать ${targetName} из клана?` : `Изменить права ${targetName}?`; if (confirm(msg)) { socket.emit('clanAction', { targetName, action }, (res) => { if (res.msg) alert(res.msg); if (res.success) loadMyClan(); }); } };
+window.sendClanChat = function() { const input = document.getElementById('clan-chat-input'); const msg = input.value.trim(); if (msg) { socket.emit('sendClanChat', msg); input.value = ''; } };
+
+socket.on('newClanMsg', (chatMsg) => {
+    if (document.getElementById('clans-modal').style.display === 'flex') {
+        const chatBox = document.getElementById('clan-chat-msgs'); const color = chatMsg.name.includes(nameInput.value) ? '#4da6ff' : '#8338ec';
+        const msgDiv = document.createElement('div'); msgDiv.style.marginBottom = '4px'; msgDiv.innerHTML = `<b style="color:${color}">${chatMsg.name}:</b> ${chatMsg.msg}`;
+        chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight;
+    }
+});
+
+let currentClanInviter = "";
+socket.on('incomingClanInvite', (clanName) => {
+    currentClanInviter = clanName; document.getElementById('clan-invite-name').innerText = clanName; document.getElementById('clan-invite-modal').style.display = 'flex';
+    if (document.getElementById('clans-modal').style.display === 'flex') { loadMyClan(); }
+});
+
+document.getElementById('btn-accept-clan-invite').onclick = () => { acceptClanInvite(currentClanInviter); document.getElementById('clan-invite-modal').style.display = 'none'; };
+document.getElementById('btn-decline-clan-invite').onclick = () => { rejectClanInvite(currentClanInviter); document.getElementById('clan-invite-modal').style.display = 'none'; };
+window.acceptClanInvite = function(clanName) { socket.emit('acceptClanInvite', clanName, (res) => { alert(res.msg); if (res.success) loadMyClan(); }); };
+window.rejectClanInvite = function(clanName) { socket.emit('rejectClanInvite', clanName, (res) => { loadMyClan(); }); };
+
+
+// ==========================================
+// 🔥 ДРУЗЬЯ И ЗРИТЕЛИ
+// ==========================================
+window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if (tabId === 'tab-list') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    if (tabId === 'tab-search') document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    if (tabId === 'tab-reqs') document.querySelectorAll('.tab-btn')[2].classList.add('active');
+};
+
+document.getElementById('btn-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'flex'; loadFriendsData(); };
+document.getElementById('btn-close-friends').onclick = () => { document.getElementById('friends-modal').style.display = 'none'; updateProfile(); };
+
+function loadFriendsData() {
+    socket.emit('getFriendsData', (res) => {
+        if (!res.success) return;
+        const list = document.getElementById('friends-list');
+        if (res.friends.length === 0) { list.innerHTML = "<p style='color:#888;'>У вас пока нет друзей :(</p>"; } 
+        else {
+            list.innerHTML = res.friends.map(f => {
+                let actionBtn = f.inGameRoom 
+                    ? `<button class="btn btn-purple btn-small" onclick="spectateRoom('${f.inGameRoom}')">👀 Смотреть</button>`
+                    : `<button class="btn btn-green btn-small" onclick="inviteFriendToMatch('${f.name}')">⚔️ Играть</button>`;
+                return `
+                <div class="friend-item">
+                    <div class="friend-info">${f.name} <br><span class="friend-mmr">ЭЛО: ${getLvlHtml(f.rating)} ${f.rating}</span></div>
+                    <div style="display:flex; gap:5px;">${actionBtn}<button class="btn btn-blue btn-small" onclick="showProfile('${f.name}')">Профиль</button><button class="btn btn-red btn-small" onclick="removeFriend('${f.name}')">Удалить</button></div>
+                </div>`;
+            }).join('');
+        }
+        const reqList = document.getElementById('requests-list');
+        document.getElementById('req-count').innerText = res.requests.length > 0 ? `(${res.requests.length})` : '';
+        if (res.requests.length === 0) { reqList.innerHTML = "<p style='color:#888;'>Нет новых запросов</p>"; } 
+        else { reqList.innerHTML = res.requests.map(r => `<div class="friend-item"><div class="friend-info">${r}</div><div><button class="btn btn-green btn-small" onclick="acceptFriend('${r}')">✔</button><button class="btn btn-red btn-small" onclick="rejectFriend('${r}')">✖</button></div></div>`).join(''); }
+    });
+}
+
+window.searchFriends = function() {
+    const q = document.getElementById('search-input').value;
+    socket.emit('searchUser', q, (res) => {
+        const resBox = document.getElementById('search-results');
+        if (!res.success || res.users.length === 0) { resBox.innerHTML = "<p style='color:#888;'>Не найдено</p>"; return; }
+        resBox.innerHTML = res.users.map(u => `<div class="friend-item"><div class="friend-info">${u.name} <span class="friend-mmr">(ЭЛО: ${getLvlHtml(u.rating)} ${u.rating})</span></div><div style="display:flex; gap:5px;"><button class="btn btn-blue btn-small" onclick="showProfile('${u.name}')">Профиль</button><button class="btn btn-orange btn-small" onclick="sendReq('${u.name}')">Добавить</button></div></div>`).join('');
+    });
+};
+
+window.sendReq = function(name) { socket.emit('sendFriendRequest', name, (res) => alert(res.msg)); };
+window.acceptFriend = function(name) { socket.emit('acceptFriend', name, () => loadFriendsData()); };
+window.rejectFriend = function(name) { socket.emit('rejectFriend', name, () => loadFriendsData()); };
+window.removeFriend = function(name) { if (confirm(`Удалить ${name} из друзей?`)) socket.emit('removeFriend', name, () => loadFriendsData()); };
+window.inviteFriendToMatch = function(name) { socket.emit('inviteFriend', name, (res) => { alert(res.msg); }); };
+
+window.spectateRoom = function(roomId) {
+    document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
+    mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex';
+    document.getElementById('goal-msg').textContent = "Трансляция..."; document.getElementById('goal-msg').style.color = "#8338ec";
+    document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block';
+    socket.emit('spectate', roomId);
+};
+
+let currentInviter = "";
+socket.on('incomingInvite', (senderName) => {
+    currentInviter = senderName; document.getElementById('invite-sender-name').innerText = senderName; document.getElementById('invite-modal').style.display = 'flex';
+});
+
+document.getElementById('btn-accept-invite').onclick = () => { socket.emit('acceptInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
+document.getElementById('btn-decline-invite').onclick = () => { socket.emit('declineInvite', currentInviter); document.getElementById('invite-modal').style.display = 'none'; };
+socket.on('inviteDeclined', (name) => { alert(`Игрок ${name} отклонил приглашение.`); });
+socket.on('forceStartGame', () => { document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none'); mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; document.getElementById('goal-msg').textContent = ""; document.getElementById('btn-cancel-search').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'block'; });
+
+// ==========================================
+// 🔥 МАГАЗИН СКИНОВ И ИГРА
 // ==========================================
 function renderShopItem() {
     const item = shopItems[shopIndex];
-    document.getElementById('shop-item-name').innerText = item.name;
-    document.getElementById('shop-item-boost').innerText = item.boost;
-    const border = document.getElementById('shop-item-preview-border');
-    const img = document.getElementById('shop-item-preview');
-    const text = document.getElementById('shop-item-preview-text');
+    document.getElementById('shop-item-name').innerText = item.name; document.getElementById('shop-item-boost').innerText = item.boost;
+    const border = document.getElementById('shop-item-preview-border'); const img = document.getElementById('shop-item-preview'); const text = document.getElementById('shop-item-preview-text');
     border.style.borderColor = item.color;
     
-    if (item.id === 'default') {
-        img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color;
-    } else {
-        img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff';
-    }
+    if (item.id === 'default') { img.style.display = 'none'; text.style.display = 'block'; border.style.background = item.color; } 
+    else { img.style.display = 'block'; text.style.display = 'none'; img.src = `/${item.id}.png`; border.style.background = '#f4faff'; }
     
-    const actionBtn = document.getElementById('btn-shop-action');
-    const priceText = document.getElementById('shop-item-price');
-    
-    if (userCurrentSkin === item.id) {
-        priceText.innerText = "Надето"; priceText.style.color = "#219ebc";
-        actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true;
-    } else if (userInventory.includes(item.id)) {
-        priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0";
-        actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false;
-        actionBtn.onclick = () => window.buySkin(item.id);
-    } else {
-        if (item.id === 'sazhik') {
-            priceText.innerText = "Только в Темном Рынке!"; priceText.style.color = "#ef233c";
-            actionBtn.innerText = "ЗАКРЫТО"; actionBtn.className = "btn btn-red"; actionBtn.disabled = true;
-        } else {
-            priceText.innerText = item.price > 0 ? `${item.price} монет` : "Бесплатно"; priceText.style.color = "#fb8500";
-            actionBtn.innerText = "КУПИТЬ"; actionBtn.className = "btn btn-orange"; actionBtn.disabled = false;
-            actionBtn.onclick = () => window.buySkin(item.id);
-        }
-    }
+    const actionBtn = document.getElementById('btn-shop-action'); const priceText = document.getElementById('shop-item-price');
+    if (userCurrentSkin === item.id) { priceText.innerText = "Надето"; priceText.style.color = "#219ebc"; actionBtn.innerText = "ВЫБРАНО"; actionBtn.className = "btn btn-blue"; actionBtn.disabled = true; } 
+    else if (userInventory.includes(item.id)) { priceText.innerText = "В инвентаре"; priceText.style.color = "#06d6a0"; actionBtn.innerText = "НАДЕТЬ"; actionBtn.className = "btn btn-green"; actionBtn.disabled = false; actionBtn.onclick = () => window.buySkin(item.id); } 
+    else { priceText.innerText = item.price > 0 ? `${item.price} монет` : "Бесплатно"; priceText.style.color = "#fb8500"; actionBtn.innerText = "КУПИТЬ"; actionBtn.className = "btn btn-orange"; actionBtn.disabled = false; actionBtn.onclick = () => window.buySkin(item.id); }
 }
 
 document.getElementById('btn-shop-prev').onclick = () => { shopIndex = (shopIndex - 1 + shopItems.length) % shopItems.length; document.getElementById('shop-error').innerText = ""; renderShopItem(); };
@@ -288,9 +712,6 @@ window.buySkin = function(skinName) { socket.emit('buySkin', skinName, (res) => 
 document.getElementById('btn-shop').onclick = () => { updateProfile(); document.getElementById('shop-modal').style.display = 'flex'; };
 document.getElementById('btn-close-shop').onclick = () => { document.getElementById('shop-modal').style.display = 'none'; };
 
-// ==========================================
-// 🔥 ИГРОВОЕ МЕНЮ И ЛОББИ
-// ==========================================
 document.getElementById('btn-play-menu').onclick = () => { document.getElementById('play-modal').style.display = 'flex'; };
 document.getElementById('btn-close-play-modal').onclick = () => { document.getElementById('play-modal').style.display = 'none'; };
 document.getElementById('btn-play').onclick = () => { document.getElementById('play-modal').style.display = 'none'; mainMenu.style.display = 'none'; gameWrapper.style.display = 'flex'; socket.emit('play'); document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('goal-msg').style.color = "#fb8500"; document.getElementById('btn-cancel-search').style.display = 'block'; document.getElementById('btn-in-game-quit').style.display = 'none'; };
@@ -299,28 +720,22 @@ document.getElementById('btn-cancel-search').onclick = () => { socket.emit('canc
 
 document.getElementById('btn-in-game-quit').onclick = () => {
     if (!serverState) return;
-    if (myRole === 'spectator') { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; activeQuickChats = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); return; }
+    if (myRole === 'spectator') { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); return; }
     
-    const isBot = serverState.isBotMatch; const isFriendly = serverState.isFriendly; const isTourney = serverState.isTournament;
+    const isBot = serverState.isBotMatch; const isFriendly = serverState.isFriendly;
     let msg = "Вы уверены, что хотите выйти?\n\nВам будет засчитано ПОРАЖЕНИЕ и снято ЭЛО!";
-    if (isBot) msg = "Вы уверены, что хотите прервать тренировку?"; 
-    if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
-    if (isTourney) msg = "Вы уверены, что хотите покинуть турнир? Вы вылетите из сетки!";
+    if (isBot) msg = "Вы уверены, что хотите прервать тренировку?"; if (isFriendly) msg = "Вы уверены, что хотите покинуть дружеский матч?";
     
-    if (confirm(msg)) { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; activeQuickChats = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); }
+    if (confirm(msg)) { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); }
 };
 
 socket.on('showEndScreen', () => { document.getElementById('end-screen').style.display = 'flex'; document.getElementById('btn-in-game-quit').style.display = 'none'; });
-socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; activeEmojis = []; activeQuickChats = []; });
-socket.on('opponentLeft', () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; activeQuickChats = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); });
-
-document.getElementById('btn-new-game').onclick = () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = []; activeQuickChats = []; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('btn-cancel-search').style.display = 'block'; socket.emit('play'); };
-document.getElementById('btn-leave-match').onclick = () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = []; activeQuickChats = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); };
+socket.on('hideEndScreen', () => { document.getElementById('end-screen').style.display = 'none'; confetti = []; activeEmojis = []; });
+socket.on('opponentLeft', () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); });
+document.getElementById('btn-new-game').onclick = () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = []; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('goal-msg').textContent = "Ищем друга..."; document.getElementById('btn-cancel-search').style.display = 'block'; socket.emit('play'); };
+document.getElementById('btn-leave-match').onclick = () => { socket.emit('leaveMatch'); clientState = null; serverState = null; myRole = null; confetti = []; activeEmojis = []; document.getElementById('game-wrapper').style.display = 'none'; document.getElementById('end-screen').style.display = 'none'; document.getElementById('btn-in-game-quit').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; updateProfile(); };
 socket.on('forceReload', () => { window.location.reload(); });
 
-// ==========================================
-// 🔥 ЛИДЕРБОРД
-// ==========================================
 document.getElementById('btn-leaderboard').onclick = () => {
     socket.emit('getLeaderboard', (res) => {
         if (res.success) {
@@ -335,46 +750,27 @@ document.getElementById('btn-leaderboard').onclick = () => {
         }
     });
 };
-const tourneyBtn = document.getElementById('btn-tourney');
-if (tourneyBtn) {
-    tourneyBtn.onclick = () => { socket.emit('joinTourney', res => alert(res.msg)); };
-}
+document.getElementById('btn-close-lb').onclick = () => { document.getElementById('leaderboard-modal').style.display = 'none'; };
 
 // ==========================================
-// 🔥 ИГРОВОЙ ДВИЖОК, ЭКРАН VS И БЫСТРЫЙ ЧАТ
+// 🔥 ИГРОВОЙ ДВИЖОК И ЭКРАН VS
 // ==========================================
 const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
 let serverState = null; let clientState = null; let myRole = null; let hitCooldown = 0; let wallCooldown = 0;
 
 socket.on('role', role => { myRole = role; });
 
-// Эмодзи и Быстрый чат
 window.sendEmoji = function(emoji) { socket.emit('sendEmoji', emoji); };
-window.toggleQuickChat = function() {
-    const menu = document.getElementById('qc-menu');
-    if (menu.style.display === 'flex') { menu.style.display = 'none'; return; }
-    menu.innerHTML = myQuickChats.map(txt => `<div class="qc-item" onclick="sendQuickChat('${txt}')">${txt}</div>`).join('');
-    menu.style.display = 'flex';
-};
-window.sendQuickChat = function(txt) {
-    socket.emit('sendQuickChat', txt);
-    document.getElementById('qc-menu').style.display = 'none';
-};
-
 socket.on('showEmoji', (data) => {
     playPop(); let startX = 400; let startY = 200;
     if (data.role === 'p1') { startX = 150; } else if (data.role === 'p2') { startX = 650; } else { startX = 400; startY = 50; }
     activeEmojis.push({ text: data.emoji, x: startX + (Math.random() * 40 - 20), y: startY + (Math.random() * 40 - 20), life: 1.0 });
 });
 
-socket.on('showQuickChat', (data) => {
-    playPop(); let startX = 400; let startY = 200;
-    if (data.role === 'p1') { startX = 150; startY = 100; } else if (data.role === 'p2') { startX = 650; startY = 100; } else { startX = 400; startY = 50; }
-    activeQuickChats.push({ text: data.text, x: startX, y: startY, life: 1.5 });
-});
-
+// 🔥 ЛОГИКА VS ЭКРАНА С ЭФФЕКТАМИ АВАТАРОК
 socket.on('showVsScreen', (data) => {
     const p1 = data.p1; const p2 = data.p2;
+    
     const p1av = document.getElementById('vs-p1-av');
     p1av.src = `/${p1.avatar || 'avatar1'}.png`;
     p1av.className = p1.vsEffect !== 'none' ? `vs-${p1.vsEffect}` : '';
@@ -415,6 +811,7 @@ socket.on('gameStateUpdate', s => {
         for (let i = 0; i < 5; i++) { if (i < score) html += `<div style="color: ${color}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: scale(1.1); transition: 0.2s;">${pawSVG}</div>`; else html += `<div style="color: #999; opacity: 0.3; transition: 0.2s;">${pawSVG}</div>`; }
         return html;
     };
+    
     document.getElementById('s1').innerHTML = renderPaws(s.player1.score, '#4da6ff'); document.getElementById('s2').innerHTML = renderPaws(s.player2.score, '#ff4d4d');
     document.getElementById('r1').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player1.rating))} ${Math.round(s.player1.rating)})`; document.getElementById('r2').innerHTML = `(ЭЛО: ${getLvlHtml(Math.round(s.player2.rating))} ${Math.round(s.player2.rating)})`;
     document.getElementById('n1').textContent = s.player1.name; document.getElementById('n2').textContent = s.player2.name;
@@ -428,140 +825,82 @@ socket.on('gameStateUpdate', s => {
     if (s.paused) { clientState.player1.x = s.player1.x; clientState.player1.y = s.player1.y; clientState.player2.x = s.player2.x; clientState.player2.y = s.player2.y; }
 });
 
-// ==========================================
-// 🔥 УПРАВЛЕНИЕ (МЫШЬ И ТАЧ)
-// ==========================================
 function sendInput(clientX, clientY) {
     if (!myRole || myRole === 'spectator' || !clientState || !serverState || serverState.paused || serverState.gameOver) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
+    const rect = canvas.getBoundingClientRect(); const x = (clientX - rect.left) * (canvas.width / rect.width); const y = (clientY - rect.top) * (canvas.height / rect.height);
     const me = myRole === 'p1' ? 'player1' : 'player2';
     
-    // Определяем радиус клюшки для границ
     let pR = serverState[me].skin === 'kompot' ? 43 : (serverState[me].skin === 'gonya' ? 28 : 35);
-    if (serverState[me].skin === 'sazhik') pR = 35;
+    let minX = myRole === 'p1' ? pR : 400 + pR; let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
     
-    // Ограничиваем движение своей половиной поля
-    let minX = myRole === 'p1' ? pR : 400 + pR;
-    let maxX = myRole === 'p1' ? 400 - pR : 800 - pR;
-    
-    // Локальное предсказание (для мгновенного отклика)
-    clientState[me].x = Math.min(maxX, Math.max(minX, x));
-    clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
-    
+    clientState[me].x = Math.min(maxX, Math.max(minX, x)); clientState[me].y = Math.min(400 - pR, Math.max(pR, y));
     socket.emit('input', { x, y });
 }
 
 canvas.addEventListener('mousemove', e => sendInput(e.clientX, e.clientY));
-canvas.addEventListener('touchmove', e => { 
-    e.preventDefault(); 
-    sendInput(e.touches[0].clientX, e.touches[0].clientY); 
-}, { passive: false });
-canvas.addEventListener('touchstart', e => { 
-    e.preventDefault(); 
-    sendInput(e.touches[0].clientX, e.touches[0].clientY); 
-}, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); sendInput(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
-// ==========================================
-// 🔥 ОТРИСОВКА ИГРОКОВ И ПОЛЯ
-// ==========================================
 function drawPlayer(x, y, skinName, color) {
     let r = skinName === 'kompot' ? 43 : (skinName === 'gonya' ? 28 : 35);
-    if (skinName === 'sazhik') r = 35;
-    
     if (skinName && skinName !== 'default' && catImages[skinName] && catImages[skinName].complete && catImages[skinName].naturalWidth > 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2);
-        ctx.restore();
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = color;
-        ctx.stroke();
+        ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(catImages[skinName], x - r, y - r, r * 2, r * 2); ctx.restore();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.lineWidth = 5; ctx.strokeStyle = color; ctx.stroke();
     } else {
-        // Если картинка не прогрузилась — рисуем красивый круг с текстом
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#fff';
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const label = skinName === 'korzhik' ? 'КОРЖ' : (skinName === 'karamelka' ? 'КАРА' : (skinName === 'kompot' ? 'КОМП' : (skinName === 'gonya' ? 'ГОНЯ' : 'КОТ')));
-        ctx.fillText(label, x, y);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (skinName === 'korzhik') ctx.fillText("КОРЖ", x, y); else if (skinName === 'karamelka') ctx.fillText("КАРА", x, y); else if (skinName === 'kompot') ctx.fillText("КОМП", x, y); else if (skinName === 'gonya') ctx.fillText("ГОНЯ", x, y); else { ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
     }
 }
 
 function render(s) {
-    // 1. Фон и разметка
-    ctx.fillStyle = '#f4faff';
-    ctx.fillRect(0, 0, 800, 400);
-    
-    // Декоративные элементы
-    ctx.font = '30px Arial';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f4faff'; ctx.fillRect(0, 0, 800, 400); ctx.font = '30px Arial'; ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     [{t:'🐾', x:120, y:80}, {t:'⭐', x:150, y:320}, {t:'🐾', x:280, y:200}, {t:'⭐', x:350, y:80}, {t:'🐾', x:400, y:320}, {t:'⭐', x:520, y:200}, {t:'🐾', x:680, y:80}, {t:'⭐', x:650, y:320}].forEach(d => ctx.fillText(d.t, d.x, d.y));
     
-    // Поле
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#ff4d4d';
-    ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke(); // Центр
-    ctx.strokeStyle = '#4da6ff';
-    ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke(); // Круг
+    ctx.lineWidth = 6; ctx.fillStyle = 'rgba(77, 166, 255, 0.2)'; ctx.beginPath(); ctx.arc(0, 200, 100, -Math.PI/2, Math.PI/2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 77, 77, 0.2)'; ctx.beginPath(); ctx.arc(800, 200, 100, Math.PI/2, -Math.PI/2); ctx.fill();
+    ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,400); ctx.stroke();
+    ctx.strokeStyle = '#4da6ff'; ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(250,400); ctx.stroke(); ctx.beginPath(); ctx.moveTo(550,0); ctx.lineTo(550,400); ctx.stroke();
+    ctx.strokeStyle = '#ff4d4d'; ctx.beginPath(); ctx.arc(400,200,80,0,Math.PI*2); ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(400,200,77,0,Math.PI*2); ctx.fill();
     
-    // Ворота
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170);
-    ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
+    const rCat = 22;
+    if (catImages['korzhik'].complete && catImages['korzhik'].naturalWidth > 0) ctx.drawImage(catImages['korzhik'], 400 - 45 - rCat, 200 - rCat, rCat*2, rCat*2);
+    if (catImages['karamelka'].complete && catImages['karamelka'].naturalWidth > 0) ctx.drawImage(catImages['karamelka'], 400 - rCat, 200 - 35 - rCat, rCat*2, rCat*2);
+    if (catImages['kompot'].complete && catImages['kompot'].naturalWidth > 0) ctx.drawImage(catImages['kompot'], 400 + 45 - rCat, 200 - rCat, rCat*2, rCat*2);
+        
+    ctx.lineWidth = 12; ctx.strokeStyle = '#4da6ff'; ctx.strokeRect(0, 115, 10, 170); ctx.strokeStyle = '#ff4d4d'; ctx.strokeRect(790, 115, 10, 170);
 
-    // 2. След шайбы
-    if (!serverState.paused && !serverState.gameOver) {
-        puckTrail.push({x: s.puck.x, y: s.puck.y});
-        if(puckTrail.length > 10) puckTrail.shift();
-    } else { puckTrail = []; }
-
-    for (let i = 0; i < puckTrail.length; i++) {
-        ctx.beginPath();
-        ctx.arc(puckTrail[i].x, puckTrail[i].y, 22 * (i/puckTrail.length), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`;
-        ctx.fill();
+    let px = s.puck.x; let py = s.puck.y;
+    
+    if (myRole && myRole !== 'spectator' && !serverState.paused && !serverState.gameOver) {
+        const myPlayer = myRole === 'p1' ? s.player1 : s.player2;
+        let pR = serverState[myRole === 'p1' ? 'player1' : 'player2'].skin === 'kompot' ? 43 : (serverState[myRole === 'p1' ? 'player1' : 'player2'].skin === 'gonya' ? 28 : 35);
+        let dx = px - myPlayer.x; let dy = py - myPlayer.y; let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < pR + 22) { px = myPlayer.x + (dx/dist)*(pR+22); py = myPlayer.y + (dy/dist)*(pR+22); }
     }
     
-    // 3. Шайба
-    ctx.beginPath();
-    ctx.arc(s.puck.x, s.puck.y, 22, 0, Math.PI * 2);
-    ctx.fillStyle = '#333';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#111';
-    ctx.stroke();
+    if (!serverState.paused && !serverState.gameOver) { puckTrail.push({x: px, y: py}); if(puckTrail.length > 10) puckTrail.shift(); } 
+    else { puckTrail = []; }
 
-    // 4. Игроки
+    ctx.save();
+    for (let i = 0; i < puckTrail.length; i++) { ctx.beginPath(); ctx.arc(puckTrail[i].x, puckTrail[i].y, 22 * (i/puckTrail.length), 0, Math.PI * 2); ctx.fillStyle = `rgba(130, 200, 255, ${0.4 * (i/puckTrail.length)})`; ctx.fill(); }
+    ctx.restore();
+    
+    ctx.beginPath(); ctx.arc(px, py, 22, 0, Math.PI * 2); ctx.fillStyle = '#333'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#111'; ctx.stroke(); ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fillStyle = '#666'; ctx.fill();
+
     drawPlayer(s.player1.x, s.player1.y, serverState.player1.skin, '#4da6ff');
     drawPlayer(s.player2.x, s.player2.y, serverState.player2.skin, '#ff4d4d');
 
-    // 5. Эффекты (Конфетти)
+    // 🔥 ФИЗИКА ЭФФЕКТОВ БОЕВОГО ПРОПУСКА
     if (confetti.length > 0) {
         confetti.forEach((c, index) => {
             if (c.type === 'blackhole') {
                 c.vx -= (c.x - 400) * 0.05; c.vy -= (c.y - 200) * 0.05;
-                c.x += c.vx * 0.1; c.y += c.vy * 0.1;
+                c.x += c.vx * 0.1; c.y += c.vy * 0.1; c.life -= 0.02;
             } else if (c.type === 'fire') {
-                c.x += c.vx; c.y += c.vy; c.vy -= 0.5;
+                c.x += c.vx; c.y += c.vy; c.vy -= 0.5; c.life -= 0.02;
             } else {
-                c.x += c.vx; c.y += c.vy; c.vy += 0.8;
+                c.x += c.vx; c.y += c.vy; c.vy += 0.8; c.life -= 0.015;
             }
-            c.life -= 0.02;
             ctx.globalAlpha = Math.max(0, c.life);
             ctx.fillStyle = c.color;
             ctx.fillRect(c.x, c.y, c.size, c.size);
@@ -570,98 +909,42 @@ function render(s) {
         ctx.globalAlpha = 1.0;
     }
     
-    // 6. Эмодзи
-    activeEmojis.forEach((em, index) => {
-        em.y -= 1.5; em.life -= 0.015;
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, em.life);
-        ctx.font = '50px Arial';
-        ctx.fillText(em.text, em.x, em.y);
-        ctx.restore();
-        if (em.life <= 0) activeEmojis.splice(index, 1);
-    });
-
-    // 7. 🔥 ОБЛАЧКА БЫСТРОГО ЧАТА (Quick Chat)
-    activeQuickChats.forEach((qc, index) => {
-        qc.y -= 0.5; qc.life -= 0.01;
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, qc.life);
-        ctx.font = 'bold 16px Comic Sans MS';
-        const textWidth = ctx.measureText(qc.text).width;
-        
-        // Фон облачка
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = '#4da6ff';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.roundRect(qc.x - textWidth/2 - 10, qc.y - 45, textWidth + 20, 30, 10);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Хвостик
-        ctx.beginPath();
-        ctx.moveTo(qc.x - 5, qc.y - 15);
-        ctx.lineTo(qc.x + 5, qc.y - 15);
-        ctx.lineTo(qc.x, qc.y - 5);
-        ctx.fill();
-        
-        // Текст
-        ctx.fillStyle = '#333';
-        ctx.textAlign = 'center';
-        ctx.fillText(qc.text, qc.x, qc.y - 25);
-        ctx.restore();
-        
-        if (qc.life <= 0) activeQuickChats.splice(index, 1);
-    });
+    if (activeEmojis.length > 0) {
+        activeEmojis.forEach((em, index) => { em.y -= 1.5; em.life -= 0.015; ctx.save(); ctx.globalAlpha = Math.max(0, em.life); ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 5; ctx.fillText(em.text, em.x, em.y); ctx.restore(); if (em.life <= 0) activeEmojis.splice(index, 1); });
+    }
 }
 
-// ==========================================
-// 🔥 ГЛАВНЫЙ ЦИКЛ (СГЛАЖИВАНИЕ)
-// ==========================================
 function loop() {
     if (serverState && clientState) {
         const lerp = 0.4;
-        
-        // Шайбу сглаживаем всегда
-        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp;
+	// Шайбу сглаживаем всегда
+        clientState.puck.x += (serverState.puck.x - clientState.puck.x) * lerp; 
         clientState.puck.y += (serverState.puck.y - clientState.puck.y) * lerp;
         
-        // Свою клюшку НЕ сглаживаем (чтобы была мгновенная реакция),
-        // кроме моментов паузы или если мы зритель.
-        if (myRole !== 'p1' || serverState.paused || myRole === 'spectator') {
-            clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp;
+        // Чужую клюшку сглаживаем всегда. СВОЮ клюшку сглаживаем ТОЛЬКО когда игра на паузе (например, возврат в центр после гола)
+        if (myRole !== 'p1' || serverState.paused) {
+            clientState.player1.x += (serverState.player1.x - clientState.player1.x) * lerp; 
             clientState.player1.y += (serverState.player1.y - clientState.player1.y) * lerp;
         }
-        if (myRole !== 'p2' || serverState.paused || myRole === 'spectator') {
-            clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp;
+        if (myRole !== 'p2' || serverState.paused) {
+            clientState.player2.x += (serverState.player2.x - clientState.player2.x) * lerp; 
             clientState.player2.y += (serverState.player2.y - clientState.player2.y) * lerp;
         }
         
-        // Звуки столкновений (только в активной игре)
         if (!serverState.paused && !serverState.gameOver) {
-            if (hitCooldown > 0) hitCooldown--;
-            if (wallCooldown > 0) wallCooldown--;
-            
-            if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) {
-                playWall(); wallCooldown = 15;
-            }
-            
+            if (hitCooldown > 0) hitCooldown--; if (wallCooldown > 0) wallCooldown--;
+            if ((serverState.puck.y <= 26 || serverState.puck.y >= 374) && wallCooldown === 0) { playWall(); wallCooldown = 15; }
+
             const checkHit = (p) => {
                 let r = serverState[p].skin === 'kompot' ? 43 : (serverState[p].skin === 'gonya' ? 28 : 35);
-                if (serverState[p].skin === 'sazhik') r = 35;
-                let dx = clientState.puck.x - clientState[p].x;
-                let dy = clientState.puck.y - clientState[p].y;
-                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 5 && hitCooldown === 0) {
-                    playHit(); hitCooldown = 15;
-                }
+                let dx = clientState.puck.x - clientState[p].x; let dy = clientState.puck.y - clientState[p].y;
+                if (Math.sqrt(dx*dx + dy*dy) < r + 22 + 4 && hitCooldown === 0) { playHit(); hitCooldown = 15; }
             };
             checkHit('player1'); checkHit('player2');
         }
-        
         render(clientState);
     }
     requestAnimationFrame(loop);
 }
 
-// Запуск движка
 loop();
