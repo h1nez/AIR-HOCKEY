@@ -164,9 +164,18 @@ document.getElementById('btn-login').onclick = () => {
 };
 
 document.getElementById('btn-register').onclick = () => {
+    const captchaResponse = grecaptcha.getResponse(); // Получаем токен капчи
+    if (!captchaResponse) {
+        authError.innerText = "Пожалуйста, подтвердите, что вы не робот!";
+        return;
+    }
+    
     authError.innerText = "Создание...";
-    authError.style.color = "#e63946";
-    socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
+    socket.emit('register', { 
+        name: nameInput.value, 
+        password: passInput.value,
+        captcha: captchaResponse // 🔥 Передаем токен на сервер
+    }, handleAuthResponse);
 };
 
 function handleAuthResponse(res) {

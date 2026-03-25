@@ -13,6 +13,7 @@
     <meta property="og:title" content="Аэрохоккей: Три Кота 🐾">
     <meta property="og:description" content="Залетай ко мне в матч! У нас тут Боевой Пропуск, кланы и онлайн-рубилово.">
     <meta property="og:image" content="/kompot.png"> <meta property="og:type" content="website">
+	<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <style>
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
@@ -112,6 +113,7 @@
             <input type="text" id="username" placeholder="Ваш никнейм">
             <input type="password" id="password" placeholder="Пароль">
             <label class="remember-label"><input type="checkbox" id="remember" checked> Запомнить меня</label>
+			<div class="g-recaptcha" data-sitekey="6Le6EpgsAAAAAN6ytVEqztBhINYwgZ_PYmiX0szw" style="margin-bottom: 10px;"></div>
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button id="btn-login" class="btn btn-blue" style="flex:1;">Войти</button>
                 <button id="btn-register" class="btn btn-red" style="flex:1;">Создать</button>
