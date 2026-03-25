@@ -385,11 +385,31 @@ document.getElementById('btn-close-admin').onclick = () => {
 window.loadAdminUsers = function() {
     socket.emit('adminGetUsers', (res) => {
         if (!res.success) return;
+
+        // 1. ОТОБРАЖЕНИЕ СПИСКА УЧАСТНИКОВ ТУРНИРА
+        const tInfo = document.getElementById('admin-tourney-info');
+        if (tInfo) {
+            if (res.tourneyPlayersList && res.tourneyPlayersList.length > 0) {
+                tInfo.innerHTML = `
+                    <div style="font-weight: bold; color: #8338ec; margin-bottom: 5px;">👥 Участники турнира (${res.tourneyPlayersList.length}):</div>
+                    <div style="color: #333; line-height: 1.4;">${res.tourneyPlayersList.join(', ')}</div>
+                `;
+                tInfo.style.display = 'block';
+            } else {
+                tInfo.innerHTML = `<div style="color: #888; font-style: italic;">Участников в турнире пока нет</div>`;
+                tInfo.style.display = 'block'; // Показываем статус, даже если пусто
+            }
+        }
+
+        // 2. ОТРИСОВКА ТАБЛИЦЫ ПОЛЬЗОВАТЕЛЕЙ
         const list = document.getElementById('admin-users-list');
         list.innerHTML = res.users.map(u => {
             const onlineDot = u.isOnline ? '<span style="color: #06d6a0;" title="В сети">🟢</span>' : '<span style="color: #ccc;" title="Оффлайн">⚪</span>';
             const rowBg = u.isOnline ? 'background: #f4fff8;' : '';
-            let spectateBtn = u.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
+            
+            // Кнопка наблюдения за матчем
+            let spectateBtn = u.inGameRoom ? 
+                `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
 
             return `
             <tr style="border-bottom: 1px solid #eee; ${rowBg}">

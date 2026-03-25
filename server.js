@@ -501,7 +501,7 @@ io.on('connection', (socket) => {
         try { 
             const users = await User.find().select('name rating coins regIp clan').lean(); 
             const enhanced = users.map(u => { const isOnline = !!connectedUsers[u.name]; let inGameRoom = null; if (isOnline) { for (let id in rooms) { if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { inGameRoom = id; break; } } } return { ...u, isOnline, inGameRoom }; }); 
-            callback({ success: true, users: enhanced, tourneyState: tourney.state, tourneyPlayers: tourney.players.length }); 
+            callback({ success: true, users: enhanced, tourneyState: tourney.state, tourneyPlayers: tourney.players.length, tourneyPlayersList: tourney.players }); 
         } catch(e) { callback({ success: false }); } 
     });
     
