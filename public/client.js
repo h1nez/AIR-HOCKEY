@@ -223,9 +223,12 @@ window.loadAdminUsers = function() {
         if (!res.success) return;
         const list = document.getElementById('admin-users-list');
         list.innerHTML = res.users.map(u => {
-            // 🔥 Вот тут мы проверяем онлайн и ставим точку!
             const onlineDot = u.isOnline ? '<span style="color: #06d6a0;" title="В сети">🟢</span>' : '<span style="color: #ccc;" title="Оффлайн">⚪</span>';
             const rowBg = u.isOnline ? 'background: #f4fff8;' : '';
+            
+            // 🔥 Кнопка "Смотреть" появляется, если игрок сейчас в комнате
+            let spectateBtn = u.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
+
             return `
             <tr style="border-bottom: 1px solid #eee; ${rowBg}">
                 <td style="padding: 5px;">
@@ -235,6 +238,7 @@ window.loadAdminUsers = function() {
                 <td style="padding: 5px; font-weight: bold; color: #fb8500;">${u.rating}</td>
                 <td style="padding: 5px; font-weight: bold; color: #06d6a0;">${u.coins}</td>
                 <td style="padding: 5px; display:flex; gap:5px; flex-wrap: wrap;">
+                    ${spectateBtn}
                     <button class="btn btn-green btn-small" onclick="adminAction('${u.name}', 'addCoins')">💰</button>
                     <button class="btn btn-orange btn-small" onclick="adminAction('${u.name}', 'setElo')">🏆</button>
                     <button class="btn btn-red btn-small" onclick="adminAction('${u.name}', 'ban')">БАН</button>
@@ -242,6 +246,12 @@ window.loadAdminUsers = function() {
             </tr>`;
         }).join('');
     });
+};
+
+// 🔥 Функция, чтобы Админ мог скрытно зайти на стрим
+window.adminSpectate = function(roomId) {
+    document.getElementById('admin-modal').style.display = 'none'; // Закрываем админку
+    spectateRoom(roomId); // Вызываем уже готовую функцию зрителя
 };
 window.adminAction = function(targetName, action) {
     let amount = 0;

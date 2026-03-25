@@ -490,12 +490,29 @@ io.on('connection', (socket) => {
         io.to(socket.roomId).emit('showEmoji', { role, emoji });
     });
 
-    // 🔥 ДОБАВЛЕНА ПРОВЕРКА ОНЛАЙНА В АДМИНКЕ
+
+// 🔥 ДОБАВЛЕНА ПРОВЕРКА ОНЛАЙНА И МАТЧЕЙ В АДМИНКЕ
     socket.on('adminGetUsers', async (callback) => {
         if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false });
         try { 
             const users = await User.find().select('name rating coins regIp clan').lean(); 
-            const enhanced = users.map(u => ({ ...u, isOnline: !!connectedUsers[u.name] }));
+            
+            const enhanced = users.map(u => {
+                const isOnline = !!connectedUsers[u.name];
+                let inGameRoom = null;
+                
+                // Если игрок онлайн, проверяем, не в матче ли он
+                if (isOnline) {
+                    for (let id in rooms) {
+                        if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) {
+                            inGameRoom = id;
+                            break;
+                        }
+                    }
+                }
+                return { ...u, isOnline, inGameRoom };
+            });
+            
             callback({ success: true, users: enhanced }); 
         } catch(e) { callback({ success: false }); }
     });
