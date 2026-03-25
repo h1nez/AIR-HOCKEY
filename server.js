@@ -72,13 +72,6 @@ const Clan = mongoose.model('Clan', clanSchema);
 
 const connectedUsers = {}; 
 
-// 🔥 СИСТЕМА ТУРНИРОВ
-let tourney = {
-    state: 'idle', // 'idle', 'reg', 'playing'
-    players: [], // Ники зарегистрированных
-    winners: [], // Победители текущего раунда
-    matchesActive: 0
-};
 
 // ==========================================
 // 2. ИГРОВАЯ ЛОГИКА И КОМНАТЫ
