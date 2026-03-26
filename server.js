@@ -5,7 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import axios from 'axios';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -171,27 +170,6 @@ async function finishMatch(room, winRole, isDisconnect = false) {
             const winnerSocketId = connectedUsers[win.name];
             if (winnerSocketId) io.to(winnerSocketId).emit('tourneyMsg', `Вы прошли дальше! Ждите остальных...`);
         }
-
-        // ВЫДАЧА НАГРАД ЗА 2 И 3 МЕСТО
-        if (lose.id !== 'bot') {
-            if (tourney.players.length === 2) {
-                // Финал -> проигравший занимает 2 место
-                try {
-                    const u2 = await User.findOne({ name: lose.name });
-                    if (u2) { u2.title = "Вице-чемпион 🥈"; await u2.save(); }
-                    const sid = connectedUsers[lose.name];
-                    if (sid) io.to(sid).emit('tourneyMsg', "🥈 2 место! Выдан титул: Вице-чемпион!");
-                } catch(e) {}
-            } else if (tourney.players.length <= 4) {
-                // Полуфинал -> проигравшие занимают 3 место
-                try {
-                    const u3 = await User.findOne({ name: lose.name });
-                    if (u3) { u3.coins += 1000; await u3.save(); }
-                    const sid = connectedUsers[lose.name];
-                    if (sid) io.to(sid).emit('tourneyMsg', "🥉 3 место! Выдано 1000 монет!");
-                } catch(e) {}
-            }
-        }
         
         io.to(room.id).emit('goalNotify', { msg: `ПОБЕДА В ТУРНИРЕ: ${win.name}!`, color: "gold", effectType: win.effect });
         setTimeout(() => { io.to(room.id).emit('showEndScreen'); }, 3000);
@@ -240,34 +218,25 @@ async function finishMatch(room, winRole, isDisconnect = false) {
 
 // 🔥 ЗАПУСК СЛЕДУЮЩЕГО РАУНДА ТУРНИРА
 async function startNextTournamentRound() {
-    // ЕСЛИ есть победители, значит мы переходим к следующему раунду
-    // ЕСЛИ победителей нет, но есть игроки — значит это СТАРТ турнира (Первый раунд)
-    if (tourney.winners.length > 0) {
-        tourney.players = [...tourney.winners];
-        tourney.winners = [];
-    }
-    // Если winners пустой и players пустой — значит турнир реально пуст
-    else if (tourney.players.length === 0) {
-        tourney.state = 'idle';
-        io.emit('tourneyAnnounce', `Турнир завершен без победителя.`);
-        return;
-    }
+    tourney.players = [...tourney.winners];
+    tourney.winners = [];
 
-    // Остальной код функции (проверка на 1 игрока, перемешивание и т.д.) остается без изменений...
+    // Если остался 1 победитель — выдаем награды!
     if (tourney.players.length === 1) {
         const championName = tourney.players[0];
         tourney.state = 'idle';
-        io.emit('tourneyAnnounce', `🏆 ТУРНИР ЗАВЕРШЕН! Чемпион: ${championName}!`);
+        io.emit('tourneyAnnounce', `🏆 ТУРНИР ЗАВЕРШЕН! Чемпион Недели: ${championName}!`);
         try {
             const u = await User.findOne({ name: championName });
             if (u) {
-                // Выдаем эффект гола "Черная дыра"
-                if (!u.goalEffects.includes('blackhole')) u.goalEffects.push('blackhole');
-                u.currentGoalEffect = 'blackhole';
+                u.title = "Чемпион Недели 🏆";
+                u.coins += 1000;
+                // Даем уникальные фразы Quick Chat
+                if (!u.quickChats.includes('Я здесь ЧЕМПИОН! 🏆')) u.quickChats.push('Я здесь ЧЕМПИОН! 🏆');
+                if (!u.quickChats.includes('Легкотня! 😎')) u.quickChats.push('Легкотня! 😎');
                 await u.save();
-                
                 const sockId = connectedUsers[championName];
-                if (sockId) io.to(sockId).emit('tourneyMsg', '🎉 1 МЕСТО! Вы выиграли турнир! Открыт эффект гола: Черная дыра 🌌!');
+                if (sockId) io.to(sockId).emit('tourneyMsg', '🎉 ПОЗДРАВЛЯЕМ! Вы выиграли турнир! Вам выдан титул, 1000 монет и новые Быстрые Фразы!');
             }
         } catch(e) {}
         return;
@@ -496,40 +465,19 @@ io.on('connection', (socket) => {
     socket.on('globalChat', (msg) => { if (!socket.user || !msg || msg.trim() === '') return; let titleStr = socket.user.title ? `[${socket.user.title}] ` : ""; let prefix = socket.user.name === ADMIN_NICKNAME ? "👑 " : ""; io.emit('chatMessage', { name: prefix + titleStr + socket.user.name, msg: msg.substring(0, 100) }); });
     socket.on('sendEmoji', (emoji) => { if (!socket.roomId || !rooms[socket.roomId] || !socket.user) return; const room = rooms[socket.roomId]; let role = 'spectator'; if (socket.id === room.player1.id) role = 'p1'; else if (socket.id === room.player2.id) role = 'p2'; io.to(socket.roomId).emit('showEmoji', { role, emoji }); });
 
-	socket.on('adminGetUsers', async (callback) => { 
-		if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false }); 
-		try { 
-			const users = await User.find().select('name rating coins regIp clan').lean(); 
-			const enhanced = users.map(u => { 
-				const isOnline = !!connectedUsers[u.name]; 
-				let inGameRoom = null; 
-				if (isOnline) { 
-					for (let id in rooms) { 
-						if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { 
-							inGameRoom = id; 
-							break; 
-						} 
-					} 
-				} 
-				return { ...u, isOnline, inGameRoom }; 
-			}); 
-        
-			// ВНИМАТЕЛЬНО проверь скобки и запятые тут:
-			callback({ 
-				success: true, 
-				users: enhanced, 
-				tourneyState: tourney.state, 
-				tourneyPlayers: tourney.players.length,
-				tourneyPlayersList: tourney.players // Запятая должна быть на строке выше
-			}); 
-		} catch(e) { 
-			callback({ success: false }); 
-		} 
-	});
+    // 🔥 ДОБАВЛЕНА ИНФОРМАЦИЯ О ТУРНИРЕ ДЛЯ АДМИНА
+    socket.on('adminGetUsers', async (callback) => { 
+        if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false }); 
+        try { 
+            const users = await User.find().select('name rating coins regIp clan').lean(); 
+            const enhanced = users.map(u => { const isOnline = !!connectedUsers[u.name]; let inGameRoom = null; if (isOnline) { for (let id in rooms) { if (!rooms[id].gameOver && (rooms[id].player1.name === u.name || rooms[id].player2.name === u.name)) { inGameRoom = id; break; } } } return { ...u, isOnline, inGameRoom }; }); 
+            callback({ success: true, users: enhanced, tourneyState: tourney.state, tourneyPlayers: tourney.players.length }); 
+        } catch(e) { callback({ success: false }); } 
+    });
     
     socket.on('adminAction', async (data, callback) => { if (!socket.user || socket.user.name !== ADMIN_NICKNAME) return callback({ success: false, msg: "Нет прав!" }); try { const target = await User.findOne({ name: data.targetName }); if (!target) return callback({ success: false, msg: "Игрок не найден!" }); if (data.action === 'addBpXp') { await applyBP(data.targetName, Number(data.amount), connectedUsers[data.targetName]); return callback({ success: true, msg: `Успешно выдано ${data.amount} XP!` }); } if (data.action === 'addCoins') { target.coins += Number(data.amount); await target.save(); } else if (data.action === 'setElo') { target.rating = Number(data.amount); await target.save(); } else if (data.action === 'ban') { await User.deleteOne({ name: data.targetName }); const tSocketId = connectedUsers[data.targetName]; if (tSocketId) { io.to(tSocketId).emit('forceReload'); const ts = io.sockets.sockets.get(tSocketId); if (ts) ts.disconnect(); } } callback({ success: true, msg: "Успешно!" }); } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); } });
 
-    socket.on('register', async (d, c) => { try { if (!(await axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=6LdUFJgsAAAAAPHdeEsev7EPONbMdUzVnknlIMUs&response=${d.captcha}`)).data.success) return c({success:false, msg:"Капча!"}); if (!d.name || !d.password) return c({success:false, msg:"Заполните поля!"}); if (await User.findOne({name:d.name})) return c({success:false, msg:"Ник занят!"}); const u = new User({name:d.name, password: await bcrypt.hash(d.password, 10), regIp: socket.handshake.address, vsCases: 1}); await u.save(); socket.user = u; connectedUsers[u.name] = socket.id; c({success:true, rejoining: false}); } catch(e) { c({success:false, msg:"Ошибка сервера"}); } });
+    socket.on('register', async (data, callback) => { try { if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" }); const existing = await User.findOne({ name: data.name }); if (existing) return callback({ success: false, msg: "Это имя уже занято!" }); let rawIp = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || "Неизвестно"; let clientIp = rawIp.split(',')[0].trim(); if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') clientIp = '127.0.0.1 (Локальный)'; const hashedPassword = await bcrypt.hash(data.password, 10); const newUser = new User({ name: data.name, password: hashedPassword, regIp: clientIp, vsCases: 1 }); await newUser.save(); socket.user = newUser; connectedUsers[newUser.name] = socket.id; if (tryRejoin(socket, newUser)) callback({ success: true, rejoining: true }); else callback({ success: true, rejoining: false }); } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); } });
     socket.on('login', async (data, callback) => { try { if (!data.name || !data.password) return callback({ success: false, msg: "Заполните все поля!" }); const user = await User.findOne({ name: data.name }); if (!user) return callback({ success: false, msg: "Аккаунт не найден!" }); const isMatch = await bcrypt.compare(data.password, user.password); if (!isMatch) return callback({ success: false, msg: "Неверный пароль!" }); socket.user = user; connectedUsers[user.name] = socket.id; if (tryRejoin(socket, user)) callback({ success: true, rejoining: true }); else callback({ success: true, rejoining: false }); } catch(e) { callback({ success: false, msg: "Ошибка сервера" }); } });
     
     socket.on('play', () => { if (socket.user) joinPlayerToRoom(socket, socket.user); else socket.emit('forceReload'); });

@@ -13,7 +13,6 @@
     <meta property="og:title" content="Аэрохоккей: Три Кота 🐾">
     <meta property="og:description" content="Залетай ко мне в матч! У нас тут Боевой Пропуск, кланы и онлайн-рубилово.">
     <meta property="og:image" content="/kompot.png"> <meta property="og:type" content="website">
-	<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <style>
         body { margin: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif; }
@@ -113,7 +112,6 @@
             <input type="text" id="username" placeholder="Ваш никнейм">
             <input type="password" id="password" placeholder="Пароль">
             <label class="remember-label"><input type="checkbox" id="remember" checked> Запомнить меня</label>
-			<div class="g-recaptcha" data-sitekey="6LdUFJgsAAAAAM6sUBGaNtyUfnH8YLz7WXyGaDxQ" style="margin-bottom: 10px;"></div>
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button id="btn-login" class="btn btn-blue" style="flex:1;">Войти</button>
                 <button id="btn-register" class="btn btn-red" style="flex:1;">Создать</button>
@@ -127,8 +125,6 @@
         <div id="menu-coins" style="font-size: 32px; color: #ffb703; margin-bottom: 20px; font-weight: bold; text-shadow: 1px 1px 0 #fff;">💰 Монеты: 0</div>
         
         <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
-            <button id="btn-tourney" class="btn btn-purple" style="display: none; background: #ef233c; animation: pulse-btn 1.5s infinite; width: 100%; margin-bottom: 10px;" onclick="joinTournament()">🏆 УЧАСТВОВАТЬ В ТУРНИРЕ</button>
-            
             <button id="btn-my-profile" class="btn btn-blue">👤 Профиль</button>
             <button id="btn-shop" class="btn btn-orange">🛒 Магазин</button>
             <button id="btn-bp" class="btn btn-green">🎁 Battle Pass</button>
@@ -418,23 +414,7 @@
 
     <div id="admin-modal" class="overlay" style="display: none; z-index: 3000;">
         <div class="modal-box" style="border-color: #d90429; max-width: 700px; width: 95%;">
-			<h2 style="color: #d90429;">👑 Панель Администратора</h2>
-
-			<div id="admin-tourney-info" style="margin-bottom: 10px; padding: 10px; background: #f0f4ff; border: 2px solid #8338ec; border-radius: 10px; font-size: 14px; display: none; text-align: left;">
-			</div>
-
-		<div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; ...">
-
-            <div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; border-radius: 10px; background: #fffaf0;">
-                <h3 style="margin: 0 0 10px 0; color: #d90429; font-size: 18px;">🏆 Управление Турниром</h3>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-green btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startReg')">Открыть регистрацию</button>
-                    <button class="btn btn-blue btn-small" style="flex: 1; font-size: 14px;" onclick="adminTourney('startMatches')">Начать турнир</button>
-                </div>
-            </div>
-
-			<div style="margin-bottom: 15px; padding: 10px; border: 2px dashed #d90429; ...">
-
+            <h2 style="color: #d90429;">👑 Панель Администратора</h2>
             <div style="max-height: 400px; overflow-y: auto; text-align: left; margin-bottom: 15px; border: 2px solid #eee; padding: 10px; border-radius: 10px;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <thead><tr style="border-bottom: 2px solid #ccc; text-align: left;"><th style="padding: 5px;">Ник / IP</th><th style="padding: 5px;">ЭЛО</th><th style="padding: 5px;">Монеты</th><th style="padding: 5px;">Действия</th></tr></thead>

@@ -164,18 +164,9 @@ document.getElementById('btn-login').onclick = () => {
 };
 
 document.getElementById('btn-register').onclick = () => {
-    const captchaResponse = grecaptcha.getResponse(); // Получаем токен капчи
-    if (!captchaResponse) {
-        authError.innerText = "Пожалуйста, подтвердите, что вы не робот!";
-        return;
-    }
-    
     authError.innerText = "Создание...";
-    socket.emit('register', { 
-        name: nameInput.value, 
-        password: passInput.value,
-        captcha: captchaResponse // 🔥 Передаем токен на сервер
-    }, handleAuthResponse);
+    authError.style.color = "#e63946";
+    socket.emit('register', { name: nameInput.value, password: passInput.value }, handleAuthResponse);
 };
 
 function handleAuthResponse(res) {
@@ -348,38 +339,6 @@ socket.on('bpLevelUp', (data) => {
 });
 
 // ==========================================
-// 🔥 ТУРНИРЫ
-// ==========================================
-socket.on('tourneyAnnounce', (msg) => {
-    alert(msg);
-    const btn = document.getElementById('btn-tourney');
-    if (btn) {
-        if (msg.includes('ОТКРЫТА')) {
-            btn.style.display = 'inline-block';
-        } else if (msg.includes('НАЧАЛСЯ') || msg.includes('отменен') || msg.includes('ЗАВЕРШЕН')) {
-            btn.style.display = 'none';
-        }
-    }
-});
-
-socket.on('tourneyMsg', (msg) => {
-    alert("🏆 ТУРНИР: " + msg);
-});
-
-window.joinTournament = function() {
-    socket.emit('joinTourney', (res) => {
-        alert(res.msg);
-    });
-};
-
-window.adminTourney = function(action) {
-    socket.emit('tourneyAdminAction', action, (res) => {
-        if (res.msg) alert(res.msg);
-        if (res.success && window.loadAdminUsers) loadAdminUsers();
-    });
-};
-
-// ==========================================
 // 🔥 АДМИН-ПАНЕЛЬ
 // ==========================================
 document.getElementById('btn-admin').onclick = () => {
@@ -394,31 +353,11 @@ document.getElementById('btn-close-admin').onclick = () => {
 window.loadAdminUsers = function() {
     socket.emit('adminGetUsers', (res) => {
         if (!res.success) return;
-
-        // 1. ОТОБРАЖЕНИЕ СПИСКА УЧАСТНИКОВ ТУРНИРА
-        const tInfo = document.getElementById('admin-tourney-info');
-        if (tInfo) {
-            if (res.tourneyPlayersList && res.tourneyPlayersList.length > 0) {
-                tInfo.innerHTML = `
-                    <div style="font-weight: bold; color: #8338ec; margin-bottom: 5px;">👥 Участники турнира (${res.tourneyPlayersList.length}):</div>
-                    <div style="color: #333; line-height: 1.4;">${res.tourneyPlayersList.join(', ')}</div>
-                `;
-                tInfo.style.display = 'block';
-            } else {
-                tInfo.innerHTML = `<div style="color: #888; font-style: italic;">Участников в турнире пока нет</div>`;
-                tInfo.style.display = 'block'; // Показываем статус, даже если пусто
-            }
-        }
-
-        // 2. ОТРИСОВКА ТАБЛИЦЫ ПОЛЬЗОВАТЕЛЕЙ
         const list = document.getElementById('admin-users-list');
         list.innerHTML = res.users.map(u => {
             const onlineDot = u.isOnline ? '<span style="color: #06d6a0;" title="В сети">🟢</span>' : '<span style="color: #ccc;" title="Оффлайн">⚪</span>';
             const rowBg = u.isOnline ? 'background: #f4fff8;' : '';
-            
-            // Кнопка наблюдения за матчем
-            let spectateBtn = u.inGameRoom ? 
-                `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
+            let spectateBtn = u.inGameRoom ? `<button class="btn btn-purple btn-small" onclick="adminSpectate('${u.inGameRoom}')" title="Смотреть матч">👀</button>` : '';
 
             return `
             <tr style="border-bottom: 1px solid #eee; ${rowBg}">
@@ -956,37 +895,5 @@ function loop() {
     }
     requestAnimationFrame(loop);
 }
-
-// ==========================================
-// 🔥 ТУРНИРЫ
-// ==========================================
-socket.on('tourneyAnnounce', (msg) => {
-    alert(msg);
-    const btn = document.getElementById('btn-tourney');
-    if (btn) {
-        if (msg.includes('ОТКРЫТА')) {
-            btn.style.display = 'inline-block';
-        } else if (msg.includes('НАЧАЛСЯ') || msg.includes('отменен') || msg.includes('ЗАВЕРШЕН')) {
-            btn.style.display = 'none';
-        }
-    }
-});
-
-socket.on('tourneyMsg', (msg) => {
-    alert("🏆 ТУРНИР: " + msg);
-});
-
-window.joinTournament = function() {
-    socket.emit('joinTourney', (res) => {
-        alert(res.msg);
-    });
-};
-
-window.adminTourney = function(action) {
-    socket.emit('tourneyAdminAction', action, (res) => {
-        if (res.msg) alert(res.msg);
-        if (res.success && window.loadAdminUsers) loadAdminUsers();
-    });
-};
 
 loop();
